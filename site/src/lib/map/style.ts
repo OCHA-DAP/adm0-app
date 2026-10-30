@@ -135,7 +135,9 @@ export function applyFocus(map: Map, draws: Draw[], focus: Focus | null, satelli
     map.setLayoutProperty(`${layer.id}-pick`, "visibility", drawn ? "visible" : "none");
     const draw = focus ? drawn : undefined;
     // One dim is enough; stacking a second would darken the surroundings twice.
-    const dimmed = !!draw && draw === draws[0];
+    // In Fade each source dims at its own opacity, so a code missing from one leaves no undimmed hole.
+    const fading = draws.some((d) => d.opacity < 1);
+    const dimmed = !!draw && (fading || draw === draws[0]);
     map.setLayoutProperty(`${layer.id}-focus`, "visibility", draw ? "visible" : "none");
     map.setLayoutProperty(`${layer.id}-dim`, "visibility", dimmed ? "visible" : "none");
     if (!draw || !focus) continue;
@@ -148,7 +150,7 @@ export function applyFocus(map: Map, draws: Draw[], focus: Focus | null, satelli
     if (!dimmed) continue;
     map.setFilter(`${layer.id}-dim`, ["!=", code, focus.iso3]);
     map.setPaintProperty(`${layer.id}-dim`, "fill-color", dim.color);
-    map.setPaintProperty(`${layer.id}-dim`, "fill-opacity", dim.opacity);
+    map.setPaintProperty(`${layer.id}-dim`, "fill-opacity", dim.opacity * (fading ? draw.opacity : 1));
   }
 }
 

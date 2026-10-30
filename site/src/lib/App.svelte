@@ -12,7 +12,7 @@
   const TABS: { id: Tab; label: string }[] = [
     { id: "map", label: "Map" },
     { id: "split", label: "Split" },
-    { id: "table", label: "Names and attributes" },
+    { id: "table", label: "Table" },
   ];
 
   let tilesBase = $state<string | null>(null);

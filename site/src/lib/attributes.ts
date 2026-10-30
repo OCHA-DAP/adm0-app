@@ -12,17 +12,15 @@ export interface AttributeGroup {
   key: string;
   label: string;
   sources: string[];
-  compare: boolean;
 }
 
-// Status, region and map name follow different conventions per source, so only two sources at a time compare them.
 export const GROUPS: AttributeGroup[] = [
-  { key: "name", label: "Name", sources: ["gaul", "ungeodata", "fieldmaps", "wp", "unterm", "m49"], compare: true },
-  { key: "mapname", label: "Map name", sources: ["ungeodata", "fieldmaps", "wp"], compare: false },
-  { key: "count", label: "Features", sources: ["gaul", "ungeodata", "fieldmaps", "wp"], compare: true },
-  { key: "sovereign", label: "Sovereign", sources: ["ungeodata", "fieldmaps"], compare: true },
-  { key: "status", label: "Status", sources: ["ungeodata", "fieldmaps", "wp", "unterm"], compare: false },
-  { key: "region", label: "Region", sources: ["gaul", "ungeodata", "fieldmaps", "m49"], compare: false },
+  { key: "name", label: "Name", sources: ["gaul", "ungeodata", "fieldmaps", "wp", "unterm", "m49"] },
+  { key: "mapname", label: "Label", sources: ["ungeodata", "fieldmaps", "wp"] },
+  { key: "count", label: "Features", sources: ["gaul", "ungeodata", "fieldmaps", "wp"] },
+  { key: "sovereign", label: "Sovereign", sources: ["ungeodata", "fieldmaps"] },
+  { key: "status", label: "Status", sources: ["ungeodata", "fieldmaps", "wp", "unterm"] },
+  { key: "region", label: "Region", sources: ["gaul", "ungeodata", "fieldmaps", "m49"] },
 ];
 
 // Map sources (layers.json) to their attributes.json source.
@@ -66,11 +64,6 @@ export function sourcesFor(group: AttributeGroup, filter: Filter): string[] {
   return filter.sources.length ? group.sources.filter((s) => filter.sources.includes(s)) : group.sources;
 }
 
-// Whether values in a group are compared at all; status and region only between two sources.
-export function compares(group: AttributeGroup, filter: Filter): boolean {
-  return filter.sources.length === 2 || group.compare;
-}
-
 export const TIE = Symbol("tie");
 
 // The most common non-empty value in a group, TIE when the top values are level, or null when all agree.
@@ -96,7 +89,7 @@ function diffKinds(row: AttributeRow, filter: Filter): Set<DiffKind> {
     if (sources.length < 2) continue;
     const present = sources.map((s) => value(row, group.key, s)).filter(Boolean);
     if (present.length > 0 && present.length < sources.length) kinds.add("missing");
-    if (compares(group, filter) && new Set(present).size > 1) kinds.add("differs");
+    if (new Set(present).size > 1) kinds.add("differs");
   }
   return kinds;
 }

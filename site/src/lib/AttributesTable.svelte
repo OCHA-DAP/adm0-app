@@ -5,7 +5,6 @@
     DEFAULT_FILTER,
     GROUPS,
     SOURCES,
-    compares,
     groupsInScope,
     majority,
     matches,
@@ -58,20 +57,29 @@
     if (next.length < 2) return;
     filter.sources = next.length === ALL.length ? [] : next;
   }
-  // In Split the active Attribute chip already names a single attribute.
-  const labelled = $derived(!split || !filter.group);
+  // A single picked attribute is already named by its active chip.
+  const labelled = $derived(!filter.group);
   let body = $state<HTMLElement>();
 
   // The focused code stays listed even when the filters would hide it.
   const shown = $derived(rows.filter((row) => row.iso3 === focus?.iso3 || matches(row, scope)));
 
-  // Scrolls once per code, so picking its parts leaves the table still.
+  // Scrolls once per code, so picking its parts leaves the table still. scrollIntoView would also
+  // scroll the hidden pane's ancestors and slide the table over the map-only view.
   const focusedCode = $derived(focus?.iso3);
+  let scroller = $state<HTMLElement>();
   $effect(() => {
     const iso3 = focusedCode;
-    if (iso3) requestAnimationFrame(() => body?.querySelector(`[data-iso3="${iso3}"]`)?.scrollIntoView({ block: "start" }));
+    if (!iso3) return;
+    requestAnimationFrame(() => {
+      const row = body?.querySelector<HTMLElement>(`[data-iso3="${iso3}"]`);
+      if (!row || !scroller) return;
+      const margin = parseFloat(getComputedStyle(row).scrollMarginTop);
+      scroller.scrollTop += row.getBoundingClientRect().top - scroller.getBoundingClientRect().top - margin;
+    });
   });
   const groups = $derived(groupsInScope(filter));
+  const visible = $derived(columns.filter((s) => groups.some((g) => g.sources.includes(s))));
 
   const dirty = $derived(JSON.stringify(filter) !== JSON.stringify(DEFAULT_FILTER));
 
@@ -80,7 +88,7 @@
     const sources = sourcesFor(group, scope);
     const inPair = sources.includes(source);
     let diff = false;
-    if (v && inPair && compares(group, scope)) {
+    if (v && inPair) {
       const top = majority(row, group, sources);
       diff = top !== null && (scope.sources.length === 2 || top === TIE || v !== top);
     }
@@ -164,6 +172,15 @@
 <div class="table-view">
   <aside class="sidebar">
     <section>{@render search()}</section>
+    <section>
+      <h2>Show</h2>
+      {@render show()}
+      {@render total()}
+    </section>
+    <section>
+      <h2>Attribute</h2>
+      {@render attributes()}
+    </section>
     {#if !split}
       <section>
         <h2>Sources</h2>
@@ -174,27 +191,18 @@
         </div>
       </section>
     {/if}
-    <section>
-      <h2>Show</h2>
-      {@render show()}
-      {@render total()}
-    </section>
-    <section>
-      <h2>Attribute</h2>
-      {@render attributes()}
-    </section>
     {@render reset()}
   </aside>
   {#if failed}
     <p>Could not load attributes.json.</p>
   {:else}
-    <div class="scroll">
+    <div class="scroll" bind:this={scroller}>
       <table>
         <thead>
           <tr>
             <th class="code">ISO3</th>
             {#if labelled}<th class="attr">Attribute</th>{/if}
-            {#each columns as source (source)}{@render sourceHead(source)}{/each}
+            {#each visible as source (source)}{@render sourceHead(source)}{/each}
           </tr>
         </thead>
         <tbody bind:this={body}>
@@ -204,12 +212,15 @@
               <tr class:start={gi === 0} class:focused data-iso3={gi === 0 ? row.iso3 : undefined}>
                 {#if gi === 0}<th class="code" rowspan={groups.length}><button type="button" class="code-link" title="Show on map" onclick={() => onfocus(row)}>{row.iso3}</button></th>{/if}
                 {#if labelled}<td class="attr">{group.label}</td>{/if}
-                {#each columns as source (source)}{@render fixedCell(row, group, source)}{/each}
+                {#each visible as source (source)}{@render fixedCell(row, group, source)}{/each}
               </tr>
             {/each}
           {/each}
         </tbody>
       </table>
+      {#if rows.length && !shown.length}
+        <p class="none">No codes match.</p>
+      {/if}
     </div>
   {/if}
 </div>
@@ -221,6 +232,10 @@
     height: 100%;
     min-height: 0;
     font-size: 0.8125rem;
+  }
+  .none {
+    padding: 1rem;
+    color: var(--brand-grey--text);
   }
   .count {
     color: var(--brand-grey--text);

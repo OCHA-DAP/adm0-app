@@ -53,10 +53,15 @@
       ],
       { layers: draws.map((d) => queryLayerId(d.id)) },
     );
-    return features.flatMap((f) => {
-      const draw = draws.find((d) => d.id === f.sourceLayer);
-      if (!draw) return [];
-      return [{ slot: draw.slot ?? null, label: LAYER_BY_ID.get(draw.id)!.label, color: draw.color, properties: f.properties }];
+    // Lines mode also reports the polygon under the click, so a click inside a country has attributes to show.
+    const lines = draws.filter((d) => LAYER_BY_ID.get(d.id)?.kind === "line");
+    const polygons = lines.length ? m.queryRenderedFeatures(point, { layers: pickLayerIds(lines) }) : [];
+    return [...features, ...polygons].flatMap((f) => {
+      const layer = LAYER_BY_ID.get(f.sourceLayer ?? "");
+      const draw = draws.find((d) => LAYER_BY_ID.get(d.id)?.source === layer?.source);
+      if (!draw || !layer) return [];
+      const label = lines.length ? `${layer.label} ${layer.kind}` : layer.label;
+      return [{ slot: draw.slot ?? null, label, color: draw.color, properties: f.properties }];
     });
   }
 

@@ -38,9 +38,6 @@
   <h2>Compare</h2>
   {@render matrix((["a", "b"] as const).map((slot) => ({ id: slot, color: SLOT_COLORS[slot], current: compare.pair[slot], pick: (id: string) => (compare.pair[slot] = id) })))}
   <p class="hint">Press [ or ] to switch views.</p>
-  {#if compare.hits.length === 0}
-    <p class="hint">Click the map to compare sources.</p>
-  {/if}
 </div>
 
 <style>
