@@ -75,7 +75,8 @@
       last = now;
       frame = requestAnimationFrame(spin);
     };
-    frame = requestAnimationFrame(spin);
+    // Dev holds still so tests and screenshots are repeatable.
+    if (!import.meta.env.DEV) frame = requestAnimationFrame(spin);
     const refit = new ResizeObserver(() => el.clientWidth && m.setZoom(fitZoom()));
     refit.observe(el);
     const stop = new AbortController();
@@ -87,6 +88,7 @@
       el.addEventListener(type, () => stop.abort(), { capture: true, signal: stop.signal });
     }
     if (linked) stop.abort();
+    if (import.meta.env.DEV) Object.assign(window, { map: m });
     map = m;
     return () => {
       stop.abort();

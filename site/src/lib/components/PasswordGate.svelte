@@ -31,7 +31,7 @@
       url.searchParams.delete(URL_PARAM);
       history.replaceState(null, "", url);
     }
-    const saved = shared ?? sessionStorage.getItem(STORAGE_KEY);
+    const saved = shared ?? sessionStorage.getItem(STORAGE_KEY) ?? ((import.meta.env.DEV && import.meta.env.DEV_PASSWORD) || null);
     if (saved) tryUnlock(saved, shared !== null);
   });
 </script>
