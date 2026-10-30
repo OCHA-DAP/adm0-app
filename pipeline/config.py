@@ -52,22 +52,11 @@ SOURCE_COLUMNS = {
     "m49": {"code": "iso3", "name": "name_m49", "region": "region"},
 }
 
-# Land sources for fieldmaps: published license and the land polygons it clips to.
-LANDS = {
-    "osm": {
-        "license": "odbl",
-        "land": f"""SELECT fid, geometry AS geom
-            FROM read_parquet('{prepare_dir / "osm_land.parquet"}')""",
-    },
-    "wp": {
-        "license": "cc0",
-        # Caspian Sea is the only World Polygons feature without a WP_Name.
-        "land": f"""SELECT row_number() OVER () AS fid, geom FROM (
-                SELECT UNNEST(ST_Dump(geometry)).geom AS geom
-                FROM read_parquet('{prepare_dir / "wp_polygons.parquet"}')
-                WHERE WP_Name IS NOT NULL
-            )""",
-    },
+# Fieldmaps: published license and the land polygons it clips to.
+FIELDMAPS = {
+    "license": "odbl",
+    "land": f"""SELECT fid, geometry AS geom
+        FROM read_parquet('{prepare_dir / "osm_land.parquet"}')""",
 }
 
 

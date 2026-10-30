@@ -45,8 +45,7 @@ const LSIB_TYPE: ExpressionSpecification = [
 const LINE_TYPE: Record<string, ExpressionSpecification> = {
   ungeodata_lines: ["match", ["get", "bdytyp"], 2, "special", 3, "armistice", 4, "separation", 8, "autonomous", 9, "sovereign", "international"],
   lsib_lines: LSIB_TYPE,
-  fieldmaps_wp_lines: LSIB_TYPE,
-  fieldmaps_osm_lines: LSIB_TYPE,
+  fieldmaps_lines: LSIB_TYPE,
 };
 
 function byType(id: string, prop: "dash" | "width") {

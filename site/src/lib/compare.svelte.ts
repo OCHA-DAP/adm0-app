@@ -1,4 +1,4 @@
-import { DEFAULT_PAIRS, LAYERS, LAYER_BY_ID, type SourceLayer } from "$lib/layers";
+import { DEFAULT_PAIR, LAYERS, SOURCES, layerFor, type SourceLayer } from "$lib/layers";
 import type { Draw, Slot } from "$lib/map/style";
 
 export type Kind = SourceLayer["kind"];
@@ -37,13 +37,10 @@ function fromUrl() {
   const q = new URLSearchParams(import.meta.env.DEV ? location.search : "");
   const pick = <T extends string>(key: string, ids: T[], fallback: T) => ids.find((id) => id === q.get(key)) ?? fallback;
   const mode = pick("mode", MODES.map((m) => m.id), MODES[0].id);
-  const ids = LAYERS.filter((l) => l.kind === mode).map((l) => l.id);
-  const pairs = structuredClone(DEFAULT_PAIRS);
-  pairs[mode] = { a: pick("a", ids, pairs[mode].a), b: pick("b", ids, pairs[mode].b) };
-  const single = { polygon: DEFAULT_PAIRS.polygon.a, line: DEFAULT_PAIRS.line.a };
-  single[mode] = pick("src", ids, single[mode]);
+  const pair = { a: pick("a", SOURCES, DEFAULT_PAIR.a), b: pick("b", SOURCES, DEFAULT_PAIR.b) };
+  const single = pick("src", SOURCES, DEFAULT_PAIR.a);
   const basemap = pick("basemap", BASEMAPS.map((b) => b.id), "map");
-  return { mode, view: pick(VIEW_PARAM, VIEWS.map((v) => v.id), "overlay"), pairs, single, basemap };
+  return { mode, view: pick(VIEW_PARAM, VIEWS.map((v) => v.id), "overlay"), pair, single, basemap };
 }
 
 function step(ids: string[], current: string, by: number) {
@@ -54,7 +51,7 @@ export class CompareState {
   #init = fromUrl();
   mode = $state<Kind>(this.#init.mode);
   view = $state<View>(this.#init.view);
-  pairs = $state(this.#init.pairs);
+  pair = $state(this.#init.pair);
   single = $state(this.#init.single);
   basemap = $state<Basemap>(this.#init.basemap);
   solo = $state<Slot | null>(null);
@@ -63,9 +60,8 @@ export class CompareState {
   #press: { slot: Slot; at: number; was: Slot | null } | null = null;
   #frame = 0;
 
-  pair = $derived(this.pairs[this.mode]);
   kindLayers = $derived(LAYERS.filter((l) => l.kind === this.mode));
-  singleLayer = $derived(LAYER_BY_ID.get(this.single[this.mode])!);
+  singleLayer = $derived(layerFor(this.single, this.mode));
   viewInfo = $derived(VIEWS.find((v) => v.id === this.view)!);
 
   draws = $derived.by<Draw[]>(() => {
@@ -86,7 +82,7 @@ export class CompareState {
   }
 
   #slotDraw(slot: Slot, opacity = 1): Draw {
-    return { id: this.pair[slot], color: SLOT_COLORS[slot], opacity, slot };
+    return { id: layerFor(this.pair[slot], this.mode).id, color: SLOT_COLORS[slot], opacity, slot };
   }
 
   writeParams(params: URLSearchParams) {
@@ -94,7 +90,7 @@ export class CompareState {
     params.set(VIEW_PARAM, this.view);
     params.set("basemap", this.basemap);
     for (const key of ["a", "b", "src"]) params.delete(key);
-    if (this.view === "single") params.set("src", this.single[this.mode]);
+    if (this.view === "single") params.set("src", this.single);
     else for (const slot of ["a", "b"] as const) params.set(slot, this.pair[slot]);
   }
 
@@ -132,10 +128,9 @@ export class CompareState {
     const slot = KEY_SLOT[e.key];
     if (by === undefined) return;
     if (this.view === "single") {
-      if (slot) this.single[this.mode] = step(this.kindLayers.map((l) => l.id), this.single[this.mode], by);
+      if (slot) this.single = step(SOURCES, this.single, by);
     } else if (!slot) {
-      const ids = this.kindLayers.map((l) => l.id).filter((id) => id !== this.pair.a);
-      this.pairs[this.mode].b = step(ids, this.pair.b, by);
+      this.pair.b = step(SOURCES.filter((s) => s !== this.pair.a), this.pair.b, by);
     } else if (!e.repeat) {
       this.#press = { slot, at: performance.now(), was: this.solo };
       this.solo = slot;

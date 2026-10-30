@@ -10,7 +10,7 @@ logger = getLogger(__name__)
 TABLES = {
     "gaul": "gaul_l0",
     "ungeodata": "ungeodata_polygons",
-    "fieldmaps": "fieldmaps_wp_polygons",
+    "fieldmaps": "fieldmaps_polygons",
     "wp": "wp_polygons",
     "unterm": "ref",
     "m49": "ref",

@@ -22,7 +22,7 @@
         <tr>
           <td>{layer.label}</td>
           {#each slots as s (s.id)}
-            <td><input type="radio" name="src-{s.id}" style:accent-color={s.color} checked={s.current === layer.id} onchange={() => s.pick(layer.id)} aria-label="{s.id.toUpperCase()}: {layer.label}" /></td>
+            <td><input type="radio" name="src-{s.id}" style:accent-color={s.color} checked={s.current === layer.source} onchange={() => s.pick(layer.source)} aria-label="{s.id.toUpperCase()}: {layer.label}" /></td>
           {/each}
         </tr>
       {/each}
@@ -31,21 +31,22 @@
 {/snippet}
 
 <div class="panel">
-  {@render segmented("Compare", MODES, compare.mode, (id) => compare.setMode(id as Kind))}
+  <h2>Basemap</h2>
+  {@render segmented("Basemap", BASEMAPS, compare.basemap, (id) => (compare.basemap = id as Basemap))}
+  <h2>Geometry</h2>
+  {@render segmented("Geometry", MODES, compare.mode, (id) => compare.setMode(id as Kind))}
   <h2>View</h2>
   {@render segmented("View", VIEWS, compare.view, (id) => compare.setView(id as View), true)}
   <p class="hint">{compare.viewInfo.hint} Press 1 to 3 to switch views.</p>
   {#if compare.view === "single"}
     <h2>Source</h2>
-    {@render matrix([{ id: "src", color: compare.singleLayer.color, current: compare.single[compare.mode], pick: (id) => (compare.single[compare.mode] = id) }])}
+    {@render matrix([{ id: "src", color: compare.singleLayer.color, current: compare.single, pick: (id) => (compare.single = id) }])}
     <p class="hint">Press [ or ] to step through sources.</p>
   {:else}
     <h2>Compare</h2>
-    {@render matrix((["a", "b"] as const).map((slot) => ({ id: slot, color: SLOT_COLORS[slot], current: compare.pair[slot], pick: (id: string) => (compare.pairs[compare.mode][slot] = id) })))}
+    {@render matrix((["a", "b"] as const).map((slot) => ({ id: slot, color: SLOT_COLORS[slot], current: compare.pair[slot], pick: (id: string) => (compare.pair[slot] = id) })))}
     <p class="hint">Tap [ or ] to show only A or B, or hold to peek. Shift+[ or ] changes B.</p>
   {/if}
-  <h2>Basemap</h2>
-  {@render segmented("Basemap", BASEMAPS, compare.basemap, (id) => (compare.basemap = id as Basemap))}
   {#if compare.hits.length === 0}
     <p class="hint">Click the map to see what each source says at that point.</p>
   {/if}
@@ -55,6 +56,9 @@
   .panel {
     left: 0.75rem;
     width: 17rem;
+  }
+  h2:first-child {
+    margin-top: 0;
   }
   .segmented {
     display: flex;

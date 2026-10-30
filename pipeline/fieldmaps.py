@@ -1,11 +1,11 @@
-"""Build the fieldmaps LSIB humanitarian ADM0 (intl view) for each land source."""
+"""Build the fieldmaps LSIB humanitarian ADM0 (intl view)."""
 
 from logging import getLogger
 from typing import TYPE_CHECKING
 
 from .config import (
     CRS,
-    LANDS,
+    FIELDMAPS,
     fieldmaps_dir,
     input_dir,
     open_db,
@@ -50,9 +50,9 @@ def _attributes(conn: DuckDBPyConnection) -> None:
     """)
 
 
-def _inputs(conn: DuckDBPyConnection, land: str) -> None:
+def _inputs(conn: DuckDBPyConnection) -> None:
     """Load land, template lines plus LSIB, and seed points."""
-    conn.execute(f"CREATE OR REPLACE TABLE land_00 AS {LANDS[land]['land']}")
+    conn.execute(f"CREATE OR REPLACE TABLE land_00 AS {FIELDMAPS['land']}")
     conn.execute(f"""--sql
         CREATE OR REPLACE TABLE lines_00 AS
         SELECT CC1, COUNTRY1, CC2, COUNTRY2, RANK::BIGINT AS RANK, LABEL, STATUS,
@@ -226,7 +226,7 @@ def _lines(conn: DuckDBPyConnection) -> None:
     """)
 
 
-def _write(conn: DuckDBPyConnection, land: str) -> None:
+def _write(conn: DuckDBPyConnection) -> None:
     for table, name in (
         ("polygons_01", "polygons"),
         ("voronoi_01", "voronoi"),
@@ -235,11 +235,11 @@ def _write(conn: DuckDBPyConnection, land: str) -> None:
         write_parquet(
             conn,
             f'SELECT * EXCLUDE geom, geom AS geometry FROM "{table}"',
-            fieldmaps_dir / f"{land}_{name}.parquet",
+            fieldmaps_dir / f"{name}.parquet",
         )
 
 
-def _validate(conn: DuckDBPyConnection, land: str) -> None:
+def _validate(conn: DuckDBPyConnection) -> None:
     def count(sql: str) -> int:
         return conn.execute(sql).fetchone()[0]
 
@@ -254,24 +254,23 @@ def _validate(conn: DuckDBPyConnection, land: str) -> None:
     if _coverage_invalid(conn, "polygons_01"):
         issues.append("polygons_01: overlaps or gaps between units")
     if issues:
-        msg = f"{land}: {'; '.join(issues)}"
+        msg = "; ".join(issues)
         raise RuntimeError(msg)
 
 
 def main() -> None:
-    """Build polygons, voronoi cells and lines for each land source."""
+    """Build polygons, voronoi cells and lines."""
     fieldmaps_dir.mkdir(parents=True, exist_ok=True)
-    for land in LANDS:
-        conn = open_db(tmp_dir / f"fieldmaps_{land}.duckdb")
-        _attributes(conn)
-        _inputs(conn, land)
-        _polygonize(conn)
-        _continents(conn)
-        _intersection(conn)
-        _dissolve(conn, "polygons_00", "polygons_01")
-        _dissolve(conn, "voronoi_00", "voronoi_01")
-        _lines(conn)
-        _validate(conn, land)
-        _write(conn, land)
-        conn.close()
-        logger.info("fieldmaps %s built", land)
+    conn = open_db(tmp_dir / "fieldmaps.duckdb")
+    _attributes(conn)
+    _inputs(conn)
+    _polygonize(conn)
+    _continents(conn)
+    _intersection(conn)
+    _dissolve(conn, "polygons_00", "polygons_01")
+    _dissolve(conn, "voronoi_00", "voronoi_01")
+    _lines(conn)
+    _validate(conn)
+    _write(conn)
+    conn.close()
+    logger.info("fieldmaps built")

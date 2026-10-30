@@ -1,12 +1,10 @@
 [
-  { "id": "gaul_l0", "label": "GAUL 2025 L0", "group": "FAO", "kind": "polygon", "color": "#009EDB" },
-  { "id": "gaul_lines", "label": "GAUL 2025 L0 lines (derived)", "group": "FAO", "kind": "line", "color": "#009EDB" },
-  { "id": "ungeodata_polygons", "label": "UN Geodata polygons", "group": "UN Geodata 1M", "kind": "polygon", "color": "#CF3F0B" },
-  { "id": "ungeodata_lines", "label": "UN Geodata lines", "group": "UN Geodata 1M", "kind": "line", "color": "#CF3F0B" },
-  { "id": "fieldmaps_wp_polygons", "label": "fieldmaps polygons (WP land)", "group": "fieldmaps", "kind": "polygon", "color": "#27833A" },
-  { "id": "fieldmaps_wp_lines", "label": "fieldmaps lines (WP land)", "group": "fieldmaps", "kind": "line", "color": "#27833A" },
-  { "id": "fieldmaps_osm_polygons", "label": "fieldmaps polygons (OSM land)", "group": "fieldmaps", "kind": "polygon", "color": "#733D96" },
-  { "id": "fieldmaps_osm_lines", "label": "fieldmaps lines (OSM land)", "group": "fieldmaps", "kind": "line", "color": "#733D96" },
-  { "id": "wp_polygons", "label": "World Polygons", "group": "US State Dept", "kind": "polygon", "color": "#7C7067" },
-  { "id": "lsib_lines", "label": "LSIB lines", "group": "US State Dept", "kind": "line", "color": "#262626" }
+  { "id": "gaul_l0", "source": "gaul", "label": "FAO GAUL", "group": "FAO", "kind": "polygon", "color": "#009EDB" },
+  { "id": "gaul_lines", "source": "gaul", "label": "FAO GAUL", "group": "FAO", "kind": "line", "color": "#009EDB" },
+  { "id": "ungeodata_polygons", "source": "ungeodata", "label": "UN Geodata", "group": "UN Geodata 1M", "kind": "polygon", "color": "#CF3F0B" },
+  { "id": "ungeodata_lines", "source": "ungeodata", "label": "UN Geodata", "group": "UN Geodata 1M", "kind": "line", "color": "#CF3F0B" },
+  { "id": "fieldmaps_polygons", "source": "fieldmaps", "label": "FieldMaps", "group": "FieldMaps", "kind": "polygon", "color": "#733D96" },
+  { "id": "fieldmaps_lines", "source": "fieldmaps", "label": "FieldMaps", "group": "FieldMaps", "kind": "line", "color": "#733D96" },
+  { "id": "wp_polygons", "source": "state_dept", "label": "US State Dept", "group": "US State Dept", "kind": "polygon", "color": "#262626" },
+  { "id": "lsib_lines", "source": "state_dept", "label": "US State Dept", "group": "US State Dept", "kind": "line", "color": "#262626" }
 ]

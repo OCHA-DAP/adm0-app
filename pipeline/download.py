@@ -20,7 +20,7 @@ from tenacity import (
     wait_exponential,
 )
 
-from .config import LANDS, download_dir
+from .config import FIELDMAPS, download_dir
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -150,10 +150,9 @@ def _ref(out: Path) -> str:
 
 def _fieldmaps(out: Path) -> str:
     dates = []
-    for land, spec in LANDS.items():
-        for geom in ("polygons", "lines"):
-            url = FIELDMAPS_URL.format(license=spec["license"], geom=geom)
-            dates.append(_stream(url, out / f"{land}_{geom}.parquet"))
+    for geom in ("polygons", "lines"):
+        url = FIELDMAPS_URL.format(license=FIELDMAPS["license"], geom=geom)
+        dates.append(_stream(url, out / f"{geom}.parquet"))
     return max(dates)
 
 

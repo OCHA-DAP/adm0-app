@@ -2,7 +2,7 @@
 export const SOURCES: Record<string, string> = {
   gaul: "GAUL",
   ungeodata: "UN Geodata",
-  fieldmaps: "fieldmaps",
+  fieldmaps: "FieldMaps",
   wp: "World Polygons",
   unterm: "UNTERM",
   m49: "M49",
