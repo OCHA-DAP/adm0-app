@@ -4,19 +4,17 @@
   let { compare }: { compare: CompareState } = $props();
 </script>
 
-{#snippet segmented(label: string, options: { id: string; label: string }[], current: string, pick: (id: string) => void, keyed = false)}
+{#snippet segmented(label: string, options: { id: string; label: string }[], current: string, pick: (id: string) => void)}
   <div class="segmented" role="radiogroup" aria-label={label}>
-    {#each options as o, i (o.id)}
-      <button role="radio" aria-checked={current === o.id} class:active={current === o.id} title={keyed ? `Press ${i + 1}` : undefined} onclick={() => pick(o.id)}>{o.label}</button>
+    {#each options as o (o.id)}
+      <button role="radio" aria-checked={current === o.id} class:active={current === o.id} onclick={() => pick(o.id)}>{o.label}</button>
     {/each}
   </div>
 {/snippet}
 
 {#snippet matrix(slots: { id: string; color: string; current: string; pick: (id: string) => void }[])}
   <table class="matrix">
-    {#if slots.length > 1}
-      <thead><tr><th></th>{#each slots as s (s.id)}<th><span class="badge" style:--color={s.color}>{s.id.toUpperCase()}</span></th>{/each}</tr></thead>
-    {/if}
+    <thead><tr><th></th>{#each slots as s (s.id)}<th><span class="badge" style:--color={s.color}>{s.id.toUpperCase()}</span></th>{/each}</tr></thead>
     <tbody>
       {#each compare.kindLayers as layer (layer.id)}
         <tr>
@@ -36,19 +34,12 @@
   <h2>Geometry</h2>
   {@render segmented("Geometry", MODES, compare.mode, (id) => compare.setMode(id as Kind))}
   <h2>View</h2>
-  {@render segmented("View", VIEWS, compare.view, (id) => compare.setView(id as View), true)}
-  <p class="hint">{compare.viewInfo.hint} Press 1 to 3 to switch views.</p>
-  {#if compare.view === "single"}
-    <h2>Source</h2>
-    {@render matrix([{ id: "src", color: compare.singleLayer.color, current: compare.single, pick: (id) => (compare.single = id) }])}
-    <p class="hint">Press [ or ] to step through sources.</p>
-  {:else}
-    <h2>Compare</h2>
-    {@render matrix((["a", "b"] as const).map((slot) => ({ id: slot, color: SLOT_COLORS[slot], current: compare.pair[slot], pick: (id: string) => (compare.pair[slot] = id) })))}
-    <p class="hint">Tap [ or ] to show only A or B, or hold to peek. Shift+[ or ] changes B.</p>
-  {/if}
+  {@render segmented("View", VIEWS, compare.view, (id) => compare.setView(id as View))}
+  <h2>Compare</h2>
+  {@render matrix((["a", "b"] as const).map((slot) => ({ id: slot, color: SLOT_COLORS[slot], current: compare.pair[slot], pick: (id: string) => (compare.pair[slot] = id) })))}
+  <p class="hint">Press [ or ] to switch views.</p>
   {#if compare.hits.length === 0}
-    <p class="hint">Click the map to see what each source says at that point.</p>
+    <p class="hint">Click the map to compare sources.</p>
   {/if}
 </div>
 

@@ -2,7 +2,7 @@ import { DEFAULT_PAIR, LAYERS, SOURCES, layerFor, type SourceLayer } from "$lib/
 import type { Draw, Slot } from "$lib/map/style";
 
 export type Kind = SourceLayer["kind"];
-export type View = "overlay" | "fade" | "single";
+export type View = "overlay" | "fade" | Slot;
 export type Basemap = "map" | "satellite";
 
 export interface Hit {
@@ -16,10 +16,11 @@ export const MODES: { id: Kind; label: string }[] = [
   { id: "line", label: "Lines" },
   { id: "polygon", label: "Polygons" },
 ];
-export const VIEWS: { id: View; label: string; hint: string }[] = [
-  { id: "overlay", label: "Overlay", hint: "Both sources together." },
-  { id: "fade", label: "Fade", hint: "A and B fade into each other on a loop, to catch small shifts." },
-  { id: "single", label: "Single", hint: "One source at a time, to step through them all." },
+export const VIEWS: { id: View; label: string }[] = [
+  { id: "overlay", label: "Overlay" },
+  { id: "fade", label: "Fade" },
+  { id: "a", label: "A" },
+  { id: "b", label: "B" },
 ];
 export const BASEMAPS: { id: Basemap; label: string }[] = [
   { id: "map", label: "Map" },
@@ -29,22 +30,15 @@ export const SLOT_COLORS: Record<Slot, string> = { a: "#009EDB", b: "#CF3F0B" };
 
 const VIEW_PARAM = "ui";
 const FADE_CYCLE_MS = 3000;
-const HOLD_MS = 250;
-const KEY_SLOT: Record<string, Slot> = { "[": "a", "]": "b" };
-const KEY_STEP: Record<string, number> = { "[": -1, "]": 1, "{": -1, "}": 1 };
+const KEY_STEP: Record<string, number> = { "[": -1, "]": 1 };
 
 function fromUrl() {
   const q = new URLSearchParams(import.meta.env.DEV ? location.search : "");
   const pick = <T extends string>(key: string, ids: T[], fallback: T) => ids.find((id) => id === q.get(key)) ?? fallback;
   const mode = pick("mode", MODES.map((m) => m.id), MODES[0].id);
   const pair = { a: pick("a", SOURCES, DEFAULT_PAIR.a), b: pick("b", SOURCES, DEFAULT_PAIR.b) };
-  const single = pick("src", SOURCES, DEFAULT_PAIR.a);
   const basemap = pick("basemap", BASEMAPS.map((b) => b.id), "map");
-  return { mode, view: pick(VIEW_PARAM, VIEWS.map((v) => v.id), "overlay"), pair, single, basemap };
-}
-
-function step(ids: string[], current: string, by: number) {
-  return ids[(ids.indexOf(current) + by + ids.length) % ids.length];
+  return { mode, view: pick(VIEW_PARAM, VIEWS.map((v) => v.id), "overlay"), pair, basemap };
 }
 
 export class CompareState {
@@ -52,30 +46,20 @@ export class CompareState {
   mode = $state<Kind>(this.#init.mode);
   view = $state<View>(this.#init.view);
   pair = $state(this.#init.pair);
-  single = $state(this.#init.single);
   basemap = $state<Basemap>(this.#init.basemap);
-  solo = $state<Slot | null>(null);
   sweep = $state(0);
   hits = $state<Hit[]>([]);
-  #press: { slot: Slot; at: number; was: Slot | null } | null = null;
   #frame = 0;
 
   kindLayers = $derived(LAYERS.filter((l) => l.kind === this.mode));
-  singleLayer = $derived(layerFor(this.single, this.mode));
-  viewInfo = $derived(VIEWS.find((v) => v.id === this.view)!);
 
   draws = $derived.by<Draw[]>(() => {
-    if (this.view === "single") return [{ id: this.singleLayer.id, color: this.singleLayer.color, opacity: 1 }];
-    if (this.solo) return [this.#slotDraw(this.solo)];
+    if (this.view === "a" || this.view === "b") return [this.#slotDraw(this.view)];
     if (this.view === "fade") return [this.#slotDraw("a", 1 - this.sweep), this.#slotDraw("b", this.sweep)];
     return [this.#slotDraw("a"), this.#slotDraw("b")];
   });
 
-  nowShowing = $derived.by(() => {
-    if (this.view === "single") return { color: this.singleLayer.color, label: this.singleLayer.label };
-    if (this.solo) return { color: SLOT_COLORS[this.solo], label: `${this.solo.toUpperCase()} only` };
-    return null;
-  });
+  nowShowing = $derived(this.view === "a" || this.view === "b" ? { color: SLOT_COLORS[this.view], label: `${this.view.toUpperCase()} only` } : null);
 
   constructor() {
     this.#animate(this.view === "fade");
@@ -89,9 +73,7 @@ export class CompareState {
     params.set("mode", this.mode);
     params.set(VIEW_PARAM, this.view);
     params.set("basemap", this.basemap);
-    for (const key of ["a", "b", "src"]) params.delete(key);
-    if (this.view === "single") params.set("src", this.single);
-    else for (const slot of ["a", "b"] as const) params.set(slot, this.pair[slot]);
+    for (const slot of ["a", "b"] as const) params.set(slot, this.pair[slot]);
   }
 
   setMode(next: Kind) {
@@ -101,7 +83,6 @@ export class CompareState {
 
   setView(next: View) {
     this.view = next;
-    this.solo = null;
     this.#animate(next === "fade");
     this.hits = [];
   }
@@ -119,30 +100,9 @@ export class CompareState {
 
   keydown(e: KeyboardEvent) {
     if (e.target instanceof HTMLElement && e.target.closest("input:not([type=radio]), select, textarea")) return;
-    const picked = VIEWS[Number(e.key) - 1];
-    if (picked) {
-      if (!e.repeat) this.setView(picked.id);
-      return;
-    }
     const by = KEY_STEP[e.key];
-    const slot = KEY_SLOT[e.key];
     if (by === undefined) return;
-    if (this.view === "single") {
-      if (slot) this.single = step(SOURCES, this.single, by);
-    } else if (!slot) {
-      this.pair.b = step(SOURCES.filter((s) => s !== this.pair.a), this.pair.b, by);
-    } else if (!e.repeat) {
-      this.#press = { slot, at: performance.now(), was: this.solo };
-      this.solo = slot;
-    }
-  }
-
-  // Tapping a key toggles that slot on its own; holding it peeks until release.
-  keyup(e: KeyboardEvent) {
-    const press = this.#press;
-    if (!press || KEY_SLOT[e.key] !== press.slot) return;
-    const held = performance.now() - press.at > HOLD_MS;
-    this.solo = held || press.was === press.slot ? null : press.slot;
-    this.#press = null;
+    const at = VIEWS.findIndex((v) => v.id === this.view) + by;
+    if (VIEWS[at]) this.setView(VIEWS[at].id);
   }
 }

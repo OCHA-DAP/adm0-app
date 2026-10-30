@@ -113,7 +113,7 @@
   });
 </script>
 
-<svelte:window onkeydown={(e) => active && compare.keydown(e)} onkeyup={(e) => compare.keyup(e)} />
+<svelte:window onkeydown={(e) => active && compare.keydown(e)} />
 
 <div class="map" bind:this={container}></div>
 {#if compare.nowShowing}
