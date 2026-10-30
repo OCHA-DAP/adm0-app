@@ -113,12 +113,8 @@ export class CompareState {
     this.#frame = requestAnimationFrame(tick);
   }
 
-  swap() {
-    this.pairs[this.mode] = { a: this.pair.b, b: this.pair.a };
-  }
-
   keydown(e: KeyboardEvent) {
-    if (e.target instanceof HTMLElement && e.target.closest("input, select, textarea")) return;
+    if (e.target instanceof HTMLElement && e.target.closest("input:not([type=radio]), select, textarea")) return;
     const picked = VIEWS[Number(e.key) - 1];
     if (picked) {
       if (!e.repeat) this.setView(picked.id);

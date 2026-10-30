@@ -1,11 +1,7 @@
 <script lang="ts">
   import { MODES, SLOT_COLORS, VIEWS, type CompareState, type Kind, type View } from "$lib/compare.svelte";
-  import Swatch from "$lib/components/Swatch.svelte";
-  import { LAYERS } from "$lib/layers";
 
   let { compare }: { compare: CompareState } = $props();
-
-  const groups = [...new Set(LAYERS.map((l) => l.group))];
 </script>
 
 {#snippet segmented(label: string, options: { id: string; label: string }[], current: string, pick: (id: string) => void, keyed = false)}
@@ -16,17 +12,22 @@
   </div>
 {/snippet}
 
-{#snippet options()}
-  {#each groups as group (group)}
-    {@const layers = compare.kindLayers.filter((l) => l.group === group)}
-    {#if layers.length}
-      <optgroup label={group}>
-        {#each layers as layer (layer.id)}
-          <option value={layer.id}>{layer.label}</option>
-        {/each}
-      </optgroup>
+{#snippet matrix(slots: { id: string; color: string; current: string; pick: (id: string) => void }[])}
+  <table class="matrix">
+    {#if slots.length > 1}
+      <thead><tr><th></th>{#each slots as s (s.id)}<th><span class="badge" style:--color={s.color}>{s.id.toUpperCase()}</span></th>{/each}</tr></thead>
     {/if}
-  {/each}
+    <tbody>
+      {#each compare.kindLayers as layer (layer.id)}
+        <tr>
+          <td>{layer.label}</td>
+          {#each slots as s (s.id)}
+            <td><input type="radio" name="src-{s.id}" style:accent-color={s.color} checked={s.current === layer.id} onchange={() => s.pick(layer.id)} aria-label="{s.id.toUpperCase()}: {layer.label}" /></td>
+          {/each}
+        </tr>
+      {/each}
+    </tbody>
+  </table>
 {/snippet}
 
 <div class="panel">
@@ -36,21 +37,11 @@
   <p class="hint">{compare.viewInfo.hint} Press 1 to 3 to switch views.</p>
   {#if compare.view === "single"}
     <h2>Source</h2>
-    <label class="slot">
-      <Swatch kind={compare.mode} color={compare.singleLayer.color} />
-      <select bind:value={compare.single[compare.mode]}>{@render options()}</select>
-    </label>
+    {@render matrix([{ id: "src", color: compare.singleLayer.color, current: compare.single[compare.mode], pick: (id) => (compare.single[compare.mode] = id) }])}
     <p class="hint">Press [ or ] to step through sources.</p>
   {:else}
     <h2>Compare</h2>
-    {#each ["a", "b"] as const as slot (slot)}
-      <label class="slot">
-        <span class="badge" style:--color={SLOT_COLORS[slot]}>{slot.toUpperCase()}</span>
-        <Swatch kind={compare.mode} color={SLOT_COLORS[slot]} />
-        <select bind:value={compare.pairs[compare.mode][slot]}>{@render options()}</select>
-      </label>
-    {/each}
-    <button class="btn swap" onclick={() => compare.swap()}>Swap A and B</button>
+    {@render matrix((["a", "b"] as const).map((slot) => ({ id: slot, color: SLOT_COLORS[slot], current: compare.pair[slot], pick: (id: string) => (compare.pairs[compare.mode][slot] = id) })))}
     <p class="hint">Tap [ or ] to show only A or B, or hold to peek. Shift+[ or ] changes B.</p>
   {/if}
   {#if compare.hits.length === 0}
@@ -97,17 +88,25 @@
     line-height: 1.4;
     margin: 0.75rem 0 0;
   }
-  .slot {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
+  .matrix {
+    width: 100%;
     margin: 0.35rem 0;
+    border-collapse: collapse;
+    font-size: 0.75rem;
   }
-  .slot select {
-    flex: 1;
-    min-width: 0;
+  .matrix td,
+  .matrix th {
+    padding: 0.15rem 0.25rem;
   }
-  .swap {
-    margin: 0.2rem 0 0.4rem;
+  .matrix td:first-child {
+    width: 100%;
+  }
+  .matrix td:not(:first-child),
+  .matrix th {
+    width: 1.75rem;
+    text-align: center;
+  }
+  .matrix tbody tr:hover {
+    background: var(--cd-grey--300);
   }
 </style>
