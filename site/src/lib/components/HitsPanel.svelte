@@ -50,23 +50,37 @@
     cursor: pointer;
     color: var(--brand-grey--text);
   }
+  section + section {
+    border-top: 1px solid var(--cd-grey--400);
+  }
   h3 {
-    font-size: 0.875rem;
-    margin: 0.75rem 0 0.25rem;
+    display: flex;
+    align-items: center;
+    font-family: var(--brand-font);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--cd-grey--900);
+    margin: 0.75rem 0 0.3rem;
   }
   table {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.75rem;
+    line-height: 1.4;
+    margin-bottom: 0.6rem;
   }
   th,
   td {
-    padding: 0.15rem 0.3rem;
+    padding: 0.1rem 0.75rem 0.1rem 0;
+    border: 0;
     word-break: break-word;
   }
   th {
-    color: var(--brand-grey--text);
+    color: var(--cd-grey--800);
     font-weight: 400;
     width: 40%;
+  }
+  td {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
 </style>

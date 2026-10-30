@@ -100,7 +100,7 @@
         </select>
       </label>
     {/each}
-    <button type="button" onclick={() => (filter = { ...DEFAULT_FILTER })}>Reset</button>
+    <button type="button" class="btn" onclick={() => (filter = { ...DEFAULT_FILTER })}>Reset</button>
     <span class="count">{shown.length} of {rows.length} codes</span>
   </div>
   {#if failed}
@@ -161,15 +161,15 @@
   .controls label {
     display: flex;
     flex-direction: column;
-    gap: 0.15rem;
-    color: var(--brand-grey--text);
-    font-size: 0.75rem;
+    gap: 0.25rem;
+    color: var(--cd-grey--700);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
   }
   .controls select,
-  .controls input,
-  .controls button {
-    padding: 0.3rem 0.4rem;
-    font-size: 0.8125rem;
+  .controls input {
     max-width: 14rem;
   }
   .controls input[type="search"] {
@@ -221,7 +221,7 @@
     background: var(--cd-grey--300);
   }
   .diff {
-    background: #fde9dc;
+    background: var(--cd-orange--300);
   }
   .dim {
     opacity: 0.35;

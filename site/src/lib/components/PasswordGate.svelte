@@ -61,14 +61,19 @@
   }
   input,
   button {
-    padding: 0.5rem;
+    padding: 0.5rem 0.75rem;
     font-size: 1rem;
+    border-radius: var(--brand-radius--sm);
   }
   button {
-    background: var(--cd-ocha-blue);
+    background: var(--brand-primary--text);
     color: var(--cd-white);
     border: 0;
+    font-weight: 500;
     cursor: pointer;
+  }
+  button:hover {
+    background: var(--brand-primary--dark);
   }
   p {
     color: var(--cd-red--aa);

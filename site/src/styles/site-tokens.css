@@ -1,3 +1,38 @@
+/* OCHA 7-step colour ramps from brand.unocha.org that brand.css leaves out, darkest (900) to lightest (300). */
+:root {
+  --cd-red--900: #520000;
+  --cd-red--800: #780b20;
+  --cd-red--700: #a71f36;
+  --cd-red--600: #ed1847;
+  --cd-red--500: #f3859b;
+  --cd-red--400: #f9c0c5;
+  --cd-red--300: #f7dfdf;
+
+  --cd-orange--900: #70200c;
+  --cd-orange--800: #90371c;
+  --cd-orange--700: #c15025;
+  --cd-orange--600: #f58220;
+  --cd-orange--500: #f9a870;
+  --cd-orange--400: #fedcbd;
+  --cd-orange--300: #ffead5;
+
+  --cd-green--900: #003425;
+  --cd-green--800: #004d35;
+  --cd-green--700: #006747;
+  --cd-green--600: #338c46;
+  --cd-green--500: #72bf44;
+  --cd-green--400: #cee3a0;
+  --cd-green--300: #e6efd0;
+
+  --cd-slate--900: #1b1b1a;
+  --cd-slate--800: #493f38;
+  --cd-slate--700: #6e6259;
+  --cd-slate--600: #aea29a;
+  --cd-slate--500: #c5bfba;
+  --cd-slate--400: #dddad7;
+  --cd-slate--300: #edeae6;
+}
+
 /* Headings use OCHA's optional Roboto Slab, served by FontFaces.astro. */
 :root {
   --brand-font-heading: var(--cd-font--roboto-slab);

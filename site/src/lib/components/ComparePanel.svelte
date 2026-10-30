@@ -50,7 +50,7 @@
         <select bind:value={compare.pairs[compare.mode][slot]}>{@render options()}</select>
       </label>
     {/each}
-    <button class="swap" onclick={() => compare.swap()}>Swap A and B</button>
+    <button class="btn swap" onclick={() => compare.swap()}>Swap A and B</button>
     {#if compare.view === "overlay"}
       <label class="range">
         <span>A</span>
@@ -81,46 +81,50 @@
   }
   .segmented {
     display: flex;
-    border: 1px solid var(--cd-ocha-blue);
-    border-radius: 4px;
+    border: 1px solid var(--cd-grey--500);
+    border-radius: var(--brand-radius--sm);
     overflow: hidden;
+    background: var(--cd-white);
   }
   .segmented button {
-    flex: 1;
-    padding: 0.35rem;
-    border: 0;
-    background: none;
-    color: var(--cd-ocha-blue);
-    font-size: 0.8125rem;
+    flex: 1 1 0;
+    padding: 0.3rem 0.6rem;
+    border: none;
+    border-left: 1px solid var(--cd-grey--400);
+    background: var(--cd-white);
+    color: var(--cd-grey--800);
+    font-size: 0.75rem;
+    font-weight: 500;
     cursor: pointer;
   }
+  .segmented button:first-child {
+    border-left: none;
+  }
+  .segmented button:hover:not(.active) {
+    background: var(--cd-grey--300);
+  }
   .segmented button.active {
-    background: var(--cd-ocha-blue);
+    background: var(--brand-primary--text);
     color: var(--cd-white);
   }
   .hint {
-    color: var(--brand-grey--text);
+    color: var(--cd-grey--700);
+    font-size: 0.75rem;
+    line-height: 1.4;
     margin: 0.75rem 0 0;
   }
   .slot {
     display: flex;
     align-items: center;
     gap: 0.3rem;
-    margin: 0.3rem 0;
+    margin: 0.35rem 0;
   }
   .slot select {
     flex: 1;
     min-width: 0;
-    font-size: 0.8125rem;
   }
   .swap {
     margin: 0.2rem 0 0.4rem;
-    padding: 0.2rem 0.5rem;
-    border: 1px solid var(--cd-grey--400);
-    border-radius: 4px;
-    background: none;
-    font-size: 0.75rem;
-    cursor: pointer;
   }
   .range,
   .check {

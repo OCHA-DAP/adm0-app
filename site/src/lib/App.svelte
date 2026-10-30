@@ -22,10 +22,13 @@
   <PasswordGate onunlock={(url) => (tilesBase = url)} />
 {:else}
   <div class="app">
-    <nav>
-      <button class:active={tab === "map"} onclick={() => show("map")}>Map</button>
-      <button class:active={tab === "table"} onclick={() => show("table")}>Names and attributes</button>
-    </nav>
+    <header class="bar">
+      <span class="title">Boundary comparison</span>
+      <nav aria-label="Views">
+        <button aria-current={tab === "map" ? "page" : undefined} onclick={() => show("map")}>Map</button>
+        <button aria-current={tab === "table" ? "page" : undefined} onclick={() => show("table")}>Names and attributes</button>
+      </nav>
+    </header>
     <div class="view" class:hidden={tab !== "map"}>
       <GlobeMap {tilesBase} {compare} active={tab === "map"} />
       <ComparePanel {compare} />
@@ -43,20 +46,41 @@
     flex-direction: column;
     height: 100vh;
   }
+  .bar {
+    display: flex;
+    flex-shrink: 0;
+    gap: 1rem;
+    justify-content: space-between;
+    align-items: center;
+    height: 3.5rem;
+    padding: 0 1.5rem;
+    background: var(--cd-white);
+    border-bottom: 1px solid var(--brand-grey--border);
+  }
+  .title {
+    font-family: var(--brand-font-heading);
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--brand-primary--text);
+  }
   nav {
     display: flex;
-    border-bottom: 1px solid var(--cd-grey--400);
+    gap: 1.75rem;
   }
   nav button {
-    padding: 0.6rem 1rem;
+    padding: 0;
     border: 0;
-    border-bottom: 3px solid transparent;
     background: none;
-    font-size: 0.875rem;
+    color: var(--cd-grey--800);
+    font-size: 0.95rem;
+    white-space: nowrap;
     cursor: pointer;
   }
-  nav button.active {
-    border-bottom-color: var(--cd-ocha-blue);
+  nav button:hover {
+    color: var(--brand-primary--dark);
+  }
+  nav button[aria-current="page"] {
+    color: var(--brand-primary--text);
     font-weight: 600;
   }
   .view {
