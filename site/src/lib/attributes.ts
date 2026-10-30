@@ -4,8 +4,8 @@ export const SOURCES: Record<string, string> = {
   ungeodata: "UN Geodata",
   fieldmaps: "FieldMaps",
   wp: "World Polygons",
-  unterm: "UNTERM",
   m49: "M49",
+  unterm: "UNTERM",
 };
 
 export interface AttributeGroup {
@@ -15,10 +15,12 @@ export interface AttributeGroup {
   compare: boolean;
 }
 
-// Status and region use different vocabularies per source, so only a source pair compares them.
+// Status, region and map name follow different conventions per source, so only a source pair compares them.
 export const GROUPS: AttributeGroup[] = [
   { key: "name", label: "Name", sources: ["gaul", "ungeodata", "fieldmaps", "wp", "unterm", "m49"], compare: true },
+  { key: "mapname", label: "Map name", sources: ["ungeodata", "fieldmaps", "wp"], compare: false },
   { key: "mapcode", label: "Map code", sources: ["gaul"], compare: false },
+  { key: "count", label: "Features", sources: ["gaul", "ungeodata", "fieldmaps", "wp"], compare: true },
   { key: "sovereign", label: "Sovereign", sources: ["ungeodata", "fieldmaps"], compare: true },
   { key: "status", label: "Status", sources: ["ungeodata", "fieldmaps", "wp", "unterm"], compare: false },
   { key: "region", label: "Region", sources: ["gaul", "ungeodata", "fieldmaps", "m49"], compare: false },
@@ -62,7 +64,7 @@ const NONE = "(none)";
 
 export type Filter = { group: string; diff: DiffType; pair: string; query: string } & Record<Facet, string>;
 export const DEFAULT_FILTER: Filter = {
-  group: "",
+  group: "name",
   diff: "any",
   pair: "",
   query: "",
