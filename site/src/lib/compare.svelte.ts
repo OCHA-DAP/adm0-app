@@ -55,7 +55,7 @@ export class CompareState {
   viewInfo = $derived(VIEWS.find((v) => v.id === this.view)!);
 
   mainDraws = $derived.by<Draw[]>(() => {
-    if (this.view === "single") return [{ id: this.singleLayer.id, color: this.singleLayer.color, dashed: false, opacity: 1 }];
+    if (this.view === "single") return [{ id: this.singleLayer.id, color: this.singleLayer.color, opacity: 1 }];
     if (this.stacked) return [this.#slotDraw("a")];
     if (this.solo) return [this.#slotDraw(this.solo)];
     return [this.#slotDraw("a", Math.min(1, 2 * (1 - this.fade))), this.#slotDraw("b", Math.min(1, 2 * this.fade))];
@@ -63,13 +63,13 @@ export class CompareState {
   overlayDraws = $derived([this.#slotDraw("b")]);
 
   nowShowing = $derived.by(() => {
-    if (this.view === "single") return { color: this.singleLayer.color, label: this.singleLayer.label, dashed: false };
-    if (this.solo) return { color: SLOT_COLORS[this.solo], label: `${this.solo.toUpperCase()} only`, dashed: this.solo === "b" };
+    if (this.view === "single") return { color: this.singleLayer.color, label: this.singleLayer.label };
+    if (this.solo) return { color: SLOT_COLORS[this.solo], label: `${this.solo.toUpperCase()} only` };
     return null;
   });
 
   #slotDraw(slot: Slot, opacity = 1): Draw {
-    return { id: this.pair[slot], color: SLOT_COLORS[slot], dashed: slot === "b", opacity, slot };
+    return { id: this.pair[slot], color: SLOT_COLORS[slot], opacity, slot };
   }
 
   setMode(next: Kind) {

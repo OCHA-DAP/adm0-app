@@ -1,4 +1,4 @@
-import type { LayerSpecification, Map, StyleSpecification } from "maplibre-gl";
+import type { DataDrivenPropertyValueSpecification, ExpressionSpecification, LayerSpecification, Map, StyleSpecification } from "maplibre-gl";
 import positron from "$lib/utils/basemap/positron.json";
 import { LAYERS, LAYER_BY_ID, type SourceLayer } from "$lib/layers";
 
@@ -7,13 +7,51 @@ export type Slot = "a" | "b";
 export interface Draw {
   id: string;
   color: string;
-  dashed: boolean;
   opacity: number;
   slot?: Slot;
 }
 
-const DASH = [3, 2];
 const FILL_OPACITY = 0.08;
+const LINE_WIDTH = 2;
+
+// Line types from the UN Guidelines for the Publication of Maps; dashes are in line widths.
+const LINE_TYPES = {
+  international: { dash: [1, 0], width: LINE_WIDTH },
+  special: { dash: [4, 1.5, 1, 1.5], width: LINE_WIDTH },
+  armistice: { dash: [3, 1.5], width: LINE_WIDTH },
+  separation: { dash: [1, 1.5], width: LINE_WIDTH },
+  autonomous: { dash: [3, 1.5], width: 1.5 },
+  sovereign: { dash: [1, 0], width: 1 },
+};
+type LineType = keyof typeof LINE_TYPES;
+
+const LSIB_TYPE: ExpressionSpecification = [
+  "case",
+  ["in", "Line of Control", ["coalesce", ["get", "label"], ["get", "LABEL"], ""]],
+  "separation",
+  [
+    "match",
+    ["coalesce", ["get", "status"], ["get", "STATUS"]],
+    "Special Line",
+    "special",
+    "Other Line of International Separation",
+    "armistice",
+    "international",
+  ],
+];
+const LINE_TYPE: Record<string, ExpressionSpecification> = {
+  ungeodata_lines: ["match", ["get", "bdytyp"], 2, "special", 3, "armistice", 4, "separation", 8, "autonomous", 9, "sovereign", "international"],
+  lsib_lines: LSIB_TYPE,
+  fieldmaps_wp_lines: LSIB_TYPE,
+  fieldmaps_osm_lines: LSIB_TYPE,
+};
+
+function byType(id: string, prop: "dash" | "width") {
+  const value = (t: (typeof LINE_TYPES)[LineType]) => (prop === "dash" ? ["literal", t.dash] : t.width);
+  const type = LINE_TYPE[id];
+  if (!type) return value(LINE_TYPES.international);
+  return ["match", type, ...Object.entries(LINE_TYPES).flatMap(([k, t]) => [k, value(t)]), value(LINE_TYPES.international)];
+}
 
 // The layer that click queries hit for a source.
 export function queryLayerId(id: string) {
@@ -31,9 +69,9 @@ function layersFor(layer: SourceLayer, draws: Draw[]): LayerSpecification[] {
     type: "line",
     paint: {
       "line-color": color,
-      "line-width": 2,
+      "line-width": byType(layer.id, "width") as DataDrivenPropertyValueSpecification<number>,
       "line-opacity": opacity,
-      ...(draw?.dashed ? { "line-dasharray": DASH } : {}),
+      "line-dasharray": byType(layer.id, "dash") as DataDrivenPropertyValueSpecification<number[]>,
     },
   };
   if (layer.kind === "line") return [line];
@@ -56,7 +94,6 @@ export function applyDraws(map: Map, draws: Draw[]) {
     const { id, layout, paint } = spec as LayerSpecification & { layout: object; paint: object };
     for (const [k, v] of Object.entries(layout)) setLayout(id, k, v);
     for (const [k, v] of Object.entries(paint)) setPaint(id, k, v);
-    if (spec.type === "line" && !("line-dasharray" in paint)) setPaint(id, "line-dasharray", undefined);
   }
 }
 

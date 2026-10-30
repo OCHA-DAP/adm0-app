@@ -184,7 +184,7 @@
 {/if}
 {#if compare.nowShowing}
   <div class="now-showing">
-    <Swatch kind={compare.mode} color={compare.nowShowing.color} dashed={compare.nowShowing.dashed} />{compare.nowShowing.label}
+    <Swatch kind={compare.mode} color={compare.nowShowing.color} />{compare.nowShowing.label}
   </div>
 {/if}
 

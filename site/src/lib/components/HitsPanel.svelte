@@ -15,7 +15,7 @@
       <section>
         <h3>
           {#if hit.slot}<span class="badge" style:--color={hit.color}>{hit.slot.toUpperCase()}</span>{/if}
-          <Swatch kind={compare.mode} color={hit.color} dashed={hit.slot === "b"} />{hit.label}
+          <Swatch kind={compare.mode} color={hit.color} />{hit.label}
         </h3>
         <table>
           <tbody>

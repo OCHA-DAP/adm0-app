@@ -46,7 +46,7 @@
     {#each ["a", "b"] as const as slot (slot)}
       <label class="slot">
         <span class="badge" style:--color={SLOT_COLORS[slot]}>{slot.toUpperCase()}</span>
-        <Swatch kind={compare.mode} color={SLOT_COLORS[slot]} dashed={slot === "b"} />
+        <Swatch kind={compare.mode} color={SLOT_COLORS[slot]} />
         <select bind:value={compare.pairs[compare.mode][slot]}>{@render options()}</select>
       </label>
     {/each}

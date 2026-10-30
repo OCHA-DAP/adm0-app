@@ -251,7 +251,17 @@ def ungeodata(conn: DuckDBPyConnection) -> None:
 def fieldmaps(conn: DuckDBPyConnection) -> None:
     """Copy the published fieldmaps humanitarian polygons and lines."""
     for path in sorted((download_dir / "fieldmaps").glob("*.parquet")):
-        _copy(conn, f"SELECT * FROM read_parquet('{path}')", f"fieldmaps_{path.stem}")
+        # Published lines are two-point segments, which tiling drops at low zoom.
+        merge = (
+            " REPLACE (ST_Multi(ST_LineMerge(geometry)) AS geometry)"
+            if path.stem.endswith("_lines")
+            else ""
+        )
+        _copy(
+            conn,
+            f"SELECT *{merge} FROM read_parquet('{path}')",
+            f"fieldmaps_{path.stem}",
+        )
 
 
 def main() -> None:
