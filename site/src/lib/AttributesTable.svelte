@@ -1,12 +1,11 @@
 <script lang="ts">
+  import { SLOT_COLORS, type Focus } from "$lib/compare.svelte";
   import {
-    BASELINE,
+    ATTRIBUTE_SOURCE,
     DEFAULT_FILTER,
-    FACETS,
     GROUPS,
     SOURCES,
     compares,
-    facetValue,
     groupsInScope,
     majority,
     matches,
@@ -14,69 +13,85 @@
     TIE,
     value,
     type AttributeRow,
+    type Part,
     type DiffType,
-    type Facet,
     type Filter,
   } from "$lib/attributes";
 
-  let { tilesBase }: { tilesBase: string } = $props();
+  let {
+    rows,
+    failed,
+    focus,
+    drawn,
+    pair,
+    split = false,
+    onfocus,
+  }: {
+    rows: AttributeRow[];
+    failed: boolean;
+    focus: Focus | null;
+    drawn: string[];
+    pair: { a: string; b: string };
+    split?: boolean;
+    onfocus: (row: AttributeRow, part?: Part | null) => void;
+  } = $props();
 
-  const ALL_SOURCES = Object.keys(SOURCES);
-
-  const LEGEND: { kind: DiffType; label: string; swatch?: string }[] = [
-    { kind: "differs", label: "Differs", swatch: "var(--cd-orange--300)" },
-    { kind: "missing", label: "Missing", swatch: "var(--cd-grey--300)" },
-    { kind: "several", label: "Several features" },
-    { kind: "only", label: "One source only" },
+  // The swatches double as the legend for the cell colors.
+  const SHOW: { id: DiffType; label: string; swatch?: string }[] = [
+    { id: "all", label: "All" },
+    { id: "differs", label: "Differs", swatch: "var(--cd-orange--300)" },
+    { id: "missing", label: "Missing", swatch: "var(--cd-grey--300)" },
   ];
 
-  let rows = $state.raw<AttributeRow[]>([]);
-  let failed = $state(false);
   let filter = $state<Filter>({ ...DEFAULT_FILTER });
+  // With the map pair in charge, the table shows and compares only A and B.
+  const ab = $derived([ATTRIBUTE_SOURCE[pair.a], ATTRIBUTE_SOURCE[pair.b]]);
+  // Split shows only the map's A and B; the full table shows the sources toggled on.
+  const ALL = Object.keys(SOURCES);
+  const scope = $derived(split ? { ...filter, sources: ab } : filter);
+  const on = $derived(filter.sources.length ? filter.sources : ALL);
+  const columns = $derived(split ? ab : on);
 
-  $effect(() => {
-    fetch(`${tilesBase}/attributes.json`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-      .then((data: AttributeRow[]) => (rows = data))
-      .catch(() => (failed = true));
-  });
-
-  const shown = $derived(rows.filter((row) => matches(row, filter)));
-  const groups = $derived(groupsInScope(filter));
-  const pairs = Object.keys(SOURCES).filter((s) => s !== BASELINE);
-  const facets = Object.keys(FACETS) as Facet[];
-
-  // Rows each option would keep, with every other filter left as it is.
-  function count<K extends keyof Filter>(key: K, option: Filter[K]) {
-    const trial = { ...filter, [key]: option };
-    return rows.filter((row) => matches(row, trial)).length;
+  // At least two sources stay on; all on is stored as empty.
+  function toggle(source: string) {
+    const next = on.includes(source) ? on.filter((s) => s !== source) : ALL.filter((s) => s === source || on.includes(s));
+    if (next.length < 2) return;
+    filter.sources = next.length === ALL.length ? [] : next;
   }
+  // In Split the active Attribute chip already names a single attribute.
+  const labelled = $derived(!split || !filter.group);
+  let body = $state<HTMLElement>();
 
-  const facetOptions = $derived(
-    Object.fromEntries(
-      facets.map((f) => [f, [...new Set(rows.map((r) => facetValue(r, f)))].sort()]),
-    ) as Record<Facet, string[]>,
-  );
+  // The focused code stays listed even when the filters would hide it.
+  const shown = $derived(rows.filter((row) => row.iso3 === focus?.iso3 || matches(row, scope)));
+
+  // Scrolls once per code, so picking its parts leaves the table still.
+  const focusedCode = $derived(focus?.iso3);
+  $effect(() => {
+    const iso3 = focusedCode;
+    if (iso3) requestAnimationFrame(() => body?.querySelector(`[data-iso3="${iso3}"]`)?.scrollIntoView({ block: "start" }));
+  });
+  const groups = $derived(groupsInScope(filter));
 
   const dirty = $derived(JSON.stringify(filter) !== JSON.stringify(DEFAULT_FILTER));
 
   function cellClass(row: AttributeRow, group: (typeof GROUPS)[number], source: string) {
     const v = value(row, group.key, source);
-    const sources = sourcesFor(group, filter);
+    const sources = sourcesFor(group, scope);
     const inPair = sources.includes(source);
     let diff = false;
-    if (v && inPair && compares(group, filter)) {
+    if (v && inPair && compares(group, scope)) {
       const top = majority(row, group, sources);
-      diff = top !== null && (!!filter.pair || top === TIE || v !== top);
+      diff = top !== null && (scope.sources.length === 2 || top === TIE || v !== top);
     }
     return { empty: !v, diff, dim: !inPair };
   }
 </script>
 
-{#snippet chips(label: string, options: { id: string; label: string; title?: string }[], current: string, pick: (id: string) => void)}
-  <div class="chips" role="radiogroup" aria-label={label}>
+{#snippet segmented(label: string, options: { id: string; label: string; title?: string; swatch?: string }[], current: string, pick: (id: string) => void)}
+  <div class="segmented" role="radiogroup" aria-label={label}>
     {#each options as o (o.id)}
-      <button type="button" role="radio" aria-checked={current === o.id} class:active={current === o.id} title={o.title} onclick={() => pick(o.id)}>{o.label}</button>
+      <button type="button" role="radio" aria-checked={current === o.id} class:active={current === o.id} title={o.title} onclick={() => pick(o.id)}>{#if o.swatch}<span class="swatch" style:background={o.swatch}></span>{/if}{o.label}</button>
     {/each}
   </div>
 {/snippet}
@@ -86,19 +101,24 @@
 {/snippet}
 
 {#snippet show()}
-  {@render chips("Show", [{ id: "any", label: "Differences" }, { id: "all", label: "All" }], filter.diff === "all" ? "all" : "any", (id) => (filter.diff = id as DiffType))}
+  {@render segmented("Show", SHOW, filter.diff, (id) => (filter.diff = id as DiffType))}
 {/snippet}
 
 {#snippet attributes()}
-  {@render chips("Attribute", [{ id: "", label: "All" }, ...GROUPS.map((g) => ({ id: g.key, label: g.label }))], filter.group, (id) => (filter.group = id))}
+  {@render segmented("Attribute", [{ id: "", label: "All" }, ...GROUPS.map((g) => ({ id: g.key, label: g.label }))], filter.group, (id) => (filter.group = id))}
 {/snippet}
 
 {#snippet sourceHead(source: string)}
-  <th class:picked={filter.pair === source || (filter.pair && source === BASELINE)}>{SOURCES[source]}</th>
+  {@const slot = !split ? null : source === ab[0] ? "a" : "b"}
+  <th>
+    {#if slot}<span class="badge" style:--color={SLOT_COLORS[slot]}>{slot.toUpperCase()}</span>{/if}{SOURCES[source]}
+  </th>
 {/snippet}
 
 {#snippet fixedCell(row: AttributeRow, group: (typeof GROUPS)[number], source: string)}
-  {#if group.sources.includes(source)}
+  {#if group.key === "count" && group.sources.includes(source)}
+    {@render partChips(row, source)}
+  {:else if group.sources.includes(source)}
     {@const c = cellClass(row, group, source)}
     <td class:empty={c.empty} class:diff={c.diff} class:dim={c.dim}>{value(row, group.key, source)}</td>
   {:else}
@@ -106,29 +126,31 @@
   {/if}
 {/snippet}
 
-{#snippet legend()}
-  <div class="legend" role="group" aria-label="Difference type">
-    {#each LEGEND as l (l.kind)}
-      <button type="button" aria-pressed={filter.diff === l.kind} class:active={filter.diff === l.kind} onclick={() => (filter.diff = filter.diff === l.kind ? "any" : l.kind)}>
-        {#if l.swatch}<span class="swatch" style:background={l.swatch}></span>{/if}{l.label}
-      </button>
-    {/each}
-  </div>
-{/snippet}
-
-{#snippet facetSelects()}
-  {#each facets as f (f)}
-    <label>
-      {FACETS[f].label}
-      <select bind:value={filter[f]}>
-        <option value="">Any</option>
-        {#each facetOptions[f] as option (option)}
-          {@const n = count(f, option)}
-          {#if n > 0 || filter[f] === option}<option value={option}>{option} ({n})</option>{/if}
-        {/each}
-      </select>
-    </label>
-  {/each}
+{#snippet partChips(row: AttributeRow, source: string)}
+  {@const parts = (row.parts as Part[] | null) ?? []}
+  {@const mine = parts.filter((p) => p.s === source)}
+  {@const picked = row.iso3 === focus?.iso3 ? focus.part : null}
+  {#if mine.length}
+    <td><div class="parts">
+      {#each mine as part (part.id)}
+        {@const label = part.label ?? "(no name)"}
+        {#if drawn.includes(part.layer)}
+          <!-- Picking the active part again goes back to the whole code. -->
+          <button
+            type="button"
+            title={label}
+            class:active={picked?.id === part.id}
+            class:unnamed={!part.label}
+            onclick={() => onfocus(row, picked?.id === part.id ? null : part)}>{label}</button
+          >
+        {:else}
+          <span class:unnamed={!part.label} title="{label}: pick this source as A or B to see it on the map">{label}</span>
+        {/if}
+      {/each}
+    </div></td>
+  {:else}
+    <td class="na"></td>
+  {/if}
 {/snippet}
 
 {#snippet reset()}
@@ -141,18 +163,26 @@
 
 <div class="table-view">
   <aside class="sidebar">
-    {@render search()}
-    <h2>Show</h2>
-    {@render show()}
-    {@render total()}
-    <h2>Difference</h2>
-    {@render legend()}
-    <h2>Attribute</h2>
-    {@render attributes()}
-    <h2>Compare with {SOURCES[BASELINE]}</h2>
-    {@render chips("Compare", [{ id: "", label: "All sources" }, ...pairs.map((p) => ({ id: p, label: SOURCES[p] }))], filter.pair, (id) => (filter.pair = id))}
-    <h2>Filter</h2>
-    <div class="facets">{@render facetSelects()}</div>
+    <section>{@render search()}</section>
+    {#if !split}
+      <section>
+        <h2>Sources</h2>
+        <div class="toggles" role="group" aria-label="Sources">
+          {#each ALL as s (s)}
+            <button type="button" aria-pressed={on.includes(s)} class:on={on.includes(s)} disabled={on.includes(s) && on.length === 2} onclick={() => toggle(s)}>{on.includes(s) ? "✓ " : ""}{SOURCES[s]}</button>
+          {/each}
+        </div>
+      </section>
+    {/if}
+    <section>
+      <h2>Show</h2>
+      {@render show()}
+      {@render total()}
+    </section>
+    <section>
+      <h2>Attribute</h2>
+      {@render attributes()}
+    </section>
     {@render reset()}
   </aside>
   {#if failed}
@@ -163,17 +193,18 @@
         <thead>
           <tr>
             <th class="code">ISO3</th>
-            <th class="attr">Attribute</th>
-            {#each ALL_SOURCES as source (source)}{@render sourceHead(source)}{/each}
+            {#if labelled}<th class="attr">Attribute</th>{/if}
+            {#each columns as source (source)}{@render sourceHead(source)}{/each}
           </tr>
         </thead>
-        <tbody>
+        <tbody bind:this={body}>
           {#each shown as row (row.iso3)}
+            {@const focused = row.iso3 === focus?.iso3}
             {#each groups as group, gi (group.key)}
-              <tr class:start={gi === 0}>
-                {#if gi === 0}<th class="code" rowspan={groups.length}>{row.iso3}</th>{/if}
-                <td class="attr">{group.label}</td>
-                {#each ALL_SOURCES as source (source)}{@render fixedCell(row, group, source)}{/each}
+              <tr class:start={gi === 0} class:focused data-iso3={gi === 0 ? row.iso3 : undefined}>
+                {#if gi === 0}<th class="code" rowspan={groups.length}><button type="button" class="code-link" title="Show on map" onclick={() => onfocus(row)}>{row.iso3}</button></th>{/if}
+                {#if labelled}<td class="attr">{group.label}</td>{/if}
+                {#each columns as source (source)}{@render fixedCell(row, group, source)}{/each}
               </tr>
             {/each}
           {/each}
@@ -186,7 +217,7 @@
 <style>
   .table-view {
     display: grid;
-    grid-template-columns: 17rem 1fr;
+    grid-template-rows: auto 1fr;
     height: 100%;
     min-height: 0;
     font-size: 0.8125rem;
@@ -194,14 +225,13 @@
   .count {
     color: var(--brand-grey--text);
   }
-  .chips,
-  .legend {
+  /* Multi-select toggles are outlined pills so they read differently from the segmented single choices. */
+  .toggles {
     display: flex;
     flex-wrap: wrap;
     gap: 0.25rem;
   }
-  .chips button,
-  .legend button {
+  .toggles button {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
@@ -213,14 +243,41 @@
     font-size: 0.75rem;
     cursor: pointer;
   }
-  .chips button:hover:not(.active),
-  .legend button:hover:not(.active) {
+  .toggles button:hover:not(.on) {
     background: var(--cd-grey--300);
   }
-  .chips button.active,
-  .legend button.active {
-    background: var(--brand-primary--text);
+  .toggles button.on {
     border-color: var(--brand-primary--text);
+    background: var(--cd-blue--lightest);
+    color: var(--brand-primary--text);
+  }
+  .segmented {
+    display: flex;
+    border: 1px solid var(--cd-grey--500);
+    border-radius: var(--brand-radius--sm);
+    overflow: hidden;
+    background: var(--cd-white);
+  }
+  .segmented button {
+    padding: 0.25rem 0.6rem;
+    border: none;
+    border-left: 1px solid var(--cd-grey--400);
+    background: var(--cd-white);
+    color: var(--cd-grey--800);
+    font-size: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    cursor: pointer;
+  }
+  .segmented button:first-child {
+    border-left: none;
+  }
+  .segmented button:hover:not(.active) {
+    background: var(--cd-grey--300);
+  }
+  .segmented button.active {
+    background: var(--brand-primary--text);
     color: var(--cd-white);
   }
   .swatch {
@@ -229,15 +286,76 @@
     border: 1px solid var(--cd-grey--500);
     border-radius: 2px;
   }
-  thead th.picked {
-    color: var(--brand-primary--text);
-    font-weight: 600;
+  tr[data-iso3] {
+    scroll-margin-top: 2rem;
+  }
+  thead th.code {
+    z-index: 3;
   }
   tr.start > * {
     border-top: 1px solid var(--cd-grey--400);
   }
   th.code {
     vertical-align: top;
+  }
+  .code-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--brand-primary--text);
+    font: inherit;
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-color: var(--cd-grey--400);
+    text-underline-offset: 2px;
+    cursor: pointer;
+  }
+  .code-link:hover {
+    text-decoration-color: currentColor;
+  }
+  tr.focused > th,
+  tr.focused > .attr {
+    background-color: var(--cd-blue--lightest);
+  }
+  .parts {
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    gap: 0.2rem;
+  }
+  .parts button,
+  .parts span {
+    max-width: 12rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0.1rem 0.45rem;
+    border: 1px solid var(--cd-grey--500);
+    border-radius: 999px;
+    background: var(--cd-white);
+    font: inherit;
+    font-size: 0.75rem;
+    text-align: left;
+  }
+  .parts button {
+    color: var(--brand-primary--text);
+    cursor: pointer;
+  }
+  .parts button:hover:not(.active) {
+    background: var(--cd-grey--300);
+  }
+  .parts button.active {
+    background: var(--brand-primary--text);
+    border-color: var(--brand-primary--text);
+    color: var(--cd-white);
+  }
+  .parts span {
+    border-style: dashed;
+    color: var(--brand-grey--text);
+  }
+  .parts .unnamed:not(.active) {
+    color: var(--brand-grey--text);
+    font-style: italic;
   }
   .attr {
     min-width: 6rem;
@@ -246,46 +364,40 @@
   .na {
     background: repeating-linear-gradient(45deg, transparent 0 4px, var(--cd-grey--300) 4px 6px);
   }
+  /* Controls wrap in a strip above the table, taking its width rather than setting it. */
   .sidebar {
     display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    max-height: 40vh;
     padding: 0.75rem 1rem;
-    border-right: 1px solid var(--cd-grey--400);
+    border-bottom: 1px solid var(--cd-grey--400);
     overflow: auto;
+    contain: inline-size;
+  }
+  .sidebar section {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
   }
   .sidebar h2 {
-    margin: 0.75rem 0 0;
+    margin: 0;
     font-size: 0.6875rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--cd-grey--700);
-  }
-  .facets {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-  .facets label {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    color: var(--cd-grey--700);
-    font-size: 0.6875rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
   }
   .sidebar .btn {
-    align-self: start;
-    margin-top: 0.5rem;
+    align-self: center;
   }
   .scroll {
     flex: 1;
     overflow: auto;
   }
   table {
+    width: 100%;
     border-collapse: separate;
     border-spacing: 0;
   }

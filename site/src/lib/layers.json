@@ -1,10 +1,10 @@
 [
-  { "id": "gaul_l0", "source": "gaul", "label": "FAO GAUL", "group": "FAO", "kind": "polygon", "color": "#009EDB" },
+  { "id": "gaul_l0", "source": "gaul", "label": "FAO GAUL", "group": "FAO", "kind": "polygon", "color": "#009EDB", "code": "ISO3_CODE", "name": "GAUL0_NAME" },
   { "id": "gaul_lines", "source": "gaul", "label": "FAO GAUL", "group": "FAO", "kind": "line", "color": "#009EDB" },
-  { "id": "ungeodata_polygons", "source": "ungeodata", "label": "UN Geodata", "group": "UN Geodata 1M", "kind": "polygon", "color": "#CF3F0B" },
+  { "id": "ungeodata_polygons", "source": "ungeodata", "label": "UN Geodata", "group": "UN Geodata 1M", "kind": "polygon", "color": "#CF3F0B", "code": "iso3cd", "name": "maplab" },
   { "id": "ungeodata_lines", "source": "ungeodata", "label": "UN Geodata", "group": "UN Geodata 1M", "kind": "line", "color": "#CF3F0B" },
-  { "id": "fieldmaps_polygons", "source": "fieldmaps", "label": "FieldMaps", "group": "FieldMaps", "kind": "polygon", "color": "#733D96" },
+  { "id": "fieldmaps_polygons", "source": "fieldmaps", "label": "FieldMaps", "group": "FieldMaps", "kind": "polygon", "color": "#733D96", "code": "iso_3", "name": "adm0_name" },
   { "id": "fieldmaps_lines", "source": "fieldmaps", "label": "FieldMaps", "group": "FieldMaps", "kind": "line", "color": "#733D96" },
-  { "id": "wp_polygons", "source": "state_dept", "label": "US State Dept", "group": "US State Dept", "kind": "polygon", "color": "#262626" },
+  { "id": "wp_polygons", "source": "state_dept", "label": "US State Dept", "group": "US State Dept", "kind": "polygon", "color": "#262626", "code": "GENC_3", "name": "Map_Label" },
   { "id": "lsib_lines", "source": "state_dept", "label": "US State Dept", "group": "US State Dept", "kind": "line", "color": "#262626" }
 ]

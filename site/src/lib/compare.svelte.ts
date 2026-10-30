@@ -1,4 +1,5 @@
 import { DEFAULT_PAIR, LAYERS, SOURCES, layerFor, type SourceLayer } from "$lib/layers";
+import type { Part } from "$lib/attributes";
 import type { Draw, Slot } from "$lib/map/style";
 
 export type Kind = SourceLayer["kind"];
@@ -10,6 +11,15 @@ export interface Hit {
   label: string;
   color: string;
   properties: Record<string, unknown>;
+}
+
+// A code picked in the table or on the map, optionally narrowed to one feature; fly frames it.
+export interface Focus {
+  iso3: string;
+  bbox: number[] | null;
+  parts: Part[];
+  part: Part | null;
+  fly: boolean;
 }
 
 export const MODES: { id: Kind; label: string }[] = [
@@ -38,7 +48,9 @@ function fromUrl() {
   const mode = pick("mode", MODES.map((m) => m.id), MODES[0].id);
   const pair = { a: pick("a", SOURCES, DEFAULT_PAIR.a), b: pick("b", SOURCES, DEFAULT_PAIR.b) };
   const basemap = pick("basemap", BASEMAPS.map((b) => b.id), "map");
-  return { mode, view: pick(VIEW_PARAM, VIEWS.map((v) => v.id), "overlay"), pair, basemap };
+  const code = q.get("focus");
+  const focus: Focus | null = code ? { iso3: code.toUpperCase(), bbox: null, parts: [], part: null, fly: false } : null;
+  return { mode, view: pick(VIEW_PARAM, VIEWS.map((v) => v.id), "overlay"), pair, basemap, focus };
 }
 
 export class CompareState {
@@ -49,6 +61,7 @@ export class CompareState {
   basemap = $state<Basemap>(this.#init.basemap);
   sweep = $state(0);
   hits = $state<Hit[]>([]);
+  focus = $state.raw<Focus | null>(this.#init.focus);
   #frame = 0;
 
   kindLayers = $derived(LAYERS.filter((l) => l.kind === this.mode));
@@ -58,8 +71,6 @@ export class CompareState {
     if (this.view === "fade") return [this.#slotDraw("a", 1 - this.sweep), this.#slotDraw("b", this.sweep)];
     return [this.#slotDraw("a"), this.#slotDraw("b")];
   });
-
-  nowShowing = $derived(this.view === "a" || this.view === "b" ? { color: SLOT_COLORS[this.view], label: `${this.view.toUpperCase()} only` } : null);
 
   constructor() {
     this.#animate(this.view === "fade");
@@ -74,6 +85,8 @@ export class CompareState {
     params.set(VIEW_PARAM, this.view);
     params.set("basemap", this.basemap);
     for (const slot of ["a", "b"] as const) params.set(slot, this.pair[slot]);
+    if (this.focus) params.set("focus", this.focus.iso3);
+    else params.delete("focus");
   }
 
   setMode(next: Kind) {
@@ -85,6 +98,10 @@ export class CompareState {
     this.view = next;
     this.#animate(next === "fade");
     this.hits = [];
+  }
+
+  focusOn(iso3: string, bbox: number[] | null, parts: Part[], part: Part | null, fly: boolean) {
+    this.focus = { iso3, bbox: part?.bbox ?? bbox, parts, part, fly };
   }
 
   #animate(on: boolean) {
@@ -100,6 +117,7 @@ export class CompareState {
 
   keydown(e: KeyboardEvent) {
     if (e.target instanceof HTMLElement && e.target.closest("input:not([type=radio]), select, textarea")) return;
+    if (e.key === "Escape") this.focus = null;
     const by = KEY_STEP[e.key];
     if (by === undefined) return;
     const at = VIEWS.findIndex((v) => v.id === this.view) + by;

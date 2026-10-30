@@ -41,8 +41,7 @@ def _entities(conn: DuckDBPyConnection) -> None:
             logger.warning("%s: %s missing, skipping", source, path.name)
             continue
         c = SOURCE_COLUMNS[key]
-        # GAUL has no sovereign column; its map code names the administering state.
-        sovereign = c.get("sovereign", c.get("mapcode"))
+        sovereign = c.get("sovereign", "NULL")
         # Fieldmaps names the entity per ISO3; its map name is the per-feature name.
         name = c["mapname"] if key == "fieldmaps" else c["name"]
         conn.execute(f"""--sql

@@ -28,7 +28,6 @@ SOURCE_COLUMNS = {
         "id": "gaul_id",
         "code": "ISO3_CODE",
         "name": "GAUL0_NAME",
-        "mapcode": "MAP_CODE",
         "region": "CONTINENT",
     },
     "ungeodata": {

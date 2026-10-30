@@ -1,17 +1,34 @@
 <script lang="ts">
   import AttributesTable from "$lib/AttributesTable.svelte";
-  import { CompareState } from "$lib/compare.svelte";
+  import { CompareState, type View } from "$lib/compare.svelte";
   import ComparePanel from "$lib/components/ComparePanel.svelte";
   import GlobeMap from "$lib/components/GlobeMap.svelte";
   import HitsPanel from "$lib/components/HitsPanel.svelte";
   import PasswordGate from "$lib/components/PasswordGate.svelte";
+  import type { AttributeRow, Part } from "$lib/attributes";
+  import { layerFor } from "$lib/layers";
+
+  type Tab = "map" | "split" | "table";
+  const TABS: { id: Tab; label: string }[] = [
+    { id: "map", label: "Map" },
+    { id: "split", label: "Split" },
+    { id: "table", label: "Names and attributes" },
+  ];
 
   let tilesBase = $state<string | null>(null);
-  const startTab = new URLSearchParams(import.meta.env.DEV ? location.search : "").get("tab") === "table" ? "table" : "map";
-  let tab = $state<"map" | "table">(startTab);
-  // The table mounts on first visit and stays, keeping its data and filters.
-  let tableSeen = $state(startTab === "table");
+  const startTab = TABS.find((t) => t.id === new URLSearchParams(import.meta.env.DEV ? location.search : "").get("tab"))?.id ?? "map";
+  let tab = $state<Tab>(startTab);
   const compare = new CompareState();
+  let rows = $state.raw<AttributeRow[]>([]);
+  let failed = $state(false);
+
+  $effect(() => {
+    if (!tilesBase) return;
+    fetch(`${tilesBase}/attributes.json`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((data: AttributeRow[]) => (rows = data))
+      .catch(() => (failed = true));
+  });
 
   // View state lives in the URL in dev only; written after unlock so the password page URL stays bare.
   $effect(() => {
@@ -22,9 +39,81 @@
     history.replaceState(null, "", url);
   });
 
-  function show(next: "map" | "table") {
+  function show(next: Tab) {
     tab = next;
-    tableSeen ||= next === "table";
+    // Click results belong to the map-only view.
+    if (next !== "map") compare.hits = [];
+  }
+
+  // The table pane's width in Split, which the map pads its camera by.
+  const PANE_REM = 36;
+  const inset = $derived(tab === "map" ? 0 : PANE_REM * parseFloat(getComputedStyle(document.documentElement).fontSize));
+
+  // The highlight slides under the current tab.
+  const tabButtons: HTMLButtonElement[] = [];
+  let pill = $state({ left: 0, width: 0 });
+  function placePill() {
+    const b = tabButtons[TABS.findIndex((t) => t.id === tab)];
+    if (b) pill = { left: b.offsetLeft, width: b.offsetWidth };
+  }
+  $effect(() => {
+    if (!tilesBase) return;
+    void tab;
+    placePill();
+    document.fonts.ready.then(placePill);
+  });
+
+  const drawn = $derived((["a", "b"] as const).map((slot) => layerFor(compare.pair[slot], "polygon").id));
+
+  const partsOf = (row: AttributeRow) => (row.parts as Part[] | null) ?? [];
+
+  // Sources can share a code for different places, so frame only the shown sources' parts.
+  function shownBox(row: AttributeRow): number[] | null {
+    const layers = compare.view === "a" ? [drawn[0]] : compare.view === "b" ? [drawn[1]] : drawn;
+    const boxes = partsOf(row).filter((p) => layers.includes(p.layer)).map((p) => p.bbox);
+    if (!boxes.length) return (row.bbox as number[] | null) ?? null;
+    const union = (bs: number[][]) => [Math.min(...bs.map((b) => b[0])), Math.min(...bs.map((b) => b[1])), Math.max(...bs.map((b) => b[2])), Math.max(...bs.map((b) => b[3]))];
+    const plain = union(boxes);
+    // Matches the pipeline's antimeridian shift: western parts move east by 360 when that is narrower.
+    const east = union(boxes.map((b) => (b[2] <= 0 ? [b[0] + 360, b[1], b[2] + 360, b[3]] : b)));
+    return plain[2] - plain[0] <= Math.max(180, east[2] - east[0]) ? plain : east;
+  }
+
+  // A code restored from a dev URL has no bbox or parts until the rows arrive.
+  $effect(() => {
+    const restored = compare.focus;
+    if (!restored || restored.bbox || !rows.length) return;
+    const row = rows.find((r) => r.iso3 === restored.iso3);
+    if (row) compare.focusOn(restored.iso3, shownBox(row), partsOf(row), null, false);
+  });
+
+  function focus(row: AttributeRow, part: Part | null = null, fly = true) {
+    compare.focusOn(String(row.iso3), shownBox(row), partsOf(row), part, fly);
+    if (tab === "table") show("split");
+  }
+
+  // Picking a part in the table shows its source alone; clearing the part restores the view.
+  let viewBeforePart: View | null = null;
+  function focusFromTable(row: AttributeRow, part: Part | null = null) {
+    if (part) {
+      viewBeforePart ??= compare.view;
+      compare.setView(part.layer === drawn[0] ? "a" : "b");
+    } else if (viewBeforePart) {
+      compare.setView(viewBeforePart);
+      viewBeforePart = null;
+    }
+    focus(row, part);
+  }
+
+  // A map click narrows to the clicked feature only when its source splits the code.
+  function pick(iso3: string, layer: string, name: string) {
+    const row = rows.find((r) => r.iso3 === iso3);
+    if (!row) return;
+    const own = partsOf(row).filter((p) => p.layer === layer);
+    const part = own.length > 1 ? (own.find((p) => p.name === name) ?? null) : null;
+    // A click inside the focused code keeps its picked part unless it lands on another one.
+    if (!part && compare.focus?.iso3 === iso3) return;
+    focus(row, part, false);
   }
 </script>
 
@@ -35,18 +124,24 @@
     <header class="bar">
       <span class="title">Boundary comparison</span>
       <nav aria-label="Views">
-        <button aria-current={tab === "map" ? "page" : undefined} onclick={() => show("map")}>Map</button>
-        <button aria-current={tab === "table" ? "page" : undefined} onclick={() => show("table")}>Names and attributes</button>
+        <span class="pill" style:transform="translateX({pill.left}px)" style:width="{pill.width}px"></span>
+        {#each TABS as t, i (t.id)}
+          <button bind:this={tabButtons[i]} aria-current={tab === t.id ? "page" : undefined} onclick={() => show(t.id)}>{t.label}</button>
+        {/each}
       </nav>
     </header>
-    <div class="view" class:hidden={tab !== "map"}>
-      <GlobeMap {tilesBase} {compare} active={tab === "map"} />
-      <ComparePanel {compare} />
-      <HitsPanel {compare} />
+    <div class="views" style:--pane="{PANE_REM}rem" style:--shift={tab === "map" ? "100%" : tab === "split" ? `calc(100% - ${PANE_REM}rem)` : "0%"}>
+      <div class="view map">
+        <GlobeMap {tilesBase} {compare} active={tab !== "table"} hits={tab === "map"} {inset} onpick={pick} />
+        <HitsPanel {compare} />
+        <ComparePanel {compare} />
+      </div>
+      <div class="view table" class:open={tab !== "map"}>
+        <div class="slide" class:full={tab === "table"}>
+          <AttributesTable {rows} {failed} focus={compare.focus} {drawn} pair={compare.pair} split={tab === "split"} onfocus={focusFromTable} />
+        </div>
+      </div>
     </div>
-    {#if tableSeen}
-      <div class="view" class:hidden={tab !== "table"}><AttributesTable {tilesBase} /></div>
-    {/if}
   </div>
 {/if}
 
@@ -74,32 +169,86 @@
     color: var(--brand-primary--text);
   }
   nav {
+    position: relative;
     display: flex;
-    gap: 1.75rem;
+    padding: 3px;
+    border-radius: 999px;
+    background: var(--cd-grey--300);
+  }
+  .pill {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    left: 0;
+    border-radius: 999px;
+    background: var(--brand-primary--text);
+    transition:
+      transform 250ms cubic-bezier(0.2, 0, 0, 1),
+      width 250ms cubic-bezier(0.2, 0, 0, 1);
   }
   nav button {
-    padding: 0;
+    position: relative;
+    padding: 0.3rem 0.9rem;
     border: 0;
     background: none;
     color: var(--cd-grey--800);
-    font-size: 0.95rem;
+    font-size: 0.85rem;
+    font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
+    transition: color 250ms;
   }
-  nav button:hover {
+  nav button:hover:not([aria-current]) {
     color: var(--brand-primary--dark);
   }
   nav button[aria-current="page"] {
-    color: var(--brand-primary--text);
-    font-weight: 600;
+    color: var(--cd-white);
+  }
+  .views {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+  /* Keeps the map's floating panels beneath the sliding table. */
+  .view.map {
+    position: absolute;
+    inset: 0;
+    isolation: isolate;
+  }
+  /* The table pane slides over the full-width map with a transform, so nothing re-lays out mid-slide. */
+  .view.table {
+    position: absolute;
+    inset: 0;
+    background: var(--cd-white);
+    transform: translateX(var(--shift));
+    transition: transform 300ms cubic-bezier(0.2, 0, 0, 1);
+    will-change: transform;
+  }
+  .view.table.open {
+    border-left: 1px solid var(--cd-grey--400);
+  }
+  .slide {
+    display: flex;
+    width: var(--pane);
+  }
+  .slide.full {
+    width: 100%;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pill,
+    .view.table {
+      transition: none;
+    }
   }
   .view {
     display: flex;
     flex: 1;
+    min-width: 0;
     min-height: 0;
     position: relative;
   }
-  .view > :global(.table-view) {
+  .slide > :global(.table-view) {
     flex: 1;
     min-width: 0;
   }

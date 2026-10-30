@@ -15,60 +15,47 @@ export interface AttributeGroup {
   compare: boolean;
 }
 
-// Status, region and map name follow different conventions per source, so only a source pair compares them.
+// Status, region and map name follow different conventions per source, so only two sources at a time compare them.
 export const GROUPS: AttributeGroup[] = [
   { key: "name", label: "Name", sources: ["gaul", "ungeodata", "fieldmaps", "wp", "unterm", "m49"], compare: true },
   { key: "mapname", label: "Map name", sources: ["ungeodata", "fieldmaps", "wp"], compare: false },
-  { key: "mapcode", label: "Map code", sources: ["gaul"], compare: false },
   { key: "count", label: "Features", sources: ["gaul", "ungeodata", "fieldmaps", "wp"], compare: true },
   { key: "sovereign", label: "Sovereign", sources: ["ungeodata", "fieldmaps"], compare: true },
   { key: "status", label: "Status", sources: ["ungeodata", "fieldmaps", "wp", "unterm"], compare: false },
   { key: "region", label: "Region", sources: ["gaul", "ungeodata", "fieldmaps", "m49"], compare: false },
 ];
 
-export const BASELINE = "gaul";
+// Map sources (layers.json) to their attributes.json source.
+export const ATTRIBUTE_SOURCE: Record<string, string> = { gaul: "gaul", ungeodata: "ungeodata", fieldmaps: "fieldmaps", state_dept: "wp" };
 
-// Sources that publish their own entity list, as opposed to M49 which shares the ref table with UNTERM.
-const ENTITY_SOURCES = Object.keys(SOURCES).filter((s) => s !== "m49");
+type DiffKind = "differs" | "missing";
+export type DiffType = DiffKind | "all";
 
-export const DIFF_TYPES = {
-  any: "Any difference",
-  differs: "Value differs",
-  missing: "Missing from a source",
-  several: "Several features under one code",
-  only: "Code in only one source",
-  none: "No differences",
-  all: "All rows",
-} as const;
-export type DiffType = keyof typeof DIFF_TYPES;
-type DiffKind = "differs" | "missing" | "several" | "only";
+// One feature of a code in one source; s is the attributes source, layer its polygon tile layer,
+// name the map label tiles match on, label the map label or else the source's name.
+export interface Part {
+  s: string;
+  id: string;
+  layer: string;
+  name: string;
+  label: string | null;
+  bbox: number[];
+}
 
-export type AttributeRow = Record<string, string | number | null>;
+// bbox is [west, south, east, north]; east can pass 180 for codes across the antimeridian.
+export type AttributeRow = Record<string, string | number | number[] | Part[] | null>;
 
 export function value(row: AttributeRow, group: string, source: string): string {
   return String(row[`${group}_${source}`] ?? "").trim();
 }
 
-// Facets take the UN view first and fall back to fieldmaps, which follows it.
-const facet = (group: string, source: string) => ({
-  label: `${GROUPS.find((g) => g.key === group)!.label} (${SOURCES[source]})`,
-  get: (r: AttributeRow) => value(r, group, source) || value(r, group, "fieldmaps"),
-});
-export const FACETS = {
-  status: facet("status", "ungeodata"),
-  region: facet("region", "m49"),
-  sovereign: facet("sovereign", "ungeodata"),
-};
-export type Facet = keyof typeof FACETS;
-const NONE = "(none)";
-
-export type Filter = { group: string; diff: DiffType; pair: string; query: string } & Record<Facet, string>;
+// sources limits the table to those sources; empty means all.
+export type Filter = { group: string; diff: DiffType; sources: string[]; query: string };
 export const DEFAULT_FILTER: Filter = {
   group: "name",
-  diff: "any",
-  pair: "",
+  diff: "differs",
+  sources: [],
   query: "",
-  ...(Object.fromEntries(Object.keys(FACETS).map((f) => [f, ""])) as Record<Facet, string>),
 };
 
 export function groupsInScope(filter: Filter): AttributeGroup[] {
@@ -76,12 +63,12 @@ export function groupsInScope(filter: Filter): AttributeGroup[] {
 }
 
 export function sourcesFor(group: AttributeGroup, filter: Filter): string[] {
-  return filter.pair ? group.sources.filter((s) => s === BASELINE || s === filter.pair) : group.sources;
+  return filter.sources.length ? group.sources.filter((s) => filter.sources.includes(s)) : group.sources;
 }
 
-// Whether values in a group are compared at all; status and region only within a source pair.
+// Whether values in a group are compared at all; status and region only between two sources.
 export function compares(group: AttributeGroup, filter: Filter): boolean {
-  return !!filter.pair || group.compare;
+  return filter.sources.length === 2 || group.compare;
 }
 
 export const TIE = Symbol("tie");
@@ -104,27 +91,19 @@ export function majority(
 
 function diffKinds(row: AttributeRow, filter: Filter): Set<DiffKind> {
   const kinds = new Set<DiffKind>();
-  const scoped = new Set<string>();
   for (const group of groupsInScope(filter)) {
     const sources = sourcesFor(group, filter);
-    sources.forEach((s) => scoped.add(s));
     if (sources.length < 2) continue;
     const present = sources.map((s) => value(row, group.key, s)).filter(Boolean);
     if (present.length > 0 && present.length < sources.length) kinds.add("missing");
     if (compares(group, filter) && new Set(present).size > 1) kinds.add("differs");
   }
-  if ([...scoped].some((s) => Number(row[`count_${s}`] ?? 0) > 1)) kinds.add("several");
-  const entities = ENTITY_SOURCES.filter((s) => scoped.has(s));
-  if (entities.length > 1 && entities.filter((s) => Number(row[`count_${s}`] ?? 0) > 0).length === 1) {
-    kinds.add("only");
-  }
   return kinds;
 }
 
-// Rows are loaded once and never mutated, so per-row derived values are cached for the option counts.
+// Rows are loaded once and never mutated, so per-row derived values are cached.
 interface RowCache {
   haystack: string;
-  facets: Record<Facet, string>;
   kinds: Map<string, Set<DiffKind>>;
 }
 const cache = new WeakMap<AttributeRow, RowCache>();
@@ -136,9 +115,6 @@ function cached(row: AttributeRow): RowCache {
       haystack: Object.values(row)
         .map((v) => String(v ?? "").toLowerCase())
         .join("\n"),
-      facets: Object.fromEntries(
-        (Object.keys(FACETS) as Facet[]).map((f) => [f, FACETS[f].get(row) || NONE]),
-      ) as Record<Facet, string>,
       kinds: new Map(),
     };
     cache.set(row, c);
@@ -146,22 +122,13 @@ function cached(row: AttributeRow): RowCache {
   return c;
 }
 
-export function facetValue(row: AttributeRow, facet: Facet): string {
-  return cached(row).facets[facet];
-}
-
 export function matches(row: AttributeRow, filter: Filter): boolean {
   const c = cached(row);
-  for (const facet of Object.keys(FACETS) as Facet[]) {
-    if (filter[facet] && c.facets[facet] !== filter[facet]) return false;
-  }
   if (filter.diff !== "all") {
-    const key = `${filter.group}|${filter.pair}`;
+    const key = `${filter.group}|${filter.sources.join()}`;
     let kinds = c.kinds.get(key);
     if (!kinds) c.kinds.set(key, (kinds = diffKinds(row, filter)));
-    if (filter.diff === "any" ? kinds.size === 0 : filter.diff === "none" ? kinds.size > 0 : !kinds.has(filter.diff)) {
-      return false;
-    }
+    if (!kinds.has(filter.diff)) return false;
   }
   const q = filter.query.trim().toLowerCase();
   return !q || c.haystack.includes(q);

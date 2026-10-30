@@ -1,4 +1,5 @@
-import type { DataDrivenPropertyValueSpecification, ExpressionSpecification, LayerSpecification, Map, StyleSpecification } from "maplibre-gl";
+import type { DataDrivenPropertyValueSpecification, ExpressionSpecification, FilterSpecification, LayerSpecification, Map, StyleSpecification } from "maplibre-gl";
+import type { Focus } from "$lib/compare.svelte";
 import positron from "$lib/utils/basemap/positron.json";
 import { LAYERS, LAYER_BY_ID, type SourceLayer } from "$lib/layers";
 import { SATELLITE } from "$lib/map/satellite";
@@ -16,6 +17,8 @@ const POSITRON_IDS = (positron.layers as LayerSpecification[]).map((l) => l.id);
 
 const FILL_OPACITY = 0.08;
 const LINE_WIDTH = 2;
+const FOCUS_WIDTH = 4;
+const DIM = { map: { color: "#FFFFFF", opacity: 0.7 }, satellite: { color: "#000000", opacity: 0.55 } };
 
 // Line types from the UN Guidelines for the Publication of Maps; dashes are in line widths.
 const LINE_TYPES = {
@@ -86,6 +89,18 @@ function layersFor(layer: SourceLayer, draws: Draw[]): LayerSpecification[] {
   return [fill, line];
 }
 
+// Drawn above every source so a focused code stands out; line tiles carry no ISO3, so these use polygons.
+function focusLayersFor(layer: SourceLayer): LayerSpecification[] {
+  if (!layer.code) return [];
+  const common = { source: layer.id, "source-layer": layer.id, layout: { visibility: "none" } } as const;
+  return [
+    { ...common, id: `${layer.id}-dim`, type: "fill", paint: { "fill-color": DIM.map.color, "fill-opacity": DIM.map.opacity } },
+    // Transparent, so a click finds the code under it in Lines mode too.
+    { ...common, id: `${layer.id}-pick`, type: "fill", paint: { "fill-opacity": 0 } },
+    { ...common, id: `${layer.id}-focus`, type: "line", paint: { "line-color": layer.color, "line-width": FOCUS_WIDTH } },
+  ];
+}
+
 type Setter = (id: string, name: string, value: unknown) => void;
 
 export function applyDraws(map: Map, draws: Draw[]) {
@@ -99,12 +114,51 @@ export function applyDraws(map: Map, draws: Draw[]) {
   }
 }
 
+// A source's line layer draws in Lines mode, so draws match polygon layers by source.
+const drawFor = (draws: Draw[], layerId: string) => draws.find((d) => LAYER_BY_ID.get(d.id)?.source === LAYER_BY_ID.get(layerId)?.source);
+
+// Pick layers of the drawn sources, A first.
+export function pickLayerIds(draws: Draw[]) {
+  return draws.flatMap((d) => LAYERS.filter((l) => l.code && l.source === LAYER_BY_ID.get(d.id)?.source).map((l) => `${l.id}-pick`));
+}
+
+// A picked part narrows its own layer to that feature; other layers outline the whole code.
+function outlined(layer: SourceLayer, focus: Focus): string[] | null {
+  return focus.part?.layer === layer.id ? [focus.part.name] : null;
+}
+
+export function applyFocus(map: Map, draws: Draw[], focus: Focus | null, satellite: boolean) {
+  const dim = DIM[satellite ? "satellite" : "map"];
+  for (const layer of LAYERS) {
+    if (!layer.code) continue;
+    const drawn = drawFor(draws, layer.id);
+    map.setLayoutProperty(`${layer.id}-pick`, "visibility", drawn ? "visible" : "none");
+    const draw = focus ? drawn : undefined;
+    // One dim is enough; stacking a second would darken the surroundings twice.
+    const dimmed = !!draw && draw === draws[0];
+    map.setLayoutProperty(`${layer.id}-focus`, "visibility", draw ? "visible" : "none");
+    map.setLayoutProperty(`${layer.id}-dim`, "visibility", dimmed ? "visible" : "none");
+    if (!draw || !focus) continue;
+    const code: ExpressionSpecification = ["upcase", ["to-string", ["coalesce", ["get", layer.code], ""]]];
+    const names = outlined(layer, focus);
+    const filter: FilterSpecification = ["==", code, focus.iso3];
+    map.setFilter(`${layer.id}-focus`, names ? ["all", filter, ["in", ["get", layer.name!], ["literal", names]]] : filter);
+    map.setPaintProperty(`${layer.id}-focus`, "line-color", draw.color);
+    map.setPaintProperty(`${layer.id}-focus`, "line-opacity", draw.opacity);
+    if (!dimmed) continue;
+    map.setFilter(`${layer.id}-dim`, ["!=", code, focus.iso3]);
+    map.setPaintProperty(`${layer.id}-dim`, "fill-color", dim.color);
+    map.setPaintProperty(`${layer.id}-dim`, "fill-opacity", dim.opacity);
+  }
+}
+
 export function applyBasemap(map: Map, satellite: boolean) {
   for (const id of POSITRON_IDS) map.setLayoutProperty(id, "visibility", satellite ? "none" : "visible");
   map.setLayoutProperty("satellite", "visibility", satellite ? "visible" : "none");
 }
 
 export function buildStyle(tilesBase: string, draws: Draw[]): StyleSpecification {
+  const focus = LAYERS.flatMap(focusLayersFor);
   return {
     version: 8,
     projection: { type: "globe" },
@@ -123,6 +177,9 @@ export function buildStyle(tilesBase: string, draws: Draw[]): StyleSpecification
       ...(positron.layers as LayerSpecification[]),
       { id: "satellite", type: "raster", source: "satellite", layout: { visibility: "none" } },
       ...LAYERS.flatMap((l) => layersFor(l, draws)),
+      // Every dim sits under every outline, so one source's dim never covers the other's outline.
+      ...focus.filter((l) => l.type === "fill"),
+      ...focus.filter((l) => l.type === "line"),
     ],
   };
 }

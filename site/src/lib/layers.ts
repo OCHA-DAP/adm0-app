@@ -9,6 +9,9 @@ export interface SourceLayer {
   group: string;
   kind: "polygon" | "line";
   color: string;
+  // Polygon layers only: the feature properties holding the ISO3 code and the feature's name.
+  code?: string;
+  name?: string;
 }
 
 export const LAYERS = layers as SourceLayer[];
