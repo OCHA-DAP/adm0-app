@@ -62,7 +62,7 @@ function layersFor(layer: SourceLayer, draws: Draw[]): LayerSpecification[] {
   const draw = draws.find((d) => d.id === layer.id);
   const opacity = draw?.opacity ?? 0;
   const color = draw?.color ?? layer.color;
-  const common = { source: layer.id, "source-layer": layer.id, layout: { visibility: opacity > 0 ? "visible" : "none" } } as const;
+  const common = { source: layer.id, "source-layer": layer.id, layout: { visibility: draw ? "visible" : "none" } } as const;
   const line: LayerSpecification = {
     ...common,
     id: `${layer.id}-line`,
@@ -101,6 +101,8 @@ export function buildStyle(tilesBase: string, draws: Draw[]): StyleSpecification
   return {
     version: 8,
     projection: { type: "globe" },
+    // Fade drives opacity every frame, so built-in easing would only make it lag.
+    transition: { duration: 0, delay: 0 },
     sprite: positron.sprite,
     glyphs: positron.glyphs,
     sources: {

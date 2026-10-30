@@ -33,7 +33,7 @@
   {@render segmented("Compare", MODES, compare.mode, (id) => compare.setMode(id as Kind))}
   <h2>View</h2>
   {@render segmented("View", VIEWS, compare.view, (id) => compare.setView(id as View), true)}
-  <p class="hint">{compare.viewInfo.hint} Press 1 to 4 to switch views.</p>
+  <p class="hint">{compare.viewInfo.hint} Press 1 to 3 to switch views.</p>
   {#if compare.view === "single"}
     <h2>Source</h2>
     <label class="slot">
@@ -51,22 +51,6 @@
       </label>
     {/each}
     <button class="btn swap" onclick={() => compare.swap()}>Swap A and B</button>
-    {#if compare.view === "overlay"}
-      <label class="range">
-        <span>A</span>
-        <input type="range" min="0" max="1" step="0.05" bind:value={compare.fade} aria-label="Crossfade between A and B" />
-        <span>B</span>
-      </label>
-      <label class="check">
-        <input type="checkbox" checked={compare.blinking} onchange={(e) => compare.setBlinking(e.currentTarget.checked)} />
-        Blink between A and B
-      </label>
-    {:else if compare.view === "lens"}
-      <label class="range">
-        <span>Lens</span>
-        <input type="range" min="40" max="300" step="10" bind:value={compare.lensRadius} aria-label="Lens size" />
-      </label>
-    {/if}
     <p class="hint">Tap [ or ] to show only A or B, or hold to peek. Shift+[ or ] changes B.</p>
   {/if}
   {#if compare.hits.length === 0}
@@ -125,15 +109,5 @@
   }
   .swap {
     margin: 0.2rem 0 0.4rem;
-  }
-  .range,
-  .check {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    margin-top: 0.4rem;
-  }
-  .range input {
-    flex: 1;
   }
 </style>

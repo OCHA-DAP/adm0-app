@@ -7,10 +7,20 @@
   import PasswordGate from "$lib/components/PasswordGate.svelte";
 
   let tilesBase = $state<string | null>(null);
-  let tab = $state<"map" | "table">("map");
+  const startTab = new URLSearchParams(location.search).get("tab") === "table" ? "table" : "map";
+  let tab = $state<"map" | "table">(startTab);
   // The table mounts on first visit and stays, keeping its data and filters.
-  let tableSeen = $state(false);
+  let tableSeen = $state(startTab === "table");
   const compare = new CompareState();
+
+  // Written only after unlock so the password page URL stays bare.
+  $effect(() => {
+    if (!tilesBase) return;
+    const url = new URL(location.href);
+    url.searchParams.set("tab", tab);
+    compare.writeParams(url.searchParams);
+    history.replaceState(null, "", url);
+  });
 
   function show(next: "map" | "table") {
     tab = next;
