@@ -1,10 +1,13 @@
 <script lang="ts">
   import {
+    BASELINE,
+    DEFAULT_FILTER,
     DIFF_TYPES,
     FACETS,
     GROUPS,
-    NONE,
     SOURCES,
+    compares,
+    facetValue,
     groupsInScope,
     majority,
     matches,
@@ -14,16 +17,14 @@
     type AttributeRow,
     type DiffType,
     type Facet,
-    type Lens,
+    type Filter,
   } from "$lib/attributes";
 
   let { tilesBase }: { tilesBase: string } = $props();
 
-  const DEFAULT: Lens = { group: "", diff: "any", pair: "", status: "", region: "", sovereign: "", query: "" };
-
   let rows = $state.raw<AttributeRow[]>([]);
   let failed = $state(false);
-  let lens = $state<Lens>({ ...DEFAULT });
+  let filter = $state<Filter>({ ...DEFAULT_FILTER });
 
   $effect(() => {
     fetch(`${tilesBase}/attributes.json`)
@@ -32,30 +33,31 @@
       .catch(() => (failed = true));
   });
 
-  const shown = $derived(rows.filter((row) => matches(row, lens)));
-  const groups = $derived(groupsInScope(lens));
-  const pairs = Object.keys(SOURCES).filter((s) => s !== "gaul");
+  const shown = $derived(rows.filter((row) => matches(row, filter)));
+  const groups = $derived(groupsInScope(filter));
+  const pairs = Object.keys(SOURCES).filter((s) => s !== BASELINE);
   const facets = Object.keys(FACETS) as Facet[];
 
-  // Rows each option would keep, with every other lens left as it is.
-  function count<K extends keyof Lens>(key: K, option: Lens[K]) {
-    const trial = { ...lens, [key]: option };
+  // Rows each option would keep, with every other filter left as it is.
+  function count<K extends keyof Filter>(key: K, option: Filter[K]) {
+    const trial = { ...filter, [key]: option };
     return rows.filter((row) => matches(row, trial)).length;
   }
 
   const facetOptions = $derived(
     Object.fromEntries(
-      facets.map((f) => [f, [...new Set(rows.map((r) => FACETS[f].get(r) || NONE))].sort()]),
+      facets.map((f) => [f, [...new Set(rows.map((r) => facetValue(r, f)))].sort()]),
     ) as Record<Facet, string[]>,
   );
 
   function cellClass(row: AttributeRow, group: (typeof GROUPS)[number], source: string) {
     const v = value(row, group.key, source);
-    const inPair = !lens.pair || source === "gaul" || source === lens.pair;
+    const sources = sourcesFor(group, filter);
+    const inPair = sources.includes(source);
     let diff = false;
-    if (v && inPair && (lens.pair || group.compare)) {
-      const top = majority(row, group, sourcesFor(group, lens));
-      diff = top !== null && (!!lens.pair || top === TIE || v !== top);
+    if (v && inPair && compares(group, filter)) {
+      const top = majority(row, group, sources);
+      diff = top !== null && (!!filter.pair || top === TIE || v !== top);
     }
     return { empty: !v, diff, dim: !inPair };
   }
@@ -63,17 +65,17 @@
 
 <div class="table-view">
   <div class="controls">
-    <input type="search" placeholder="Search code or name" bind:value={lens.query} />
+    <input type="search" placeholder="Search code or name" bind:value={filter.query} />
     <label>
       Attribute
-      <select bind:value={lens.group}>
+      <select bind:value={filter.group}>
         <option value="">All ({count("group", "")})</option>
         {#each GROUPS as g (g.key)}<option value={g.key}>{g.label} ({count("group", g.key)})</option>{/each}
       </select>
     </label>
     <label>
       Differences
-      <select bind:value={lens.diff}>
+      <select bind:value={filter.diff}>
         {#each Object.entries(DIFF_TYPES) as [key, label] (key)}
           <option value={key}>{label} ({count("diff", key as DiffType)})</option>
         {/each}
@@ -81,24 +83,24 @@
     </label>
     <label>
       Compare
-      <select bind:value={lens.pair}>
+      <select bind:value={filter.pair}>
         <option value="">All sources ({count("pair", "")})</option>
-        {#each pairs as p (p)}<option value={p}>GAUL vs {SOURCES[p]} ({count("pair", p)})</option>{/each}
+        {#each pairs as p (p)}<option value={p}>{SOURCES[BASELINE]} vs {SOURCES[p]} ({count("pair", p)})</option>{/each}
       </select>
     </label>
     {#each facets as f (f)}
       <label>
         {FACETS[f].label}
-        <select bind:value={lens[f]}>
+        <select bind:value={filter[f]}>
           <option value="">Any</option>
           {#each facetOptions[f] as option (option)}
             {@const n = count(f, option)}
-            {#if n > 0 || lens[f] === option}<option value={option}>{option} ({n})</option>{/if}
+            {#if n > 0 || filter[f] === option}<option value={option}>{option} ({n})</option>{/if}
           {/each}
         </select>
       </label>
     {/each}
-    <button type="button" onclick={() => (lens = { ...DEFAULT })}>Reset</button>
+    <button type="button" onclick={() => (filter = { ...DEFAULT_FILTER })}>Reset</button>
     <span class="count">{shown.length} of {rows.length} codes</span>
   </div>
   {#if failed}
@@ -160,7 +162,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
-    color: var(--cd-grey--700);
+    color: var(--brand-grey--text);
     font-size: 0.75rem;
   }
   .controls select,
@@ -174,7 +176,7 @@
     width: 14rem;
   }
   .count {
-    color: var(--cd-grey--700);
+    color: var(--brand-grey--text);
     margin-left: auto;
   }
   .scroll {
@@ -187,16 +189,13 @@
   }
   th,
   td {
-    text-align: left;
-    vertical-align: top;
     padding: 0.25rem 0.5rem;
-    border-bottom: 1px solid var(--cd-grey--300);
     min-width: 8rem;
     max-width: 16rem;
   }
   thead th {
     position: sticky;
-    background: var(--cd-white, #fff);
+    background: var(--cd-white);
     font-weight: 600;
     z-index: 1;
   }
@@ -205,7 +204,7 @@
   }
   thead tr:nth-child(2) th {
     top: 1.6rem;
-    color: var(--cd-grey--700);
+    color: var(--brand-grey--text);
     font-weight: 400;
   }
   .first {
@@ -214,12 +213,12 @@
   .code {
     position: sticky;
     left: 0;
-    background: var(--cd-white, #fff);
+    background: var(--cd-white);
     min-width: 4rem;
     z-index: 2;
   }
   .empty {
-    background: var(--cd-grey--200, #f2f2f2);
+    background: var(--cd-grey--300);
   }
   .diff {
     background: #fde9dc;

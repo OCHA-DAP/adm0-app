@@ -25,9 +25,7 @@ jobs:
           cache: npm
           cache-dependency-path: site/package-lock.json
       - run: npm ci
-      - run: |
-          [ -n "$TILES_URL" ] || { echo "TILES_URL secret is not set"; exit 1; }
-          node scripts/seal-url.mjs
+      - run: node scripts/seal-url.mjs
         env:
           TILES_URL: ${{ secrets.TILES_URL }}
           SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}

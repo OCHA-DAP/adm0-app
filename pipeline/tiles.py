@@ -1,24 +1,14 @@
 """Write one PMTiles file per source layer for the comparison map."""
 
+import json
 from logging import getLogger
 
 import tylertoo
 
-from .config import prepare_dir, tiles_dir
+from .config import layers_json, prepare_dir, tiles_dir
 
 logger = getLogger(__name__)
 
-LAYERS = (
-    "gaul_l0",
-    "ungeodata_polygons",
-    "ungeodata_lines",
-    "lsib_lines",
-    "wp_polygons",
-    "fieldmaps_wp_polygons",
-    "fieldmaps_wp_lines",
-    "fieldmaps_osm_polygons",
-    "fieldmaps_osm_lines",
-)
 MAX_ZOOM = 12
 # Every boundary must render at every zoom, so only sub-pixel simplification drops.
 KEEP_ALL = {
@@ -33,7 +23,7 @@ KEEP_ALL = {
 def main() -> None:
     """Build an overview and PMTiles for each prepared layer."""
     tiles_dir.mkdir(parents=True, exist_ok=True)
-    for name in LAYERS:
+    for name in (layer["id"] for layer in json.loads(layers_json.read_text())):
         src = prepare_dir / f"{name}.parquet"
         overview = tiles_dir / f"{name}.overview.parquet"
         tylertoo.overview(str(src), str(overview), max_zoom=MAX_ZOOM, **KEEP_ALL)

@@ -1,23 +1,33 @@
 """Build the fieldmaps LSIB humanitarian ADM0 (intl view) for each land source."""
 
 from logging import getLogger
+from typing import TYPE_CHECKING
 
-from duckdb import DuckDBPyConnection, connect
+from .config import (
+    CRS,
+    LANDS,
+    fieldmaps_dir,
+    input_dir,
+    open_db,
+    prepare_dir,
+    tmp_dir,
+    write_parquet,
+)
 
-from .config import CRS, PARQUET_OPTS, fieldmaps_dir, input_dir, prepare_dir, tmp_dir
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from duckdb import DuckDBPyConnection
 
 logger = getLogger(__name__)
 
-LANDS = ("osm", "wp")
+SRC = input_dir / "fieldmaps"
 GEOM_PRECISION = 0.000000001
 LINE_KEYS = ["COUNTRY1", "COUNTRY2", "RANK", "LABEL"]
-# Known erroneous LSIB segments, as (CC1, CC2, RANK).
-LSIB_DROP = [("SS", "SD", 1), ("KE", "SS", 2), ("SS", "SS", 2), ("KE", "KE", 2)]
 
 
 def _attributes(conn: DuckDBPyConnection) -> None:
     """Load the hand-curated point and line attributes."""
-    src = input_dir / "fieldmaps"
     conn.execute(f"""--sql
         CREATE OR REPLACE TABLE attrs_points AS
         SELECT * REPLACE (
@@ -29,56 +39,55 @@ def _attributes(conn: DuckDBPyConnection) -> None:
             coalesce(region3_cd, region2_cd, region1_cd, status_cd) AS region3_cd,
             coalesce(region3_nm, region2_nm, region1_nm, status_nm) AS region3_nm
         )
-        FROM read_csv('{src / "adm0_points.csv"}', all_varchar=true,
+        FROM read_csv('{SRC / "adm0_points.csv"}', all_varchar=true,
                       nullstr=['', '#N/A'])
     """)
     conn.execute(f"""--sql
         CREATE OR REPLACE TABLE attrs_lines AS
         SELECT * EXCLUDE (rank_all)
-        FROM read_csv('{src / "adm0_lines.csv"}', all_varchar=true,
+        FROM read_csv('{SRC / "adm0_lines.csv"}', all_varchar=true,
                       nullstr=['', '#N/A'])
     """)
 
 
 def _inputs(conn: DuckDBPyConnection, land: str) -> None:
     """Load land, template lines plus LSIB, and seed points."""
-    src = input_dir / "fieldmaps"
-    if land == "osm":
-        conn.execute(f"""--sql
-            CREATE OR REPLACE TABLE land_00 AS
-            SELECT fid, geometry AS geom
-            FROM read_parquet('{prepare_dir / "osm_land.parquet"}')
-        """)
-    else:
-        # Caspian Sea is the only World Polygons feature without a WP_Name.
-        conn.execute(f"""--sql
-            CREATE OR REPLACE TABLE land_00 AS
-            SELECT row_number() OVER () AS fid, geom FROM (
-                SELECT UNNEST(ST_Dump(geometry)).geom AS geom
-                FROM read_parquet('{prepare_dir / "wp_polygons.parquet"}')
-                WHERE WP_Name IS NOT NULL
-            )
-        """)
-    drop = " OR ".join(
-        f"(CC1 = '{a}' AND CC2 = '{b}' AND RANK::INTEGER = {r})"
-        for a, b, r in LSIB_DROP
-    )
+    conn.execute(f"CREATE OR REPLACE TABLE land_00 AS {LANDS[land]['land']}")
     conn.execute(f"""--sql
         CREATE OR REPLACE TABLE lines_00 AS
         SELECT CC1, COUNTRY1, CC2, COUNTRY2, RANK::BIGINT AS RANK, LABEL, STATUS,
                NOTES, ST_SetCRS(geom, '{CRS}') AS geom
-        FROM read_parquet('{src / "adm0_lines.parquet"}')
+        FROM read_parquet('{SRC / "adm0_lines.parquet"}')
         UNION ALL
-        SELECT CC1, COUNTRY1, CC2, COUNTRY2, RANK::BIGINT, LABEL, STATUS, NOTES,
+        SELECT l.CC1, COUNTRY1, l.CC2, COUNTRY2, l.RANK::BIGINT, LABEL, STATUS, NOTES,
                geometry
-        FROM read_parquet('{prepare_dir / "lsib_lines.parquet"}')
-        WHERE NOT ({drop})
+        FROM read_parquet('{prepare_dir / "lsib_lines.parquet"}') l
+        -- Known erroneous LSIB segments.
+        ANTI JOIN read_csv('{SRC / "lsib_drop.csv"}') d
+          ON l.CC1 = d.CC1 AND l.CC2 = d.CC2 AND l.RANK::INTEGER = d.RANK
     """)
     conn.execute(f"""--sql
         CREATE OR REPLACE TABLE points_00 AS
         SELECT id, ST_SetCRS(geom, '{CRS}') AS geom
-        FROM read_parquet('{src / "adm0_points.parquet"}')
+        FROM read_parquet('{SRC / "adm0_points.parquet"}')
     """)
+
+
+def _coverage_invalid(conn: DuckDBPyConnection, table: str) -> bool:
+    return conn.execute(
+        f'SELECT ST_CoverageInvalidEdges_Agg(geom) IS NOT NULL FROM "{table}"'
+    ).fetchone()[0]
+
+
+def _land_envelopes(conn: DuckDBPyConnection) -> Iterator[tuple[int, bytes]]:
+    """Yield each crossed land polygon's fid and envelope WKB."""
+    for (fid,) in conn.execute("SELECT fid FROM land_01").fetchall():
+        yield (
+            fid,
+            conn.execute(
+                "SELECT ST_AsWKB(ST_Envelope(geom)) FROM land_01 WHERE fid = $1", [fid]
+            ).fetchone()[0],
+        )
 
 
 def _polygonize(conn: DuckDBPyConnection) -> None:
@@ -98,10 +107,8 @@ def _polygonize(conn: DuckDBPyConnection) -> None:
     """)
     faces, points = conn.execute("""--sql
         SELECT (SELECT count(*) FROM voronoi_00), (SELECT count(*) FROM points_00)
-    """).fetchall()[0]
-    invalid = conn.execute(
-        "SELECT ST_CoverageInvalidEdges_Agg(geom) IS NOT NULL FROM voronoi_00"
-    ).fetchall()[0][0]
+    """).fetchone()
+    invalid = _coverage_invalid(conn, "voronoi_00")
     if faces != points or invalid:
         msg = f"polygonize: {faces} faces for {points} points, invalid={invalid}"
         raise RuntimeError(msg)
@@ -109,7 +116,7 @@ def _polygonize(conn: DuckDBPyConnection) -> None:
 
 def _continents(conn: DuckDBPyConnection) -> None:
     """Keep the land masses crossed by a boundary line."""
-    wkb = conn.execute("SELECT ST_AsWKB(geom) FROM lines_01").fetchall()[0][0]
+    wkb = conn.execute("SELECT ST_AsWKB(geom) FROM lines_01").fetchone()[0]
     conn.execute(
         """--sql
         CREATE OR REPLACE TABLE land_01 AS
@@ -123,10 +130,7 @@ def _intersection(conn: DuckDBPyConnection) -> None:
     """Clip voronoi cells to land; whole islands go to the cell holding them."""
     conn.execute("CREATE OR REPLACE TABLE clip (id VARCHAR, geom GEOMETRY)")
     # One land polygon per execute(), passed as WKB, caps GEOS memory.
-    for (fid,) in conn.execute("SELECT fid FROM land_01").fetchall():
-        env = conn.execute(
-            "SELECT ST_AsWKB(ST_Envelope(geom)) FROM land_01 WHERE fid = $1", [fid]
-        ).fetchall()[0][0]
+    for fid, env in _land_envelopes(conn):
         cells = conn.execute(
             "SELECT id, ST_AsWKB(geom) FROM voronoi_00 "
             "WHERE ST_Intersects(geom, ST_GeomFromWKB($1))",
@@ -188,12 +192,10 @@ def _lines(conn: DuckDBPyConnection) -> None:
         f"CREATE OR REPLACE TABLE lines_clip AS "
         f"SELECT {keys}, geom FROM lines_00 LIMIT 0"
     )
-    for (fid,) in conn.execute("SELECT fid FROM land_01").fetchall():
-        land, env = conn.execute(
-            "SELECT ST_AsWKB(geom), ST_AsWKB(ST_Envelope(geom)) FROM land_01 "
-            "WHERE fid = $1",
-            [fid],
-        ).fetchall()[0]
+    for fid, env in _land_envelopes(conn):
+        land = conn.execute(
+            "SELECT ST_AsWKB(geom) FROM land_01 WHERE fid = $1", [fid]
+        ).fetchone()[0]
         for *vals, line in conn.execute(
             f"SELECT {keys}, ST_AsWKB(geom) FROM lines_00 "
             "WHERE ST_Intersects(ST_Envelope(geom), ST_GeomFromWKB($1))",
@@ -230,33 +232,26 @@ def _write(conn: DuckDBPyConnection, land: str) -> None:
         ("voronoi_01", "voronoi"),
         ("lines_02", "lines"),
     ):
-        out = fieldmaps_dir / f"{land}_{name}.parquet"
-        conn.execute(f"""--sql
-            COPY (SELECT * EXCLUDE geom, ST_SetCRS(geom, '{CRS}') AS geometry
-                  FROM "{table}")
-            TO '{out}' {PARQUET_OPTS}
-        """)
-        n = conn.execute(f'SELECT count(*) FROM "{table}"').fetchall()[0][0]
-        logger.info("%s_%s: %d rows", land, name, n)
+        write_parquet(
+            conn,
+            f'SELECT * EXCLUDE geom, geom AS geometry FROM "{table}"',
+            fieldmaps_dir / f"{land}_{name}.parquet",
+        )
 
 
 def _validate(conn: DuckDBPyConnection, land: str) -> None:
+    def count(sql: str) -> int:
+        return conn.execute(sql).fetchone()[0]
+
+    invalid = "WHERE geom IS NULL OR NOT ST_IsValid(geom)"
     issues = []
-    for table, key in (("polygons_01", "id"), ("lines_02", None)):
-        bad = conn.execute(
-            f'SELECT count(*) FROM "{table}" WHERE geom IS NULL OR NOT ST_IsValid(geom)'
-        ).fetchall()[0][0]
-        if bad:
-            issues.append(f"{table}: {bad} null/invalid geometries")
-        if key:
-            dup = conn.execute(
-                f'SELECT count(*) - count(DISTINCT "{key}") FROM "{table}"'
-            ).fetchall()[0][0]
-            if dup:
-                issues.append(f"{table}: {dup} duplicate {key}")
-    if conn.execute(
-        "SELECT ST_CoverageInvalidEdges_Agg(geom) IS NOT NULL FROM polygons_01"
-    ).fetchall()[0][0]:
+    if bad := count(f"SELECT count(*) FROM polygons_01 {invalid}"):
+        issues.append(f"polygons_01: {bad} null/invalid geometries")
+    if dup := count("SELECT count(*) - count(DISTINCT id) FROM polygons_01"):
+        issues.append(f"polygons_01: {dup} duplicate id")
+    if bad := count(f"SELECT count(*) FROM lines_02 {invalid}"):
+        issues.append(f"lines_02: {bad} null/invalid geometries")
+    if _coverage_invalid(conn, "polygons_01"):
         issues.append("polygons_01: overlaps or gaps between units")
     if issues:
         msg = f"{land}: {'; '.join(issues)}"
@@ -267,10 +262,7 @@ def main() -> None:
     """Build polygons, voronoi cells and lines for each land source."""
     fieldmaps_dir.mkdir(parents=True, exist_ok=True)
     for land in LANDS:
-        db = tmp_dir / f"fieldmaps_{land}.duckdb"
-        db.unlink(missing_ok=True)
-        conn = connect(db)
-        conn.execute("LOAD spatial")
+        conn = open_db(tmp_dir / f"fieldmaps_{land}.duckdb")
         _attributes(conn)
         _inputs(conn, land)
         _polygonize(conn)

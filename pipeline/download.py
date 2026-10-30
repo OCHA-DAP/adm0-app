@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from fnmatch import filter as fnfilter
+from functools import partial
 from logging import getLogger
 from shutil import rmtree
 from typing import TYPE_CHECKING
@@ -19,19 +20,7 @@ from tenacity import (
     wait_exponential,
 )
 
-from .config import (
-    FIELDMAPS_LICENSE,
-    FIELDMAPS_URL,
-    GAUL_URL,
-    LAND_OSM_URL,
-    LAND_WP_URL,
-    LSIB_META_URL,
-    LSIB_NS,
-    LSIB_URL,
-    M49_URL,
-    UNTERM_URL,
-    download_dir,
-)
+from .config import LANDS, download_dir
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -39,7 +28,22 @@ if TYPE_CHECKING:
 
 logger = getLogger(__name__)
 
-HEADERS = {"User-Agent": "Mozilla/5.0 (adm0-site)"}
+GAUL_URL = (
+    "https://storage.googleapis.com/fao-maps-catalog-data/boundaries/GAUL_2025_L1.zip"
+)
+LAND_OSM_URL = (
+    "https://osmdata.openstreetmap.de/download/land-polygons-complete-4326.zip"
+)
+LAND_WP_URL = "https://data.geodata.state.gov/WorldPolygons.zip"
+LSIB_URL = "https://data.geodata.state.gov/LSIB.gpkg"
+LSIB_META_URL = "https://geodata.state.gov/geonetwork/srv/api/records/3bdb81a0-c1b9-439a-a0b1-85dac30c59b2"
+LSIB_NS = {
+    "gco": "http://www.isotc211.org/2005/gco",
+    "gmd": "http://www.isotc211.org/2005/gmd",
+}
+UNTERM_URL = "https://conferences.unite.un.org/untermapi/api/term/downloadCountries"
+FIELDMAPS_URL = "https://data.source.coop/fieldmaps/international/{license}/humanitarian/adm0-{geom}/adm0_{geom}.parquet"
+M49_URL = "https://unstats.un.org/unsd/methodology/m49/overview/"
 
 
 def _transient(e: BaseException) -> bool:
@@ -62,46 +66,44 @@ def _client() -> Client:
     return Client(
         http2=True,
         timeout=Timeout(60, connect=30),
-        headers=HEADERS,
+        headers={"User-Agent": "Mozilla/5.0 (adm0-site)"},
         follow_redirects=True,
     )
-
-
-@_retry
-def _stream(url: str, dest: Path) -> str | None:
-    """Stream ``url`` to ``dest`` and return its Last-Modified date, if any."""
-    with _client() as client, client.stream("GET", url) as r:
-        r.raise_for_status()
-        with dest.open("wb") as f:
-            f.writelines(r.iter_bytes(chunk_size=4 * 1024 * 1024))
-        modified = r.headers.get("last-modified")
-    return parsedate_to_datetime(modified).date().isoformat() if modified else None
-
-
-def _zip(url: str, out: Path, only: str | None = None) -> str | None:
-    tmp = out / ".tmp"
-    try:
-        date = _stream(url, tmp)
-        with ZipFile(tmp) as z:
-            z.extractall(out, fnfilter(z.namelist(), only) if only else None)
-    finally:
-        tmp.unlink(missing_ok=True)
-    return date
 
 
 def _today() -> str:
     return datetime.now(UTC).date().isoformat()
 
 
-def _gaul(out: Path) -> str:
-    return _zip(GAUL_URL, out) or _today()
+@_retry
+def _stream(url: str, dest: Path, *, required: bool = False) -> str:
+    """Stream ``url`` to ``dest`` and return its Last-Modified date, else today.
 
-
-def _osm(out: Path) -> str:
-    date = _zip(LAND_OSM_URL, out)
-    if not date:
-        msg = "OSM land date not found in Last-Modified header"
+    With ``required``, a missing Last-Modified header raises instead.
+    """
+    with _client() as client, client.stream("GET", url) as r:
+        r.raise_for_status()
+        with dest.open("wb") as f:
+            f.writelines(r.iter_bytes(chunk_size=4 * 1024 * 1024))
+        modified = r.headers.get("last-modified")
+    if modified:
+        return parsedate_to_datetime(modified).date().isoformat()
+    if required:
+        msg = f"{url}: date not found in Last-Modified header"
         raise ValueError(msg)
+    return _today()
+
+
+def _zip(
+    url: str, out: Path, only: str | None = None, *, required: bool = False
+) -> str:
+    tmp = out / ".tmp"
+    try:
+        date = _stream(url, tmp, required=required)
+        with ZipFile(tmp) as z:
+            z.extractall(out, fnfilter(z.namelist(), only) if only else None)
+    finally:
+        tmp.unlink(missing_ok=True)
     return date
 
 
@@ -148,10 +150,10 @@ def _ref(out: Path) -> str:
 
 def _fieldmaps(out: Path) -> str:
     dates = []
-    for land, license_ in FIELDMAPS_LICENSE.items():
+    for land, spec in LANDS.items():
         for geom in ("polygons", "lines"):
-            url = FIELDMAPS_URL.format(license=license_, geom=geom)
-            dates.append(_stream(url, out / f"{land}_{geom}.parquet") or _today())
+            url = FIELDMAPS_URL.format(license=spec["license"], geom=geom)
+            dates.append(_stream(url, out / f"{land}_{geom}.parquet"))
     return max(dates)
 
 
@@ -166,9 +168,9 @@ def _fetch(source: str, fn: Callable[[Path], str]) -> None:
 def main() -> None:
     """Download all sources in parallel."""
     jobs = {
-        "gaul": _gaul,
+        "gaul": partial(_zip, GAUL_URL),
         "lsib": _lsib,
-        "osm": _osm,
+        "osm": partial(_zip, LAND_OSM_URL, required=True),
         "wp": _wp,
         "ref": _ref,
         "fieldmaps": _fieldmaps,

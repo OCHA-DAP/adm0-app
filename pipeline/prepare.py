@@ -3,10 +3,14 @@
 import html
 import re
 from logging import getLogger
+from typing import TYPE_CHECKING
 
-from duckdb import DuckDBPyConnection, connect
+from .config import download_dir, input_dir, open_db, prepare_dir, write_parquet
 
-from .config import CRS, PARQUET_OPTS, download_dir, input_dir, prepare_dir
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from duckdb import DuckDBPyConnection
 
 logger = getLogger(__name__)
 
@@ -16,17 +20,23 @@ UNTERM_STATUS = {
     1: "Observer State",
     2: "Member of specialized agencies",
 }
+UNGEODATA_STATUS = {
+    0: "Antarctica",
+    1: "State",
+    2: "Occupied Palestinian Territory",
+    3: "Non-Self-Governing Territory",
+    4: "Territory",
+    5: "Special Region or Province",
+    99: "Undetermined",
+}
 
 
 def _copy(conn: DuckDBPyConnection, query: str, name: str) -> None:
-    out = prepare_dir / f"{name}.parquet"
-    conn.execute(f"""--sql
-        COPY (SELECT * REPLACE (ST_SetCRS(geometry, '{CRS}') AS geometry)
-              FROM ({query}))
-        TO '{out}' {PARQUET_OPTS}
-    """)
-    n = conn.execute(f"SELECT count(*) FROM read_parquet('{out}')").fetchall()[0][0]
-    logger.info("%s: %d rows", name, n)
+    write_parquet(conn, query, prepare_dir / f"{name}.parquet")
+
+
+def _strip_stars(s: str) -> str:
+    return re.sub(r"\s*\*+$", "", s)
 
 
 def gaul(conn: DuckDBPyConnection) -> None:
@@ -50,7 +60,7 @@ def gaul(conn: DuckDBPyConnection) -> None:
                END AS gaul_id,
                * EXCLUDE geometry, geometry
         FROM (
-            SELECT {attrs}, count(*) AS gaul1_count,
+            SELECT {attrs},
                    ST_Multi(ST_CollectionExtract(
                        ST_MakeValid(ST_Union_Agg(geom)), 3)) AS geometry
             FROM gaul_l1 GROUP BY ALL
@@ -61,42 +71,71 @@ def gaul(conn: DuckDBPyConnection) -> None:
     )
 
 
-def lsib(conn: DuckDBPyConnection) -> None:
-    """Copy LSIB boundary lines."""
-    path = download_dir / "lsib/LSIB.gpkg"
+def gaul_lines(conn: DuckDBPyConnection) -> None:
+    """Derive GAUL L0 boundary lines from edges shared by neighbouring polygons."""
+    path = prepare_dir / "gaul_l0.parquet"
+    conn.execute(f"""--sql
+        CREATE TEMP TABLE gaul_boundary AS
+        SELECT gaul_id, ISO3_CODE, GAUL0_NAME, ST_Boundary(geometry) AS boundary,
+               ST_XMin(geometry) AS xmin, ST_YMin(geometry) AS ymin,
+               ST_XMax(geometry) AS xmax, ST_YMax(geometry) AS ymax
+        FROM read_parquet('{path}')
+    """)
+    conn.execute("""--sql
+        CREATE TEMP TABLE gaul_pairs AS
+        SELECT a.gaul_id AS id_1, b.gaul_id AS id_2
+        FROM gaul_boundary a JOIN gaul_boundary b ON a.gaul_id < b.gaul_id
+         AND a.xmin <= b.xmax AND b.xmin <= a.xmax
+         AND a.ymin <= b.ymax AND b.ymin <= a.ymax
+    """)
+    _copy(
+        conn,
+        """--sql
+        SELECT * FROM (
+            SELECT a.gaul_id AS gaul_id_1, a.ISO3_CODE AS iso3_1,
+                   a.GAUL0_NAME AS name_1, b.gaul_id AS gaul_id_2,
+                   b.ISO3_CODE AS iso3_2, b.GAUL0_NAME AS name_2,
+                   ST_LineMerge(ST_CollectionExtract(
+                       ST_Intersection(a.boundary, b.boundary), 2)) AS geometry
+            FROM gaul_pairs p
+            JOIN gaul_boundary a ON a.gaul_id = p.id_1
+            JOIN gaul_boundary b ON b.gaul_id = p.id_2
+        )
+        WHERE NOT ST_IsEmpty(geometry)
+        ORDER BY gaul_id_1, gaul_id_2
+        """,
+        "gaul_lines",
+    )
+
+
+def _gpkg(conn: DuckDBPyConnection, path: Path, where: str, name: str) -> None:
+    """Copy the one GeoPackage layer whose name matches ``where``."""
     layer = conn.execute(f"""--sql
         SELECT name FROM (
             SELECT UNNEST(layers).name AS name FROM ST_Read_Meta('{path}')
         )
-        WHERE starts_with(name, 'Department of State LSIB')
-    """).fetchall()[0][0]
+        WHERE {where}
+    """).fetchone()[0]
     _copy(
         conn,
         f"""--sql
         SELECT * EXCLUDE (fid, geom), geom AS geometry
         FROM ST_Read('{path}', layer='{layer}')
         """,
-        "lsib_lines",
+        name,
     )
+
+
+def lsib(conn: DuckDBPyConnection) -> None:
+    """Copy LSIB boundary lines."""
+    path = download_dir / "lsib/LSIB.gpkg"
+    _gpkg(conn, path, "starts_with(name, 'Department of State LSIB')", "lsib_lines")
 
 
 def wp(conn: DuckDBPyConnection) -> None:
     """Copy State Department World Polygons (full resolution layer)."""
     path = next((download_dir / "wp").rglob("WorldPolygons*.gpkg"))
-    layer = conn.execute(f"""--sql
-        SELECT name FROM (
-            SELECT UNNEST(layers).name AS name FROM ST_Read_Meta('{path}')
-        )
-        WHERE regexp_full_match(name, 'DoS_WP_\\d+_\\d+')
-    """).fetchall()[0][0]
-    _copy(
-        conn,
-        f"""--sql
-        SELECT * EXCLUDE (fid, geom), geom AS geometry
-        FROM ST_Read('{path}', layer='{layer}')
-        """,
-        "wp_polygons",
-    )
+    _gpkg(conn, path, "regexp_full_match(name, 'DoS_WP_\\d+_\\d+')", "wp_polygons")
 
 
 def osm(conn: DuckDBPyConnection) -> None:
@@ -111,7 +150,7 @@ def osm(conn: DuckDBPyConnection) -> None:
 
 def _key(name: str) -> str:
     """Match UNTERM names ("Sudan (the)", "Côte d'Ivoire") to M49 names."""
-    name = re.sub(r"\s*\*+$", "", name.strip())
+    name = _strip_stars(name.strip())
     name = re.sub(r"\s*\((the|The)\)$", "", name)
     return name.replace("\N{RIGHT SINGLE QUOTATION MARK}", "'").strip().lower()
 
@@ -150,9 +189,7 @@ def ref(conn: DuckDBPyConnection) -> None:
             used.add(_key(m[8]))
         short = u["English short"] if u else ""
         stars = len(short.strip()) - len(short.strip().rstrip("*"))
-        clean = {
-            k: re.sub(r"\s*\*+$", "", (v or "").strip()) for k, v in (u or {}).items()
-        }
+        clean = {k: _strip_stars((v or "").strip()) for k, v in (u or {}).items()}
         out.append(
             {
                 "iso3": m[11],
@@ -181,18 +218,23 @@ def ref(conn: DuckDBPyConnection) -> None:
         f"INSERT INTO ref VALUES ({', '.join('?' * len(out[0]))})",
         [list(r.values()) for r in out],
     )
-    out_path = prepare_dir / "ref.parquet"
-    conn.execute(
-        f"COPY (SELECT * FROM ref ORDER BY iso3) TO '{out_path}' (FORMAT PARQUET)"
+    write_parquet(
+        conn, "SELECT * FROM ref ORDER BY iso3", prepare_dir / "ref.parquet", geo=False
     )
-    logger.info("ref: %d rows", len(out))
 
 
 def ungeodata(conn: DuckDBPyConnection) -> None:
-    """Copy UN Geodata 1M country polygons and boundary lines from ``inputs/``."""
-    for layer, name in (
-        ("bnda_cty", "ungeodata_polygons"),
-        ("bndl", "ungeodata_lines"),
+    """Copy UN Geodata 1M country polygons and international lines from ``inputs/``."""
+    status = " ".join(f"WHEN {k} THEN '{v}'" for k, v in UNGEODATA_STATUS.items())
+    # bdytyp 0 is coastline, 6 and 7 subnational, 99 other.
+    for layer, name, extra, where in (
+        (
+            "bnda_cty",
+            "ungeodata_polygons",
+            f", CASE stscod {status} END AS status_label",
+            "true",
+        ),
+        ("bndl", "ungeodata_lines", "", "bdytyp IN (1, 2, 3, 4, 8, 9)"),
     ):
         path = input_dir / f"ungeodata/{layer}.parquet"
         if not path.exists():
@@ -200,7 +242,8 @@ def ungeodata(conn: DuckDBPyConnection) -> None:
             raise FileNotFoundError(msg)
         _copy(
             conn,
-            f"SELECT * EXCLUDE globalid FROM read_parquet('{path}')",
+            f"SELECT * EXCLUDE globalid{extra} "
+            f"FROM read_parquet('{path}') WHERE {where}",
             name,
         )
 
@@ -214,7 +257,6 @@ def fieldmaps(conn: DuckDBPyConnection) -> None:
 def main() -> None:
     """Prepare every downloaded source."""
     prepare_dir.mkdir(parents=True, exist_ok=True)
-    conn = connect()
-    conn.execute("LOAD spatial")
-    for fn in (ref, gaul, lsib, wp, osm, ungeodata, fieldmaps):
+    conn = open_db()
+    for fn in (ref, gaul, gaul_lines, lsib, wp, osm, ungeodata, fieldmaps):
         fn(conn)

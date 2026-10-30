@@ -1,41 +1,11 @@
-"""Pipeline-wide constants and command-line options."""
+"""Pipeline-wide constants, source definitions and DuckDB helpers."""
 
-from argparse import ArgumentParser
-from logging import INFO, basicConfig
-from os import getenv
+from logging import getLogger
 from pathlib import Path
 
-basicConfig(
-    level=INFO,
-    format="%(asctime)s - %(name)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+from duckdb import DuckDBPyConnection, connect
 
-STEPS = ("download", "prepare", "attributes", "tiles")
-OPTIONAL_STEPS = ("fieldmaps", "register")
-
-parser = ArgumentParser(description="Build the ADM0 differences register.")
-parser.add_argument("--step", default=getenv("STEP"), choices=STEPS + OPTIONAL_STEPS)
-args, _ = parser.parse_known_args()
-steps = [args.step] if args.step else list(STEPS)
-
-GAUL_URL = (
-    "https://storage.googleapis.com/fao-maps-catalog-data/boundaries/GAUL_2025_L1.zip"
-)
-LAND_OSM_URL = (
-    "https://osmdata.openstreetmap.de/download/land-polygons-complete-4326.zip"
-)
-LAND_WP_URL = "https://data.geodata.state.gov/WorldPolygons.zip"
-LSIB_URL = "https://data.geodata.state.gov/LSIB.gpkg"
-LSIB_META_URL = "https://geodata.state.gov/geonetwork/srv/api/records/3bdb81a0-c1b9-439a-a0b1-85dac30c59b2"
-LSIB_NS = {
-    "gco": "http://www.isotc211.org/2005/gco",
-    "gmd": "http://www.isotc211.org/2005/gmd",
-}
-UNTERM_URL = "https://conferences.unite.un.org/untermapi/api/term/downloadCountries"
-FIELDMAPS_URL = "https://data.source.coop/fieldmaps/international/{license}/humanitarian/adm0-{geom}/adm0_{geom}.parquet"
-FIELDMAPS_LICENSE = {"wp": "cc0", "osm": "odbl"}
-M49_URL = "https://unstats.un.org/unsd/methodology/m49/overview/"
+logger = getLogger(__name__)
 
 CRS = "OGC:CRS84"
 PARQUET_OPTS = "(FORMAT PARQUET, COMPRESSION ZSTD, GEOPARQUET_VERSION V2)"
@@ -48,3 +18,76 @@ fieldmaps_dir = tmp_dir / "fieldmaps"
 register_dir = root / "outputs/register"
 tiles_dir = root / "outputs/tiles"
 input_dir = root / "inputs"
+layers_json = root / "site/src/lib/layers.json"
+
+BASELINE = "gaul"
+
+# Per source: entity id and join code, then attribute columns (output name: SQL).
+SOURCE_COLUMNS = {
+    "gaul": {
+        "id": "gaul_id",
+        "code": "ISO3_CODE",
+        "name": "GAUL0_NAME",
+        "mapcode": "MAP_CODE",
+        "region": "CONTINENT",
+    },
+    "ungeodata": {
+        "id": "iso3cd || coalesce('-' || romnam, '')",
+        "code": "iso3cd",
+        "name": "romnam",
+        "sovereign": "isoclr",
+        "status": "status_label",
+        "region": "contcd",
+    },
+    "fieldmaps": {
+        "id": "id",
+        "code": "iso_3",
+        "name": "adm0_name",
+        "sovereign": "iso_3_grp",
+        "status": "status_nm",
+        "region": "region1_nm",
+    },
+    "wp": {"code": "GENC_3", "name": "WP_Name", "status": "US_Recog"},
+    "unterm": {"code": "iso3", "name": "name_en_short", "status": "un_status"},
+    "m49": {"code": "iso3", "name": "name_m49", "region": "region"},
+}
+
+# Land sources for fieldmaps: published license and the land polygons it clips to.
+LANDS = {
+    "osm": {
+        "license": "odbl",
+        "land": f"""SELECT fid, geometry AS geom
+            FROM read_parquet('{prepare_dir / "osm_land.parquet"}')""",
+    },
+    "wp": {
+        "license": "cc0",
+        # Caspian Sea is the only World Polygons feature without a WP_Name.
+        "land": f"""SELECT row_number() OVER () AS fid, geom FROM (
+                SELECT UNNEST(ST_Dump(geometry)).geom AS geom
+                FROM read_parquet('{prepare_dir / "wp_polygons.parquet"}')
+                WHERE WP_Name IS NOT NULL
+            )""",
+    },
+}
+
+
+def open_db(path: Path | None = None) -> DuckDBPyConnection:
+    """Connect with spatial loaded, to a fresh file at ``path`` or in memory."""
+    if path:
+        path.unlink(missing_ok=True)
+    conn = connect(path or ":memory:")
+    conn.execute("LOAD spatial")
+    return conn
+
+
+def write_parquet(
+    conn: DuckDBPyConnection, query: str, out: Path, *, geo: bool = True
+) -> None:
+    """Write ``query`` to ``out``, as CRS84 GeoParquet when ``geo``, and log rows."""
+    if geo:
+        query = f"""SELECT * REPLACE (ST_SetCRS(geometry, '{CRS}') AS geometry)
+            FROM ({query})"""
+    opts = PARQUET_OPTS if geo else "(FORMAT PARQUET, COMPRESSION ZSTD)"
+    conn.execute(f"COPY ({query}) TO '{out}' {opts}")
+    n = conn.execute(f"SELECT count(*) FROM read_parquet('{out}')").fetchone()[0]
+    logger.info("%s: %d rows", out.stem, n)
