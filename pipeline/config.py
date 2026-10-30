@@ -35,6 +35,7 @@ SOURCE_COLUMNS = {
         "id": "iso3cd || coalesce('-' || romnam, '')",
         "code": "iso3cd",
         "name": "romnam",
+        "mapname": "maplab",
         "sovereign": "isoclr",
         "status": "status_label",
         "region": "contcd",
@@ -42,12 +43,18 @@ SOURCE_COLUMNS = {
     "fieldmaps": {
         "id": "id",
         "code": "iso_3",
-        "name": "adm0_name",
+        "name": "adm0_name1",
+        "mapname": "adm0_name",
         "sovereign": "iso_3_grp",
         "status": "status_nm",
         "region": "region1_nm",
     },
-    "wp": {"code": "GENC_3", "name": "WP_Name", "status": "US_Recog"},
+    "wp": {
+        "code": "GENC_3",
+        "name": "WP_Name",
+        "mapname": "Map_Label",
+        "status": "US_Recog",
+    },
     "unterm": {"code": "iso3", "name": "name_en_short", "status": "un_status"},
     "m49": {"code": "iso3", "name": "name_m49", "region": "region"},
 }

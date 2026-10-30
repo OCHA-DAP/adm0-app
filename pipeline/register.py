@@ -43,9 +43,11 @@ def _entities(conn: DuckDBPyConnection) -> None:
         c = SOURCE_COLUMNS[key]
         # GAUL has no sovereign column; its map code names the administering state.
         sovereign = c.get("sovereign", c.get("mapcode"))
+        # Fieldmaps names the entity per ISO3; its map name is the per-feature name.
+        name = c["mapname"] if key == "fieldmaps" else c["name"]
         conn.execute(f"""--sql
             INSERT INTO entities
-            SELECT '{source}', {c["id"]}, {c["code"]}, {sovereign}, {c["name"]},
+            SELECT '{source}', {c["id"]}, {c["code"]}, {sovereign}, {name},
                    {c.get("status", "NULL")}, {c["region"]}, ST_Area(geometry),
                    ST_XMin(geometry), ST_YMin(geometry), ST_XMax(geometry),
                    ST_YMax(geometry), geometry
