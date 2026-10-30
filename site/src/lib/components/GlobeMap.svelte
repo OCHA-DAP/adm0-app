@@ -7,7 +7,8 @@
   import type { CompareState, Hit } from "$lib/compare.svelte";
   import Swatch from "$lib/components/Swatch.svelte";
   import { LAYER_BY_ID } from "$lib/layers";
-  import { applyDraws, buildStyle, queryLayerId } from "$lib/map/style";
+  import { SATELLITE_PROTOCOL, satelliteTile } from "$lib/map/satellite";
+  import { applyBasemap, applyDraws, buildStyle, queryLayerId } from "$lib/map/style";
 
   let { tilesBase, compare, active }: { tilesBase: string; compare: CompareState; active: boolean } = $props();
 
@@ -43,7 +44,10 @@
     if (!container) return;
     const protocol = new Protocol();
     maplibregl.addProtocol("pmtiles", protocol.tile);
+    maplibregl.addProtocol(SATELLITE_PROTOCOL, satelliteTile);
     const el = container;
+    // MapLibre writes the hash on creation, so a linked position has to be read first.
+    const linked = import.meta.env.DEV && location.hash.length > 1;
     const fitZoom = () => Math.log2((GLOBE_FIT * Math.min(el.clientWidth, el.clientHeight)) / GLOBE_PX_AT_Z0);
     const m = new maplibregl.Map({
       container: el,
@@ -51,6 +55,7 @@
       center: [20, 10],
       zoom: fitZoom(),
       attributionControl: { compact: true },
+      hash: import.meta.env.DEV,
     });
     m.once("load", () => (loaded = true));
     m.on("click", (e) => {
@@ -81,6 +86,7 @@
     for (const type of ["pointerdown", "wheel", "keydown"]) {
       el.addEventListener(type, () => stop.abort(), { capture: true, signal: stop.signal });
     }
+    if (linked) stop.abort();
     map = m;
     return () => {
       stop.abort();
@@ -88,11 +94,16 @@
       map = null;
       loaded = false;
       maplibregl.removeProtocol("pmtiles");
+      maplibregl.removeProtocol(SATELLITE_PROTOCOL);
     };
   });
 
   $effect(() => {
     if (map && loaded) applyDraws(map, compare.draws);
+  });
+
+  $effect(() => {
+    if (map && loaded) applyBasemap(map, compare.basemap === "satellite");
   });
 
   $effect(() => {

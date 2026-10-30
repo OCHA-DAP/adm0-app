@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { MODES, SLOT_COLORS, VIEWS, type CompareState, type Kind, type View } from "$lib/compare.svelte";
+  import { BASEMAPS, MODES, SLOT_COLORS, VIEWS, type Basemap, type CompareState, type Kind, type View } from "$lib/compare.svelte";
 
   let { compare }: { compare: CompareState } = $props();
 </script>
@@ -44,6 +44,8 @@
     {@render matrix((["a", "b"] as const).map((slot) => ({ id: slot, color: SLOT_COLORS[slot], current: compare.pair[slot], pick: (id: string) => (compare.pairs[compare.mode][slot] = id) })))}
     <p class="hint">Tap [ or ] to show only A or B, or hold to peek. Shift+[ or ] changes B.</p>
   {/if}
+  <h2>Basemap</h2>
+  {@render segmented("Basemap", BASEMAPS, compare.basemap, (id) => (compare.basemap = id as Basemap))}
   {#if compare.hits.length === 0}
     <p class="hint">Click the map to see what each source says at that point.</p>
   {/if}

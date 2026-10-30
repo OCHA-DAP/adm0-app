@@ -3,6 +3,7 @@ import type { Draw, Slot } from "$lib/map/style";
 
 export type Kind = SourceLayer["kind"];
 export type View = "overlay" | "fade" | "single";
+export type Basemap = "map" | "satellite";
 
 export interface Hit {
   slot: Slot | null;
@@ -20,6 +21,10 @@ export const VIEWS: { id: View; label: string; hint: string }[] = [
   { id: "fade", label: "Fade", hint: "A and B fade into each other on a loop, to catch small shifts." },
   { id: "single", label: "Single", hint: "One source at a time, to step through them all." },
 ];
+export const BASEMAPS: { id: Basemap; label: string }[] = [
+  { id: "map", label: "Map" },
+  { id: "satellite", label: "Satellite" },
+];
 export const SLOT_COLORS: Record<Slot, string> = { a: "#009EDB", b: "#CF3F0B" };
 
 const VIEW_PARAM = "ui";
@@ -29,7 +34,7 @@ const KEY_SLOT: Record<string, Slot> = { "[": "a", "]": "b" };
 const KEY_STEP: Record<string, number> = { "[": -1, "]": 1, "{": -1, "}": 1 };
 
 function fromUrl() {
-  const q = new URLSearchParams(location.search);
+  const q = new URLSearchParams(import.meta.env.DEV ? location.search : "");
   const pick = <T extends string>(key: string, ids: T[], fallback: T) => ids.find((id) => id === q.get(key)) ?? fallback;
   const mode = pick("mode", MODES.map((m) => m.id), MODES[0].id);
   const ids = LAYERS.filter((l) => l.kind === mode).map((l) => l.id);
@@ -37,7 +42,8 @@ function fromUrl() {
   pairs[mode] = { a: pick("a", ids, pairs[mode].a), b: pick("b", ids, pairs[mode].b) };
   const single = { polygon: DEFAULT_PAIRS.polygon.a, line: DEFAULT_PAIRS.line.a };
   single[mode] = pick("src", ids, single[mode]);
-  return { mode, view: pick(VIEW_PARAM, VIEWS.map((v) => v.id), "overlay"), pairs, single };
+  const basemap = pick("basemap", BASEMAPS.map((b) => b.id), "map");
+  return { mode, view: pick(VIEW_PARAM, VIEWS.map((v) => v.id), "overlay"), pairs, single, basemap };
 }
 
 function step(ids: string[], current: string, by: number) {
@@ -50,6 +56,7 @@ export class CompareState {
   view = $state<View>(this.#init.view);
   pairs = $state(this.#init.pairs);
   single = $state(this.#init.single);
+  basemap = $state<Basemap>(this.#init.basemap);
   solo = $state<Slot | null>(null);
   sweep = $state(0);
   hits = $state<Hit[]>([]);
@@ -85,6 +92,7 @@ export class CompareState {
   writeParams(params: URLSearchParams) {
     params.set("mode", this.mode);
     params.set(VIEW_PARAM, this.view);
+    params.set("basemap", this.basemap);
     for (const key of ["a", "b", "src"]) params.delete(key);
     if (this.view === "single") params.set("src", this.single[this.mode]);
     else for (const slot of ["a", "b"] as const) params.set(slot, this.pair[slot]);

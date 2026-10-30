@@ -1,6 +1,7 @@
 import type { DataDrivenPropertyValueSpecification, ExpressionSpecification, LayerSpecification, Map, StyleSpecification } from "maplibre-gl";
 import positron from "$lib/utils/basemap/positron.json";
 import { LAYERS, LAYER_BY_ID, type SourceLayer } from "$lib/layers";
+import { SATELLITE } from "$lib/map/satellite";
 
 export type Slot = "a" | "b";
 
@@ -10,6 +11,8 @@ export interface Draw {
   opacity: number;
   slot?: Slot;
 }
+
+const POSITRON_IDS = (positron.layers as LayerSpecification[]).map((l) => l.id);
 
 const FILL_OPACITY = 0.08;
 const LINE_WIDTH = 2;
@@ -97,6 +100,11 @@ export function applyDraws(map: Map, draws: Draw[]) {
   }
 }
 
+export function applyBasemap(map: Map, satellite: boolean) {
+  for (const id of POSITRON_IDS) map.setLayoutProperty(id, "visibility", satellite ? "none" : "visible");
+  map.setLayoutProperty("satellite", "visibility", satellite ? "visible" : "none");
+}
+
 export function buildStyle(tilesBase: string, draws: Draw[]): StyleSpecification {
   return {
     version: 8,
@@ -107,10 +115,15 @@ export function buildStyle(tilesBase: string, draws: Draw[]): StyleSpecification
     glyphs: positron.glyphs,
     sources: {
       ...(positron.sources as StyleSpecification["sources"]),
+      satellite: SATELLITE,
       ...Object.fromEntries(
         LAYERS.map((l) => [l.id, { type: "vector" as const, url: `pmtiles://${tilesBase}/${l.id}.pmtiles` }]),
       ),
     },
-    layers: [...(positron.layers as LayerSpecification[]), ...LAYERS.flatMap((l) => layersFor(l, draws))],
+    layers: [
+      ...(positron.layers as LayerSpecification[]),
+      { id: "satellite", type: "raster", source: "satellite", layout: { visibility: "none" } },
+      ...LAYERS.flatMap((l) => layersFor(l, draws)),
+    ],
   };
 }
