@@ -1,5 +1,6 @@
 """Pipeline-wide constants, source definitions and DuckDB helpers."""
 
+import json
 from logging import getLogger
 from pathlib import Path
 
@@ -22,7 +23,8 @@ layers_json = root / "site/src/lib/layers.json"
 
 BASELINE = "gaul"
 
-# Per source: entity id and join code, then attribute columns (output name: SQL).
+# Per source: entity id, join code and register entity name (default name), then
+# attribute columns (output name: SQL).
 SOURCE_COLUMNS = {
     "gaul": {
         "id": "gaul_id",
@@ -42,6 +44,7 @@ SOURCE_COLUMNS = {
     "fieldmaps": {
         "id": "id",
         "code": "iso_3",
+        "entity": "adm0_name",
         "name": "adm0_name1",
         "mapname": "adm0_name",
         "sovereign": "iso_3_grp",
@@ -58,12 +61,10 @@ SOURCE_COLUMNS = {
     "m49": {"code": "iso3", "name": "name_m49", "region": "region"},
 }
 
-# Fieldmaps: published license and the land polygons it clips to.
-FIELDMAPS = {
-    "license": "odbl",
-    "land": f"""SELECT fid, geometry AS geom
-        FROM read_parquet('{prepare_dir / "osm_land.parquet"}')""",
-}
+
+def layers() -> list[dict]:
+    """Map layers shared with the site, one per PMTiles file."""
+    return json.loads(layers_json.read_text())
 
 
 def open_db(path: Path | None = None) -> DuckDBPyConnection:

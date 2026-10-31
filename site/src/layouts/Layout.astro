@@ -92,9 +92,6 @@ import FontFaces from "$lib/components/FontFaces.astro";
       0 0 2px var(--cd-white),
       0 0 2px var(--cd-white);
   }
-  .hidden {
-    display: none !important;
-  }
   th,
   td {
     text-align: left;
@@ -114,7 +111,8 @@ import FontFaces from "$lib/components/FontFaces.astro";
     font-size: 0.8125rem;
     z-index: 3;
   }
-  .panel h2 {
+  .panel h2,
+  .sidebar h2 {
     font-family: var(--brand-font);
     font-size: 0.6875rem;
     font-weight: 600;

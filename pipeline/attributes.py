@@ -3,23 +3,17 @@
 from logging import getLogger
 from typing import TYPE_CHECKING
 
-from .config import SOURCE_COLUMNS, open_db, prepare_dir, tiles_dir
+from .config import SOURCE_COLUMNS, layers, open_db, prepare_dir, tiles_dir
 
 if TYPE_CHECKING:
     from duckdb import DuckDBPyConnection
 
 logger = getLogger(__name__)
 
+# Map polygon layers, keyed by source; their code and name match the tiles.
+POLYGONS = {lyr["source"]: lyr for lyr in layers() if lyr["kind"] == "polygon"}
 # Prepared table each source's attributes come from.
-TABLES = {
-    "gaul": "gaul_l0",
-    "ungeodata": "ungeodata_polygons",
-    "fieldmaps": "fieldmaps_polygons",
-    "wp": "wp_polygons",
-    "unterm": "ref",
-    "m49": "ref",
-}
-GEOMETRY = ["gaul", "ungeodata", "fieldmaps", "wp"]
+TABLES = {s: lyr["id"] for s, lyr in POLYGONS.items()} | {"unterm": "ref", "m49": "ref"}
 
 # Boxes wider than a hemisphere shift western parts east by 360 when that gives
 # the narrower box, so east can pass 180.
@@ -31,26 +25,24 @@ BBOX = """CASE WHEN max(x1) - min(x0) <= greatest(180, max(e1) - min(e0))
 def _parts(conn: DuckDBPyConnection) -> None:
     """Load every polygon of every geometry source's features into ``parts``."""
     features = " UNION ALL ".join(
-        f"""SELECT upper({c["code"]}) AS iso3, '{s}' AS source, '{TABLES[s]}' AS layer,
-            {rank} AS rank,
-            row_number() OVER () AS fid, {c.get("mapname", c["name"])} AS name,
-            coalesce(nullif(trim({c.get("mapname", c["name"])}::VARCHAR), ''),
-                {c["name"]}) AS label,
+        f"""SELECT upper({lyr["code"]}) AS iso3, '{s}' AS source,
+            '{lyr["id"]}' AS layer, {rank} AS rank, row_number() OVER () AS fid,
+            {lyr["name"]} AS name,
+            coalesce(nullif(trim({lyr["name"]}::VARCHAR), ''),
+                {SOURCE_COLUMNS[s]["name"]}) AS label,
             geometry
-        FROM read_parquet('{prepare_dir / TABLES[s]}.parquet')"""
-        for rank, s in enumerate(GEOMETRY)
-        for c in [SOURCE_COLUMNS[s]]
+        FROM read_parquet('{prepare_dir / lyr["id"]}.parquet')"""
+        for rank, (s, lyr) in enumerate(POLYGONS.items())
     )
     conn.execute(f"""--sql
         CREATE TABLE parts AS
         SELECT *, CASE WHEN x1 <= 0 THEN x0 + 360 ELSE x0 END AS e0,
                CASE WHEN x1 <= 0 THEN x1 + 360 ELSE x1 END AS e1
         FROM (SELECT iso3, source, layer, rank, fid, trim(name::VARCHAR) AS name,
-                trim(label::VARCHAR) AS label,
-                geometry, ST_Area(geometry) AS area,
-                round(ST_XMin(geometry), 3) AS x0, round(ST_XMax(geometry), 3) AS x1,
-                round(ST_YMin(geometry), 3) AS y0, round(ST_YMax(geometry), 3) AS y1
-            FROM (SELECT * EXCLUDE geometry, unnest(ST_Dump(geometry)).geom AS geometry
+                trim(label::VARCHAR) AS label, ST_Area(part) AS area,
+                round(ST_XMin(part), 3) AS x0, round(ST_XMax(part), 3) AS x1,
+                round(ST_YMin(part), 3) AS y0, round(ST_YMax(part), 3) AS y1
+            FROM (SELECT * EXCLUDE geometry, unnest(ST_Dump(geometry)).geom AS part
                 FROM ({features}) WHERE iso3 IS NOT NULL))
     """)
 
@@ -77,10 +69,11 @@ def main() -> None:
             f"string_agg(DISTINCT trim({expr}::VARCHAR), ' | ' ORDER BY "
             f"trim({expr}::VARCHAR)) AS {col}_{source}"
             for col, expr in cols.items()
-            if col not in {"id", "code"}
+            if col not in {"id", "code", "entity"}
         )
+        count = f"count(*) AS count_{source}," if source in POLYGONS else ""
         selects.append(
-            f"""(SELECT upper({cols["code"]}) AS iso3, count(*) AS count_{source},
+            f"""(SELECT upper({cols["code"]}) AS iso3, {count}
             {aggs}
             FROM read_parquet('{prepare_dir / table}.parquet')
             WHERE {cols["code"]} IS NOT NULL GROUP BY 1) AS {source}"""

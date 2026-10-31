@@ -1,14 +1,12 @@
 import layers from "$lib/layers.json";
 
-// One entry per PMTiles file; pipeline/tiles.py reads the same layers.json, and the source-layer name is the id.
+// One entry per PMTiles file; pipeline/tiles.py and pipeline/attributes.py read the same layers.json, and the source-layer name is the id.
 export interface SourceLayer {
   id: string;
-  // Shared by a source's polygon and line layers, so a pick carries across modes.
+  // Shared by a source's polygon and line layers, so a pick carries across modes; also its attributes.json source.
   source: string;
   label: string;
-  group: string;
   kind: "polygon" | "line";
-  color: string;
   // Polygon layers only: the feature properties holding the ISO3 code and the feature's name.
   code?: string;
   name?: string;

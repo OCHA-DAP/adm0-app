@@ -17,7 +17,6 @@ export interface Hit {
 export interface Focus {
   iso3: string;
   bbox: number[] | null;
-  parts: Part[];
   part: Part | null;
   fly: boolean;
 }
@@ -49,7 +48,7 @@ function fromUrl() {
   const pair = { a: pick("a", SOURCES, DEFAULT_PAIR.a), b: pick("b", SOURCES, DEFAULT_PAIR.b) };
   const basemap = pick("basemap", BASEMAPS.map((b) => b.id), "map");
   const code = q.get("focus");
-  const focus: Focus | null = code ? { iso3: code.toUpperCase(), bbox: null, parts: [], part: null, fly: false } : null;
+  const focus: Focus | null = code ? { iso3: code.toUpperCase(), bbox: null, part: null, fly: false } : null;
   return { mode, view: pick(VIEW_PARAM, VIEWS.map((v) => v.id), "overlay"), pair, basemap, focus };
 }
 
@@ -68,16 +67,14 @@ export class CompareState {
 
   draws = $derived.by<Draw[]>(() => {
     if (this.view === "a" || this.view === "b") return [this.#slotDraw(this.view)];
-    if (this.view === "fade") return [this.#slotDraw("a", 1 - this.sweep), this.#slotDraw("b", this.sweep)];
     return [this.#slotDraw("a"), this.#slotDraw("b")];
   });
 
-  constructor() {
-    this.#animate(this.view === "fade");
-  }
+  // Kept apart from draws so Fade's per-frame change touches only opacity.
+  opacities = $derived(this.view === "fade" ? [1 - this.sweep, this.sweep] : this.draws.map(() => 1));
 
-  #slotDraw(slot: Slot, opacity = 1): Draw {
-    return { id: layerFor(this.pair[slot], this.mode).id, color: SLOT_COLORS[slot], opacity, slot };
+  #slotDraw(slot: Slot): Draw {
+    return { id: layerFor(this.pair[slot], this.mode).id, color: SLOT_COLORS[slot], slot };
   }
 
   writeParams(params: URLSearchParams) {
@@ -96,15 +93,14 @@ export class CompareState {
 
   setView(next: View) {
     this.view = next;
-    this.#animate(next === "fade");
     this.hits = [];
   }
 
-  focusOn(iso3: string, bbox: number[] | null, parts: Part[], part: Part | null, fly: boolean) {
-    this.focus = { iso3, bbox: part?.bbox ?? bbox, parts, part, fly };
+  focusOn(iso3: string, bbox: number[] | null, part: Part | null, fly: boolean) {
+    this.focus = { iso3, bbox: part?.bbox ?? bbox, part, fly };
   }
 
-  #animate(on: boolean) {
+  animate(on: boolean) {
     cancelAnimationFrame(this.#frame);
     if (!on) return;
     const start = performance.now();

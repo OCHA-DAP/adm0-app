@@ -12,16 +12,21 @@ export const SATELLITE: RasterSourceSpecification = {
   attribution: "Powered by Esri | Esri, Vantor, Earthstar Geographics, and the GIS User Community",
 };
 
-// Missing tiles 404 without CORS headers, so any failed fetch counts as no imagery.
+// Missing tiles 404 without CORS headers, so the browser can't cache them; remembered here instead.
+const missing = new Set<string>();
+
+// Any failed fetch counts as no imagery.
 async function fetchTile(z: number, x: number, y: number, signal: AbortSignal) {
-  const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}?blankTile=false`;
+  const key = `${z}/${y}/${x}`;
+  if (missing.has(key)) return null;
   try {
-    const res = await fetch(url, { signal });
-    return res.ok ? await res.blob() : null;
+    const res = await fetch(`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${key}?blankTile=false`, { signal });
+    if (res.ok) return await res.blob();
   } catch (e) {
     if (signal.aborted) throw e;
-    return null;
   }
+  missing.add(key);
+  return null;
 }
 
 // Imagery depth varies by place, so a missing tile is cropped and enlarged from the nearest ancestor.

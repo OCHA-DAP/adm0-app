@@ -19,11 +19,11 @@ if TYPE_CHECKING:
 
 logger = getLogger(__name__)
 
-# Each register source: its SOURCE_COLUMNS key and polygons file.
+# Each register source's polygons file, keyed as in SOURCE_COLUMNS.
 SOURCES = {
-    BASELINE: (BASELINE, prepare_dir / "gaul_l0.parquet"),
-    "ungeodata": ("ungeodata", prepare_dir / "ungeodata_polygons.parquet"),
-    "fieldmaps": ("fieldmaps", fieldmaps_dir / "polygons.parquet"),
+    BASELINE: prepare_dir / "gaul_l0.parquet",
+    "ungeodata": prepare_dir / "ungeodata_polygons.parquet",
+    "fieldmaps": fieldmaps_dir / "polygons.parquet",
 }
 
 
@@ -36,17 +36,16 @@ def _entities(conn: DuckDBPyConnection) -> None:
             xmin DOUBLE, ymin DOUBLE, xmax DOUBLE, ymax DOUBLE, geom GEOMETRY
         )
     """)
-    for source, (key, path) in SOURCES.items():
+    for source, path in SOURCES.items():
         if not path.exists():
             logger.warning("%s: %s missing, skipping", source, path.name)
             continue
-        c = SOURCE_COLUMNS[key]
+        c = SOURCE_COLUMNS[source]
         sovereign = c.get("sovereign", "NULL")
-        # Fieldmaps names the entity per ISO3; its map name is the per-feature name.
-        name = c["mapname"] if key == "fieldmaps" else c["name"]
         conn.execute(f"""--sql
             INSERT INTO entities
-            SELECT '{source}', {c["id"]}, {c["code"]}, {sovereign}, {name},
+            SELECT '{source}', {c["id"]}, {c["code"]}, {sovereign},
+                   {c.get("entity", c["name"])},
                    {c.get("status", "NULL")}, {c["region"]}, ST_Area(geometry),
                    ST_XMin(geometry), ST_YMin(geometry), ST_XMax(geometry),
                    ST_YMax(geometry), geometry

@@ -29,6 +29,18 @@ UNGEODATA_STATUS = {
     5: "Special Region or Province",
     99: "Undetermined",
 }
+# Line types from the UN Guidelines for the Publication of Maps, as line_type.
+UNGEODATA_LINE_TYPE = {
+    2: "special",
+    3: "armistice",
+    4: "separation",
+    8: "autonomous",
+    9: "sovereign",
+}
+LSIB_LINE_TYPE = """CASE WHEN label LIKE '%Line of Control%' THEN 'separation'
+    WHEN status = 'Special Line' THEN 'special'
+    WHEN status = 'Other Line of International Separation' THEN 'armistice'
+    ELSE 'international' END AS line_type"""
 
 
 def _copy(conn: DuckDBPyConnection, query: str, name: str) -> None:
@@ -108,8 +120,10 @@ def gaul_lines(conn: DuckDBPyConnection) -> None:
     )
 
 
-def _gpkg(conn: DuckDBPyConnection, path: Path, where: str, name: str) -> None:
-    """Copy the one GeoPackage layer whose name matches ``where``."""
+def _gpkg(
+    conn: DuckDBPyConnection, path: Path, where: str, name: str, extra: str = ""
+) -> None:
+    """Copy the one GeoPackage layer whose name matches ``where``, plus ``extra``."""
     layer = conn.execute(f"""--sql
         SELECT name FROM (
             SELECT UNNEST(layers).name AS name FROM ST_Read_Meta('{path}')
@@ -119,7 +133,7 @@ def _gpkg(conn: DuckDBPyConnection, path: Path, where: str, name: str) -> None:
     _copy(
         conn,
         f"""--sql
-        SELECT * EXCLUDE (fid, geom), geom AS geometry
+        SELECT * EXCLUDE (fid, geom){extra}, geom AS geometry
         FROM ST_Read('{path}', layer='{layer}')
         """,
         name,
@@ -129,7 +143,8 @@ def _gpkg(conn: DuckDBPyConnection, path: Path, where: str, name: str) -> None:
 def lsib(conn: DuckDBPyConnection) -> None:
     """Copy LSIB boundary lines."""
     path = download_dir / "lsib/LSIB.gpkg"
-    _gpkg(conn, path, "starts_with(name, 'Department of State LSIB')", "lsib_lines")
+    where = "starts_with(name, 'Department of State LSIB')"
+    _gpkg(conn, path, where, "lsib_lines", f", {LSIB_LINE_TYPE}")
 
 
 def wp(conn: DuckDBPyConnection) -> None:
@@ -226,6 +241,7 @@ def ref(conn: DuckDBPyConnection) -> None:
 def ungeodata(conn: DuckDBPyConnection) -> None:
     """Copy UN Geodata 1M country polygons and international lines from ``inputs/``."""
     status = " ".join(f"WHEN {k} THEN '{v}'" for k, v in UNGEODATA_STATUS.items())
+    line_type = " ".join(f"WHEN {k} THEN '{v}'" for k, v in UNGEODATA_LINE_TYPE.items())
     # bdytyp 0 is coastline, 6 and 7 subnational, 99 other.
     for layer, name, extra, where in (
         (
@@ -234,7 +250,12 @@ def ungeodata(conn: DuckDBPyConnection) -> None:
             f", CASE stscod {status} END AS status_label",
             "true",
         ),
-        ("bndl", "ungeodata_lines", "", "bdytyp IN (1, 2, 3, 4, 8, 9)"),
+        (
+            "bndl",
+            "ungeodata_lines",
+            f", CASE bdytyp {line_type} ELSE 'international' END AS line_type",
+            "bdytyp IN (1, 2, 3, 4, 8, 9)",
+        ),
     ):
         path = input_dir / f"ungeodata/{layer}.parquet"
         if not path.exists():
@@ -257,9 +278,10 @@ def fieldmaps(conn: DuckDBPyConnection) -> None:
             if path.stem.endswith("_lines")
             else ""
         )
+        line_type = f", {LSIB_LINE_TYPE}" if path.stem == "lines" else ""
         _copy(
             conn,
-            f"SELECT *{merge} FROM read_parquet('{path}')",
+            f"SELECT *{merge}{line_type} FROM read_parquet('{path}')",
             f"fieldmaps_{path.stem}",
         )
 

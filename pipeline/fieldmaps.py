@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 
 from .config import (
     CRS,
-    FIELDMAPS,
     fieldmaps_dir,
     input_dir,
     open_db,
@@ -15,8 +14,6 @@ from .config import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
-
     from duckdb import DuckDBPyConnection
 
 logger = getLogger(__name__)
@@ -52,7 +49,11 @@ def _attributes(conn: DuckDBPyConnection) -> None:
 
 def _inputs(conn: DuckDBPyConnection) -> None:
     """Load land, template lines plus LSIB, and seed points."""
-    conn.execute(f"CREATE OR REPLACE TABLE land_00 AS {FIELDMAPS['land']}")
+    conn.execute(f"""--sql
+        CREATE OR REPLACE TABLE land_00 AS
+        SELECT fid, geometry AS geom
+        FROM read_parquet('{prepare_dir / "osm_land.parquet"}')
+    """)
     conn.execute(f"""--sql
         CREATE OR REPLACE TABLE lines_00 AS
         SELECT CC1, COUNTRY1, CC2, COUNTRY2, RANK::BIGINT AS RANK, LABEL, STATUS,
@@ -79,15 +80,11 @@ def _coverage_invalid(conn: DuckDBPyConnection, table: str) -> bool:
     ).fetchone()[0]
 
 
-def _land_envelopes(conn: DuckDBPyConnection) -> Iterator[tuple[int, bytes]]:
-    """Yield each crossed land polygon's fid and envelope WKB."""
-    for (fid,) in conn.execute("SELECT fid FROM land_01").fetchall():
-        yield (
-            fid,
-            conn.execute(
-                "SELECT ST_AsWKB(ST_Envelope(geom)) FROM land_01 WHERE fid = $1", [fid]
-            ).fetchone()[0],
-        )
+def _land_envelopes(conn: DuckDBPyConnection) -> list[tuple[int, bytes]]:
+    """Each crossed land polygon's fid and envelope WKB."""
+    return conn.execute(
+        "SELECT fid, ST_AsWKB(ST_Envelope(geom)) FROM land_01"
+    ).fetchall()
 
 
 def _polygonize(conn: DuckDBPyConnection) -> None:

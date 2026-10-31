@@ -1,9 +1,8 @@
-// Column groups for attributes.json from pipeline/attributes.py; each column is `${group}_${source}`.
+import { LAYERS } from "$lib/layers";
+
+// Columns in attributes.json from pipeline/attributes.py are `${group}_${source}`; map sources keep their map label.
 export const SOURCES: Record<string, string> = {
-  gaul: "GAUL",
-  ungeodata: "UN Geodata",
-  fieldmaps: "FieldMaps",
-  wp: "World Polygons",
+  ...Object.fromEntries(LAYERS.map((l) => [l.source, l.label])),
   m49: "M49",
   unterm: "UNTERM",
 };
@@ -14,17 +13,19 @@ export interface AttributeGroup {
   sources: string[];
 }
 
-export const GROUPS: AttributeGroup[] = [
-  { key: "name", label: "Name", sources: ["gaul", "ungeodata", "fieldmaps", "wp", "unterm", "m49"] },
-  { key: "mapname", label: "Label", sources: ["ungeodata", "fieldmaps", "wp"] },
-  { key: "count", label: "Features", sources: ["gaul", "ungeodata", "fieldmaps", "wp"] },
-  { key: "sovereign", label: "Sovereign", sources: ["ungeodata", "fieldmaps"] },
-  { key: "status", label: "Status", sources: ["ungeodata", "fieldmaps", "wp", "unterm"] },
-  { key: "region", label: "Region", sources: ["gaul", "ungeodata", "fieldmaps", "m49"] },
+const GROUP_LABELS = [
+  { key: "name", label: "Name" },
+  { key: "mapname", label: "Label" },
+  { key: "count", label: "Features" },
+  { key: "sovereign", label: "Sovereign" },
+  { key: "status", label: "Status" },
+  { key: "region", label: "Region" },
 ];
 
-// Map sources (layers.json) to their attributes.json source.
-export const ATTRIBUTE_SOURCE: Record<string, string> = { gaul: "gaul", ungeodata: "ungeodata", fieldmaps: "fieldmaps", state_dept: "wp" };
+// Each group covers the sources the pipeline wrote a column for.
+export function attributeGroups(row: AttributeRow | undefined): AttributeGroup[] {
+  return GROUP_LABELS.map((g) => ({ ...g, sources: row ? Object.keys(SOURCES).filter((s) => `${g.key}_${s}` in row) : [] }));
+}
 
 type DiffKind = "differs" | "missing";
 export type DiffType = DiffKind | "all";
@@ -41,7 +42,12 @@ export interface Part {
 }
 
 // bbox is [west, south, east, north]; east can pass 180 for codes across the antimeridian.
-export type AttributeRow = Record<string, string | number | number[] | Part[] | null>;
+export interface AttributeRow {
+  iso3: string;
+  bbox: number[] | null;
+  parts: Part[] | null;
+  [column: string]: unknown;
+}
 
 export function value(row: AttributeRow, group: string, source: string): string {
   return String(row[`${group}_${source}`] ?? "").trim();
@@ -56,8 +62,8 @@ export const DEFAULT_FILTER: Filter = {
   query: "",
 };
 
-export function groupsInScope(filter: Filter): AttributeGroup[] {
-  return filter.group ? GROUPS.filter((g) => g.key === filter.group) : GROUPS;
+export function groupsInScope(groups: AttributeGroup[], filter: Filter): AttributeGroup[] {
+  return filter.group ? groups.filter((g) => g.key === filter.group) : groups;
 }
 
 export function sourcesFor(group: AttributeGroup, filter: Filter): string[] {
@@ -82,9 +88,9 @@ export function majority(
   return first[1] === second[1] ? TIE : first[0];
 }
 
-function diffKinds(row: AttributeRow, filter: Filter): Set<DiffKind> {
+function diffKinds(row: AttributeRow, groups: AttributeGroup[], filter: Filter): Set<DiffKind> {
   const kinds = new Set<DiffKind>();
-  for (const group of groupsInScope(filter)) {
+  for (const group of groupsInScope(groups, filter)) {
     const sources = sourcesFor(group, filter);
     if (sources.length < 2) continue;
     const present = sources.map((s) => value(row, group.key, s)).filter(Boolean);
@@ -115,12 +121,12 @@ function cached(row: AttributeRow): RowCache {
   return c;
 }
 
-export function matches(row: AttributeRow, filter: Filter): boolean {
+export function matches(row: AttributeRow, groups: AttributeGroup[], filter: Filter): boolean {
   const c = cached(row);
   if (filter.diff !== "all") {
     const key = `${filter.group}|${filter.sources.join()}`;
     let kinds = c.kinds.get(key);
-    if (!kinds) c.kinds.set(key, (kinds = diffKinds(row, filter)));
+    if (!kinds) c.kinds.set(key, (kinds = diffKinds(row, groups, filter)));
     if (!kinds.has(filter.diff)) return false;
   }
   const q = filter.query.trim().toLowerCase();

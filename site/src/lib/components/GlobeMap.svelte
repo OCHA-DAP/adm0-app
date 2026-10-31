@@ -7,7 +7,7 @@
   import type { CompareState, Focus, Hit } from "$lib/compare.svelte";
   import { LAYER_BY_ID } from "$lib/layers";
   import { SATELLITE_PROTOCOL, satelliteTile } from "$lib/map/satellite";
-  import { applyBasemap, applyDraws, applyFocus, buildStyle, pickLayerIds, queryLayerId } from "$lib/map/style";
+  import { applyBasemap, applyDraws, applyFocus, applyOpacity, buildStyle, drawFor, pickLayerIds, queryLayerId } from "$lib/map/style";
 
   let {
     tilesBase,
@@ -44,7 +44,8 @@
   let stopSpin = () => {};
   let framed: Focus | null = null;
 
-  function query(m: maplibregl.Map, point: maplibregl.Point): Hit[] {
+  // picked is the click's pick-layer features, reused for the polygons under a line click.
+  function query(m: maplibregl.Map, point: maplibregl.Point, picked: maplibregl.MapGeoJSONFeature[]): Hit[] {
     const draws = compare.draws;
     const features = m.queryRenderedFeatures(
       [
@@ -54,13 +55,12 @@
       { layers: draws.map((d) => queryLayerId(d.id)) },
     );
     // Lines mode also reports the polygon under the click, so a click inside a country has attributes to show.
-    const lines = draws.filter((d) => LAYER_BY_ID.get(d.id)?.kind === "line");
-    const polygons = lines.length ? m.queryRenderedFeatures(point, { layers: pickLayerIds(lines) }) : [];
-    return [...features, ...polygons].flatMap((f) => {
+    const lines = compare.mode === "line";
+    return [...features, ...(lines ? picked : [])].flatMap((f) => {
       const layer = LAYER_BY_ID.get(f.sourceLayer ?? "");
-      const draw = draws.find((d) => LAYER_BY_ID.get(d.id)?.source === layer?.source);
+      const draw = drawFor(draws, f.sourceLayer ?? "");
       if (!draw || !layer) return [];
-      const label = lines.length ? `${layer.label} ${layer.kind}` : layer.label;
+      const label = lines ? `${layer.label} ${layer.kind}` : layer.label;
       return [{ slot: draw.slot ?? null, label, color: draw.color, properties: f.properties }];
     });
   }
@@ -86,11 +86,12 @@
     m.on("click", (e) => {
       // Rendered order puts later sources first; A's feature should win.
       const ids = pickLayerIds(compare.draws);
-      const [hit] = m.queryRenderedFeatures(e.point, { layers: ids }).sort((x, y) => ids.indexOf(x.layer.id) - ids.indexOf(y.layer.id));
+      const picked = m.queryRenderedFeatures(e.point, { layers: ids }).sort((x, y) => ids.indexOf(x.layer.id) - ids.indexOf(y.layer.id));
+      const hit = picked[0];
       const layer = hit && LAYER_BY_ID.get(hit.sourceLayer);
       if (layer?.code) onpick(String(hit.properties[layer.code] ?? "").toUpperCase(), layer.id, String(hit.properties[layer.name!] ?? ""));
       if (!hits) return;
-      const all = query(m, e.point);
+      const all = query(m, e.point, picked);
       const seen = new Set<string>();
       compare.hits = all.filter((h) => {
         const key = `${h.slot}:${h.label}:${JSON.stringify(h.properties)}`;
@@ -101,8 +102,8 @@
     let last = performance.now();
     const spin = (now: number) => {
       const c = m.getCenter();
-      // Clamp so a backgrounded tab doesn't jump ahead on return.
-      m.setCenter([c.lng - (Math.min(now - last, 100) / 1000) * SPIN_DEG_PER_S, c.lat]);
+      // Clamp so a backgrounded tab doesn't jump ahead on return; a covered map holds still.
+      if (active) m.setCenter([c.lng - (Math.min(now - last, 100) / 1000) * SPIN_DEG_PER_S, c.lat]);
       last = now;
       frame = requestAnimationFrame(spin);
     };
@@ -137,7 +138,17 @@
   });
 
   $effect(() => {
-    if (map && loaded) applyFocus(map, compare.draws, compare.focus, compare.basemap === "satellite");
+    if (map && loaded) applyFocus(map, compare.draws, compare.focus, compare.view === "fade", compare.basemap === "satellite");
+  });
+
+  $effect(() => {
+    if (map && loaded) applyOpacity(map, compare.draws, compare.opacities, compare.basemap === "satellite");
+  });
+
+  // Fade animates only while the map shows.
+  $effect(() => {
+    compare.animate(active && compare.view === "fade");
+    return () => compare.animate(false);
   });
 
   // Each pick frames once, after the layout settles so a pane that just opened has its final size.
@@ -173,11 +184,9 @@
 <svelte:window onkeydown={(e) => active && compare.keydown(e)} />
 
 <div class="map" bind:this={container} style:--inset="{inset}px"></div>
-<div class="pills" style:--inset="{inset}px">
-  {#if compare.focus}
-    <button class="pill focus" aria-label="Clear highlight" onclick={() => (compare.focus = null)}>{compare.focus.iso3} <span aria-hidden="true">×</span></button>
-  {/if}
-</div>
+{#if compare.focus}
+  <button class="focus" style:--inset="{inset}px" aria-label="Clear highlight" onclick={() => (compare.focus = null)}>{compare.focus.iso3} <span aria-hidden="true">×</span></button>
+{/if}
 
 <style>
   .map {
@@ -187,31 +196,23 @@
     right: var(--inset);
     transition: right 300ms cubic-bezier(0.2, 0, 0, 1);
   }
-  .pills {
+  .focus {
     position: absolute;
     top: 0.75rem;
     left: calc((100% - var(--inset)) / 2);
     transform: translateX(-50%);
     transition: left 300ms cubic-bezier(0.2, 0, 0, 1);
-    display: flex;
-    gap: 0.5rem;
-    pointer-events: none;
     z-index: 3;
-  }
-  .pill {
     padding: 0.3rem 0.75rem;
+    border: 0;
     background: var(--cd-white);
     border-radius: 999px;
     box-shadow: var(--panel-shadow);
+    color: inherit;
+    font-family: inherit;
     font-size: 0.875rem;
     font-weight: 600;
     white-space: nowrap;
-  }
-  .focus {
-    border: 0;
-    color: inherit;
-    font-family: inherit;
-    pointer-events: auto;
     cursor: pointer;
   }
   .focus span {

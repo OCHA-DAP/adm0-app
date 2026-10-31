@@ -20,7 +20,7 @@ from tenacity import (
     wait_exponential,
 )
 
-from .config import FIELDMAPS, download_dir
+from .config import download_dir
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -42,6 +42,7 @@ LSIB_NS = {
     "gmd": "http://www.isotc211.org/2005/gmd",
 }
 UNTERM_URL = "https://conferences.unite.un.org/untermapi/api/term/downloadCountries"
+FIELDMAPS_LICENSE = "odbl"
 FIELDMAPS_URL = "https://data.source.coop/fieldmaps/international/{license}/humanitarian/adm0-{geom}/adm0_{geom}.parquet"
 M49_URL = "https://unstats.un.org/unsd/methodology/m49/overview/"
 
@@ -151,7 +152,7 @@ def _ref(out: Path) -> str:
 def _fieldmaps(out: Path) -> str:
     dates = []
     for geom in ("polygons", "lines"):
-        url = FIELDMAPS_URL.format(license=FIELDMAPS["license"], geom=geom)
+        url = FIELDMAPS_URL.format(license=FIELDMAPS_LICENSE, geom=geom)
         dates.append(_stream(url, out / f"{geom}.parquet"))
     return max(dates)
 

@@ -1,16 +1,17 @@
 <script lang="ts">
   import { SLOT_COLORS, type Focus } from "$lib/compare.svelte";
+  import Segmented from "$lib/components/Segmented.svelte";
   import {
-    ATTRIBUTE_SOURCE,
     DEFAULT_FILTER,
-    GROUPS,
     SOURCES,
+    attributeGroups,
     groupsInScope,
     majority,
     matches,
     sourcesFor,
     TIE,
     value,
+    type AttributeGroup,
     type AttributeRow,
     type Part,
     type DiffType,
@@ -44,7 +45,7 @@
 
   let filter = $state<Filter>({ ...DEFAULT_FILTER });
   // With the map pair in charge, the table shows and compares only A and B.
-  const ab = $derived([ATTRIBUTE_SOURCE[pair.a], ATTRIBUTE_SOURCE[pair.b]]);
+  const ab = $derived([pair.a, pair.b]);
   // Split shows only the map's A and B; the full table shows the sources toggled on.
   const ALL = Object.keys(SOURCES);
   const scope = $derived(split ? { ...filter, sources: ab } : filter);
@@ -62,7 +63,8 @@
   let body = $state<HTMLElement>();
 
   // The focused code stays listed even when the filters would hide it.
-  const shown = $derived(rows.filter((row) => row.iso3 === focus?.iso3 || matches(row, scope)));
+  const allGroups = $derived(attributeGroups(rows[0]));
+  const shown = $derived(rows.filter((row) => row.iso3 === focus?.iso3 || matches(row, allGroups, scope)));
 
   // Scrolls once per code, so picking its parts leaves the table still. scrollIntoView would also
   // scroll the hidden pane's ancestors and slide the table over the map-only view.
@@ -78,12 +80,12 @@
       scroller.scrollTop += row.getBoundingClientRect().top - scroller.getBoundingClientRect().top - margin;
     });
   });
-  const groups = $derived(groupsInScope(filter));
+  const groups = $derived(groupsInScope(allGroups, filter));
   const visible = $derived(columns.filter((s) => groups.some((g) => g.sources.includes(s))));
 
   const dirty = $derived(JSON.stringify(filter) !== JSON.stringify(DEFAULT_FILTER));
 
-  function cellClass(row: AttributeRow, group: (typeof GROUPS)[number], source: string) {
+  function cellClass(row: AttributeRow, group: AttributeGroup, source: string) {
     const v = value(row, group.key, source);
     const sources = sourcesFor(group, scope);
     const inPair = sources.includes(source);
@@ -96,34 +98,7 @@
   }
 </script>
 
-{#snippet segmented(label: string, options: { id: string; label: string; title?: string; swatch?: string }[], current: string, pick: (id: string) => void)}
-  <div class="segmented" role="radiogroup" aria-label={label}>
-    {#each options as o (o.id)}
-      <button type="button" role="radio" aria-checked={current === o.id} class:active={current === o.id} title={o.title} onclick={() => pick(o.id)}>{#if o.swatch}<span class="swatch" style:background={o.swatch}></span>{/if}{o.label}</button>
-    {/each}
-  </div>
-{/snippet}
-
-{#snippet search()}
-  <input type="search" placeholder="Search code or name" bind:value={filter.query} />
-{/snippet}
-
-{#snippet show()}
-  {@render segmented("Show", SHOW, filter.diff, (id) => (filter.diff = id as DiffType))}
-{/snippet}
-
-{#snippet attributes()}
-  {@render segmented("Attribute", [{ id: "", label: "All" }, ...GROUPS.map((g) => ({ id: g.key, label: g.label }))], filter.group, (id) => (filter.group = id))}
-{/snippet}
-
-{#snippet sourceHead(source: string)}
-  {@const slot = !split ? null : source === ab[0] ? "a" : "b"}
-  <th>
-    {#if slot}<span class="badge" style:--color={SLOT_COLORS[slot]}>{slot.toUpperCase()}</span>{/if}{SOURCES[source]}
-  </th>
-{/snippet}
-
-{#snippet fixedCell(row: AttributeRow, group: (typeof GROUPS)[number], source: string)}
+{#snippet fixedCell(row: AttributeRow, group: AttributeGroup, source: string)}
   {#if group.key === "count" && group.sources.includes(source)}
     {@render partChips(row, source)}
   {:else if group.sources.includes(source)}
@@ -135,8 +110,7 @@
 {/snippet}
 
 {#snippet partChips(row: AttributeRow, source: string)}
-  {@const parts = (row.parts as Part[] | null) ?? []}
-  {@const mine = parts.filter((p) => p.s === source)}
+  {@const mine = (row.parts ?? []).filter((p) => p.s === source)}
   {@const picked = row.iso3 === focus?.iso3 ? focus.part : null}
   {#if mine.length}
     <td><div class="parts">
@@ -161,25 +135,17 @@
   {/if}
 {/snippet}
 
-{#snippet reset()}
-  {#if dirty}<button type="button" class="btn" onclick={() => (filter = { ...DEFAULT_FILTER })}>Reset</button>{/if}
-{/snippet}
-
-{#snippet total()}
-  <span class="count">{shown.length} of {rows.length} codes</span>
-{/snippet}
-
 <div class="table-view">
   <aside class="sidebar">
-    <section>{@render search()}</section>
+    <section><input type="search" placeholder="Search code or name" bind:value={filter.query} /></section>
     <section>
       <h2>Show</h2>
-      {@render show()}
-      {@render total()}
+      <Segmented label="Show" options={SHOW} current={filter.diff} pick={(id) => (filter.diff = id as DiffType)} />
+      <span class="count">{shown.length} of {rows.length} codes</span>
     </section>
     <section>
       <h2>Attribute</h2>
-      {@render attributes()}
+      <Segmented label="Attribute" options={[{ id: "", label: "All" }, ...allGroups.map((g) => ({ id: g.key, label: g.label }))]} current={filter.group} pick={(id) => (filter.group = id)} />
     </section>
     {#if !split}
       <section>
@@ -191,7 +157,7 @@
         </div>
       </section>
     {/if}
-    {@render reset()}
+    {#if dirty}<button type="button" class="btn" onclick={() => (filter = { ...DEFAULT_FILTER })}>Reset</button>{/if}
   </aside>
   {#if failed}
     <p>Could not load attributes.json.</p>
@@ -202,7 +168,10 @@
           <tr>
             <th class="code">ISO3</th>
             {#if labelled}<th class="attr">Attribute</th>{/if}
-            {#each visible as source (source)}{@render sourceHead(source)}{/each}
+            {#each visible as source (source)}
+              {@const slot = !split ? null : source === ab[0] ? "a" : "b"}
+              <th>{#if slot}<span class="badge" style:--color={SLOT_COLORS[slot]}>{slot.toUpperCase()}</span>{/if}{SOURCES[source]}</th>
+            {/each}
           </tr>
         </thead>
         <tbody bind:this={body}>
@@ -265,41 +234,6 @@
     border-color: var(--brand-primary--text);
     background: var(--cd-blue--lightest);
     color: var(--brand-primary--text);
-  }
-  .segmented {
-    display: flex;
-    border: 1px solid var(--cd-grey--500);
-    border-radius: var(--brand-radius--sm);
-    overflow: hidden;
-    background: var(--cd-white);
-  }
-  .segmented button {
-    padding: 0.25rem 0.6rem;
-    border: none;
-    border-left: 1px solid var(--cd-grey--400);
-    background: var(--cd-white);
-    color: var(--cd-grey--800);
-    font-size: 0.75rem;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    cursor: pointer;
-  }
-  .segmented button:first-child {
-    border-left: none;
-  }
-  .segmented button:hover:not(.active) {
-    background: var(--cd-grey--300);
-  }
-  .segmented button.active {
-    background: var(--brand-primary--text);
-    color: var(--cd-white);
-  }
-  .swatch {
-    width: 0.7rem;
-    height: 0.7rem;
-    border: 1px solid var(--cd-grey--500);
-    border-radius: 2px;
   }
   tr[data-iso3] {
     scroll-margin-top: 2rem;
@@ -398,11 +332,6 @@
   }
   .sidebar h2 {
     margin: 0;
-    font-size: 0.6875rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--cd-grey--700);
   }
   .sidebar .btn {
     align-self: center;

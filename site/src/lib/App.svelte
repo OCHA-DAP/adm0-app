@@ -65,13 +65,11 @@
 
   const drawn = $derived((["a", "b"] as const).map((slot) => layerFor(compare.pair[slot], "polygon").id));
 
-  const partsOf = (row: AttributeRow) => (row.parts as Part[] | null) ?? [];
-
   // Sources can share a code for different places, so frame only the shown sources' parts.
   function shownBox(row: AttributeRow): number[] | null {
     const layers = compare.view === "a" ? [drawn[0]] : compare.view === "b" ? [drawn[1]] : drawn;
-    const boxes = partsOf(row).filter((p) => layers.includes(p.layer)).map((p) => p.bbox);
-    if (!boxes.length) return (row.bbox as number[] | null) ?? null;
+    const boxes = (row.parts ?? []).filter((p) => layers.includes(p.layer)).map((p) => p.bbox);
+    if (!boxes.length) return row.bbox;
     const union = (bs: number[][]) => [Math.min(...bs.map((b) => b[0])), Math.min(...bs.map((b) => b[1])), Math.max(...bs.map((b) => b[2])), Math.max(...bs.map((b) => b[3]))];
     const plain = union(boxes);
     // Matches the pipeline's antimeridian shift: western parts move east by 360 when that is narrower.
@@ -79,16 +77,16 @@
     return plain[2] - plain[0] <= Math.max(180, east[2] - east[0]) ? plain : east;
   }
 
-  // A code restored from a dev URL has no bbox or parts until the rows arrive.
+  // A code restored from a dev URL has no bbox until the rows arrive.
   $effect(() => {
     const restored = compare.focus;
     if (!restored || restored.bbox || !rows.length) return;
     const row = rows.find((r) => r.iso3 === restored.iso3);
-    if (row) compare.focusOn(restored.iso3, shownBox(row), partsOf(row), null, false);
+    if (row) compare.focusOn(restored.iso3, shownBox(row), null, false);
   });
 
   function focus(row: AttributeRow, part: Part | null = null, fly = true) {
-    compare.focusOn(String(row.iso3), shownBox(row), partsOf(row), part, fly);
+    compare.focusOn(row.iso3, shownBox(row), part, fly);
     if (tab === "table") show("split");
   }
 
@@ -109,7 +107,7 @@
   function pick(iso3: string, layer: string, name: string) {
     const row = rows.find((r) => r.iso3 === iso3);
     if (!row) return;
-    const own = partsOf(row).filter((p) => p.layer === layer);
+    const own = (row.parts ?? []).filter((p) => p.layer === layer);
     const part = own.length > 1 ? (own.find((p) => p.name === name) ?? null) : null;
     // A click inside the focused code keeps its picked part unless it lands on another one.
     if (!part && compare.focus?.iso3 === iso3) return;
@@ -211,6 +209,12 @@
     overflow: hidden;
   }
   /* Keeps the map's floating panels beneath the sliding table. */
+  .view {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+  }
   .view.map {
     position: absolute;
     inset: 0;
@@ -240,13 +244,6 @@
     .view.table {
       transition: none;
     }
-  }
-  .view {
-    display: flex;
-    flex: 1;
-    min-width: 0;
-    min-height: 0;
-    position: relative;
   }
   .slide > :global(.table-view) {
     flex: 1;
