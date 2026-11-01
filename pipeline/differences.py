@@ -209,14 +209,14 @@ def _patches(conn: DuckDBPyConnection) -> None:
 
 
 def _dots(conn: DuckDBPyConnection) -> None:
-    """Dot each island, skipping any within 10 widths of a larger one in its item."""
+    """Dot each island, skipping any within 5 widths of a larger one in its item."""
     conn.execute("""--sql
         CREATE TEMP TABLE dot_islands AS
         SELECT row_number() OVER () AS id, pair, item, km2, geometry,
             ST_XMin(geometry) AS x0, ST_XMax(geometry) AS x1,
             ST_YMin(geometry) AS y0, ST_YMax(geometry) AS y1,
             (x0 + x1) / 2 AS cx, (y0 + y1) / 2 AS cy,
-            10 * greatest(x1 - x0, y1 - y0) AS reach
+            5 * greatest(x1 - x0, y1 - y0) AS reach
         FROM patches WHERE type = 'island'
     """)
     write_parquet(
