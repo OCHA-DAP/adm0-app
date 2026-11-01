@@ -17,6 +17,9 @@
           {/each}
         </tr>
       {/each}
+      {#if compare.mode === "voronoi"}
+        <tr class="fixed"><td>OpenStreetMap</td><td colspan={slots.length}><span class="swatch"></span></td></tr>
+      {/if}
     </tbody>
   </table>
 {/snippet}
@@ -47,6 +50,15 @@
     line-height: 1.4;
     margin: 0.75rem 0 0;
   }
+  .swatch {
+    display: inline-block;
+    width: 0.8rem;
+    height: 0.8rem;
+    vertical-align: middle;
+    border: 1px solid #424242;
+    border-radius: 2px;
+    background: rgb(66 66 66 / 0.85);
+  }
   .matrix {
     width: 100%;
     margin: 0.35rem 0;
@@ -65,7 +77,7 @@
     width: 1.75rem;
     text-align: center;
   }
-  .matrix tbody tr:hover {
+  .matrix tbody tr:not(.fixed):hover {
     background: var(--cd-grey--300);
   }
 </style>

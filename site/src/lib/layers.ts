@@ -10,6 +10,8 @@ export interface SourceLayer {
   // Polygon layers only: the feature properties holding the ISO3 code and the feature's name.
   code?: string;
   name?: string;
+  // The property naming the entity a geometry difference refers to; Voronoi cells carry it too.
+  entity?: string;
 }
 
 export const LAYERS = layers as SourceLayer[];

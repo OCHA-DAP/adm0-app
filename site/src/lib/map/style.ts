@@ -1,5 +1,5 @@
 import type { ExpressionSpecification, FilterSpecification, LayerSpecification, Map, StyleSpecification } from "maplibre-gl";
-import type { Focus } from "$lib/compare.svelte";
+import type { Focus, ItemFocus } from "$lib/compare.svelte";
 import positron from "$lib/utils/basemap/positron.json";
 import { LAYERS, LAYER_BY_ID, layerFor, type SourceLayer } from "$lib/layers";
 import { SATELLITE } from "$lib/map/satellite";
@@ -38,23 +38,30 @@ const LINE_WIDTHS = byType((t) => t.width);
 export const DIFFERENCES = "differences";
 export const DIFF_COLOR = "#7B3FA0";
 const DIFF_FILL_OPACITY = 0.45;
+// Islands are OSM land, outside both sources, so they draw in neutral grey instead of a source's colour.
+const ISLAND_COLOR = "#424242";
+const ISLAND: ExpressionSpecification = ["==", ["get", "type"], "island"];
 
-// "all" draws every patch outside Fade; in Fade, "a" and "b" each draw every patch in one source's color.
+// "all" draws islands always and land outside Fade; in Fade, "a" and "b" each draw land in one source's color.
 const DIFF_SETS = ["all", "a", "b"] as const;
 export const DIFF_FILLS = DIFF_SETS.map((k) => `${DIFFERENCES}-${k}-fill`);
-// Voronoi area rows only outline a focused item; the sources' own Voronoi show the rest.
+// Voronoi area rows only take clicks; the sources' own Voronoi show the rest.
 const PATCH: ExpressionSpecification = ["!=", ["get", "type"], "voronoi"];
-const DIFF_FOCUS = `${DIFFERENCES}-focus`;
+// Transparent, so a click finds the difference under it, Voronoi area rows included.
+export const DIFF_PICK = `${DIFFERENCES}-pick`;
+// One point per island patch, on top of source lines; its edge thins out by z12 so it melts into its island.
+const DIFF_DOTS = `${DIFFERENCES}_dots`;
+const DOTS_LAYER: LayerSpecification = { id: DIFF_DOTS, source: DIFF_DOTS, "source-layer": DIFF_DOTS, layout: { visibility: "none" }, type: "circle", paint: { "circle-color": ISLAND_COLOR, "circle-radius": 4, "circle-stroke-color": "#FFFFFF", "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 8, 1, 12, 0] } };
 
 function differenceLayers(): LayerSpecification[] {
   const common = { source: DIFFERENCES, "source-layer": DIFFERENCES, layout: { visibility: "none" } } as const;
   return [
     ...DIFF_SETS.flatMap((k): LayerSpecification[] => [
-      { ...common, id: `${DIFFERENCES}-${k}-fill`, type: "fill", paint: { "fill-color": DIFF_COLOR, "fill-opacity": DIFF_FILL_OPACITY } },
-      // Islands get a heavier outline so a small one still shows at low zoom.
-      { ...common, id: `${DIFFERENCES}-${k}-line`, type: "line", paint: { "line-color": DIFF_COLOR, "line-width": ["match", ["get", "type"], "island", 2, 0.5] } },
+      { ...common, id: `${DIFFERENCES}-${k}-fill`, type: "fill", paint: { "fill-color": DIFF_COLOR, "fill-opacity": ["case", ISLAND, 1, DIFF_FILL_OPACITY] } },
+      // The white edge keeps a grey island apart from dark satellite water.
+      { ...common, id: `${DIFFERENCES}-${k}-line`, type: "line", paint: { "line-color": DIFF_COLOR, "line-width": ["case", ISLAND, 1, 0.5] } },
     ]),
-    { ...common, id: DIFF_FOCUS, type: "line", paint: { "line-color": "#1F1F1F", "line-width": 2.5 } },
+    { ...common, id: DIFF_PICK, type: "fill", paint: { "fill-opacity": 0 } },
   ];
 }
 
@@ -62,27 +69,71 @@ function differenceLayers(): LayerSpecification[] {
 const NOT_BORDER: ExpressionSpecification = ["!", ["all", ["==", ["get", "type"], "land"], ["==", ["get", "side"], "both"]]];
 
 // Shows the pair's patches, or hides them all when pair is null. Tiles name sides by
-// sorted source id, so swapped means slot A holds tile side "b".
-export function applyDifferences(map: Map, pair: string | null, fade: boolean, draws: Draw[], swapped: boolean) {
+// sorted source id, so swapped means slot A holds tile side "b". Focused items keep the
+// colours and grey every other item's patches.
+const OTHER_ITEM_COLOR = "#9E9E9E";
+// Focused land draws only through its entities' tint, so it never looks like a region of its own.
+const FOCUSED_LAND_HIDDEN = (items: string[]): ExpressionSpecification => ["!", ["all", ["==", ["get", "type"], "land"], ["in", ["get", "item"], ["literal", items]]]];
+export function applyDifferences(map: Map, pair: string | null, fade: boolean, draws: Draw[], swapped: boolean, items: string[] | null) {
   const split = fade && draws.length === 2;
   const byPair: ExpressionSpecification = ["==", ["get", "pair"], pair];
+  map.setLayoutProperty(DIFF_PICK, "visibility", pair ? "visible" : "none");
+  if (pair) map.setFilter(DIFF_PICK, ["all", byPair, NOT_BORDER]);
+  map.setLayoutProperty(DIFF_DOTS, "visibility", pair && items ? "visible" : "none");
+  if (pair && items) map.setFilter(DIFF_DOTS, ["all", byPair, ["in", ["get", "item"], ["literal", items]]]);
   for (const k of DIFF_SETS) {
-    const shown = !!pair && (k === "all") !== split;
-    const color = k === "all" ? DIFF_COLOR : draws[(k === "b") !== swapped ? 1 : 0]?.color ?? DIFF_COLOR;
+    const shown = !!pair && (k === "all" || split);
+    const kinds: ExpressionSpecification[] = k === "all" ? (split ? [ISLAND] : []) : [["!", ISLAND]];
+    const land = k === "all" ? DIFF_COLOR : draws[(k === "b") !== swapped ? 1 : 0]?.color ?? DIFF_COLOR;
     for (const type of ["fill", "line"] as const) {
       const id = `${DIFFERENCES}-${k}-${type}`;
       map.setLayoutProperty(id, "visibility", shown ? "visible" : "none");
       if (!shown) continue;
-      map.setFilter(id, ["all", byPair, NOT_BORDER, PATCH]);
-      map.setPaintProperty(id, `${type}-color`, color);
+      map.setFilter(id, ["all", byPair, NOT_BORDER, PATCH, ...kinds, ...(items ? [FOCUSED_LAND_HIDDEN(items)] : [])]);
+      const color: ExpressionSpecification = ["case", ISLAND, type === "line" ? "#FFFFFF" : ISLAND_COLOR, land];
+      map.setPaintProperty(id, `${type}-color`, items ? ["case", ["in", ["get", "item"], ["literal", items]], color, ISLAND, type === "line" ? "#FFFFFF" : OTHER_ITEM_COLOR, OTHER_ITEM_COLOR] : color);
     }
   }
 }
 
-// Outlines one item's patches and Voronoi area in the shown pair, or nothing when item is null.
-export function applyItemFocus(map: Map, item: string | null, pair: string) {
-  map.setLayoutProperty(DIFF_FOCUS, "visibility", item ? "visible" : "none");
-  if (item) map.setFilter(DIFF_FOCUS, ["all", ["==", ["get", "item"], item], ["==", ["get", "pair"], pair], NOT_BORDER]);
+// Each source's whole Voronoi cells for a focused difference or code, tinted so islands joined to a mainland read as one.
+const ENTITY_FILL_OPACITY = 0.3;
+function entityLayersFor(layer: SourceLayer): LayerSpecification[] {
+  if (layer.kind !== "voronoi") return [];
+  const common = { source: layer.id, "source-layer": layer.id, layout: { visibility: "none" } } as const;
+  return [
+    { ...common, id: `${layer.id}-entity-fill`, type: "fill", paint: { "fill-color": "transparent", "fill-opacity": ENTITY_FILL_OPACITY } },
+    { ...common, id: `${layer.id}-entity`, type: "line", paint: { "line-color": "transparent", "line-width": FOCUS_WIDTH } },
+  ];
+}
+
+// The cells to tint per source: a difference's entity, or a focused code narrowed to a picked part's feature.
+function cellFilter(source: string, item: ItemFocus | null, focus: Focus | null): FilterSpecification | null {
+  const polygon = layerFor(source, "polygon");
+  if (item) {
+    const [code, name] = item.entities[source] ?? [null, null];
+    if (code == null && name == null) return null;
+    return ["all", ["==", ["get", polygon.code!], code ?? null], ["==", ["get", polygon.entity!], name ?? null]] as FilterSpecification;
+  }
+  if (!focus) return null;
+  const byCode: FilterSpecification = ["==", ["upcase", ["to-string", ["coalesce", ["get", polygon.code!], ""]]], focus.iso3];
+  return focus.part?.layer === polygon.id ? ["all", byCode, ["==", ["get", polygon.name!], focus.part.name]] : byCode;
+}
+
+// Voronoi tints each drawn source's cells for the focused difference or code.
+export function applyVoronoiFocus(map: Map, draws: Draw[], item: ItemFocus | null, focus: Focus | null) {
+  for (const layer of LAYERS) {
+    if (layer.kind !== "voronoi") continue;
+    const draw = draws.find((d) => d.id === layer.id);
+    const filter = draw ? cellFilter(layer.source, item, focus) : null;
+    const shown = !!filter;
+    for (const [id, type] of [[`${layer.id}-entity`, "line"], [`${layer.id}-entity-fill`, "fill"]] as const) {
+      map.setLayoutProperty(id, "visibility", shown ? "visible" : "none");
+      if (!shown) continue;
+      map.setFilter(id, filter);
+      map.setPaintProperty(id, `${type}-color`, draw!.color);
+    }
+  }
 }
 
 // Fade calls this every frame with plain numbers only, so nothing is re-evaluated per feature.
@@ -195,6 +246,10 @@ export function applyOpacity(map: Map, draws: Draw[], opacities: number[], satel
     map.setPaintProperty(`${d.id}-line`, "line-opacity", o);
     if (layer.kind !== "line") map.setPaintProperty(`${d.id}-fill`, "fill-opacity", FILL_OPACITY * o);
     map.setPaintProperty(`${polygon}-focus`, "line-opacity", o);
+    if (layer.kind === "voronoi") {
+      map.setPaintProperty(`${d.id}-entity`, "line-opacity", o);
+      map.setPaintProperty(`${d.id}-entity-fill`, "fill-opacity", ENTITY_FILL_OPACITY * o);
+    }
     map.setPaintProperty(`${polygon}-dim`, "fill-opacity", dim * o);
   });
 }
@@ -217,17 +272,20 @@ export function buildStyle(tilesBase: string, draws: Draw[]): StyleSpecification
       ...(positron.sources as StyleSpecification["sources"]),
       satellite: SATELLITE,
       ...Object.fromEntries(
-        [...LAYERS.map((l) => l.id), DIFFERENCES].map((id) => [id, { type: "vector" as const, url: `pmtiles://${tilesBase}/${id}.pmtiles` }]),
+        [...LAYERS.map((l) => l.id), DIFFERENCES, DIFF_DOTS].map((id) => [id, { type: "vector" as const, url: `pmtiles://${tilesBase}/${id}.pmtiles` }]),
       ),
     },
     layers: [
       ...(positron.layers as LayerSpecification[]),
       { id: "satellite", type: "raster", source: "satellite", layout: { visibility: "none" } },
+      ...LAYERS.flatMap(entityLayersFor).filter((l) => l.type === "fill"),
       ...differenceLayers(),
       ...LAYERS.flatMap((l) => layersFor(l, draws)),
       // Every dim sits under every outline, so one source's dim never covers the other's outline.
       ...focus.filter((l) => l.type === "fill"),
       ...focus.filter((l) => l.type === "line"),
+      ...LAYERS.flatMap(entityLayersFor).filter((l) => l.type === "line"),
+      DOTS_LAYER,
     ],
   };
 }

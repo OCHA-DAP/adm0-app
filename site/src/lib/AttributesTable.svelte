@@ -4,7 +4,6 @@
   import {
     DEFAULT_FILTER,
     ENTITY,
-    ITEM_TYPES,
     SOURCES,
     attributeGroups,
     groupsInScope,
@@ -50,7 +49,6 @@
     { id: "all", label: "All" },
     { id: "differs", label: "Differs", swatch: "var(--cd-orange--300)" },
   ];
-  const TYPE_LABEL = Object.fromEntries(ITEM_TYPES.map((t) => [t.id, t.label]));
 
   let filter = $state<Filter>({ ...DEFAULT_FILTER });
   // Split lists what the map can show; the full table lists attributes unrelated to geometry.
@@ -89,28 +87,32 @@
     if (it.type !== "no_land" && !(it.pairs ?? []).includes(diffPair)) return false;
     return matches(it, [ENTITY], itemScope);
   }
-  const shownItems = $derived(items.filter((it) => it.item === item?.id || itemShown(it)));
+  const shownItems = $derived(items.filter((it) => it.item === item?.ids[0] || itemShown(it)));
 
   const shown = $derived(rows.filter((row) => row.iso3 === focus?.iso3 || matches(row, attrGroups, rowScope)));
 
-  // Scrolls once per code or item. scrollIntoView would also scroll the hidden pane's ancestors
-  // and slide the table over the map-only view.
+  // Scrolls once per code or item, only when the row sits outside the area below the sticky header.
+  // scrollIntoView would also scroll the hidden pane's ancestors and slide the table over the map-only view.
   let scroller = $state<HTMLElement>();
   function scrollTo(selector: string) {
     requestAnimationFrame(() => {
       const row = body?.querySelector<HTMLElement>(selector);
       if (!row || !scroller) return;
-      const margin = parseFloat(getComputedStyle(row).scrollMarginTop);
-      scroller.scrollTop += row.getBoundingClientRect().top - scroller.getBoundingClientRect().top - margin;
+      const head = scroller.querySelector("thead")?.getBoundingClientRect().height ?? 0;
+      const box = row.getBoundingClientRect();
+      const top = box.top - scroller.getBoundingClientRect().top - head;
+      if (top < 0 || top + box.height > scroller.clientHeight - head) scroller.scrollTop += top;
     });
   }
   const focusedCode = $derived(focus?.iso3);
   $effect(() => {
     if (focusedCode) scrollTo(`[data-iso3="${focusedCode}"]`);
   });
-  const focusedItem = $derived(item?.id);
+  const focusedItem = $derived(item?.ids[0]);
   $effect(() => {
-    if (focusedItem) scrollTo(`[data-item="${focusedItem}"]`);
+    if (!focusedItem) return;
+    list = "differences";
+    scrollTo(`[data-item="${focusedItem}"]`);
   });
 
   const visible = $derived(geometry ? columns : columns.filter((s) => groups.some((g) => g.sources.includes(s))));
@@ -129,13 +131,14 @@
   const count = $derived(
     geometry ? `${shownItems.length} differences` : `${shown.length} of ${rows.length} codes`,
   );
-  const fmt = (n: number | null) => (n == null ? "" : n.toLocaleString("en", { maximumFractionDigits: n < 10 ? 1 : 0 }));
-  function itemMeta(it: ItemRow) {
-    const parts = [TYPE_LABEL[it.type]];
-    if (it.islands) parts.push(`${fmt(it.islands)} islands`);
-    if (it.km2) parts.push(`${fmt(it.km2)} km²`);
-    return parts.join(" · ");
-  }
+  const slotOf = (source: string) => (source === ab[0] ? "a" : "b");
+  // Differences grouped like Features: under A's code, or B's when A has none, codes in order.
+  const groupCode = (it: ItemRow) => ab.map((s) => String(it[`code_${s}`] ?? "")).find(Boolean) ?? "";
+  const itemGroups = $derived.by(() => {
+    const groups = new Map<string, ItemRow[]>();
+    for (const it of shownItems) groups.set(groupCode(it), [...(groups.get(groupCode(it)) ?? []), it]);
+    return [...groups].sort(([x], [y]) => x.localeCompare(y, "en", { sensitivity: "base" }));
+  });
 </script>
 
 {#snippet fixedCell(row: AttributeRow, group: AttributeGroup, source: string)}
@@ -152,14 +155,10 @@
 {#snippet entityCell(it: ItemRow, source: string)}
   {@const c = cellClass(it, ENTITY, source)}
   {#if !ENTITY.sources.includes(source)}<td class="na"></td>{:else}
-  <td class:empty={c.empty} class:diff={c.diff} class:dim={c.dim} class:ref={c.ref} class:absent={it.missing?.includes(source)} title={it.missing?.includes(source) ? "No entity of its own here" : undefined}
-    >{value(it as unknown as AttributeRow, ENTITY.key, source)}</td
+  {@const [code, name] = [String(it[`code_${source}`] ?? ""), it[`name_${source}`]]}
+  <td class:empty={!name} class:dim={c.dim} class:ref={c.ref} class:absent={it.missing?.includes(source)} title={it.missing?.includes(source) ? "No entity of its own here" : undefined}
+    >{#if code && code !== groupCode(it)}<span class="iso" style:color={SLOT_COLORS[slotOf(source)]}>{code}</span>{/if}{name ?? ""}{#if c.ref && it.type === "no_land"}<div class="meta">No OSM land</div>{/if}</td
   >{/if}
-{/snippet}
-
-{#snippet itemHead(it: ItemRow)}
-  <button type="button" class="code-link" title="Show on map" onclick={() => onitem(it, itemTitle(it))}>{itemTitle(it)}</button>
-  <div class="meta">{itemMeta(it)}</div>
 {/snippet}
 
 {#snippet partChips(row: AttributeRow, source: string)}
@@ -231,18 +230,21 @@
       <table>
         <thead>
           <tr>
-            <th class="code">{geometry ? "Difference" : "ISO3"}</th>
+            <th class="code">ISO3</th>
             {#if labelled && !geometry}<th class="attr">Attribute</th>{/if}
             {#each visible as source (source)}{@render sourceHead(source)}{/each}
           </tr>
         </thead>
         <tbody bind:this={body}>
           {#if geometry}
-            {#each shownItems as it (it.item)}
-              <tr class="start" class:focused={it.item === item?.id} data-item={it.item}>
-                <th class="code item">{@render itemHead(it)}</th>
-                {#each visible as source (source)}{@render entityCell(it, source)}{/each}
-              </tr>
+            {#each itemGroups as [code, group] (code)}
+              {#each group as it, i (it.item)}
+                <tr class="clickable" class:start={i === 0} class:focused={it.item === item?.ids[0]} data-item={it.item} tabindex="0" role="button"
+                  onclick={() => onitem(it, itemTitle(it))} onkeydown={(e) => e.key === "Enter" && onitem(it, itemTitle(it))}>
+                  {#if i === 0}<th class="code group" rowspan={group.length}>{code}</th>{/if}
+                  {#each visible as source (source)}{@render entityCell(it, source)}{/each}
+                </tr>
+              {/each}
             {/each}
           {:else}
             {#each shown as row (row.iso3)}
@@ -305,9 +307,6 @@
     border-color: var(--brand-primary--text);
     background: var(--cd-blue--lightest);
     color: var(--brand-primary--text);
-  }
-  tr[data-iso3] {
-    scroll-margin-top: 2rem;
   }
   thead th.code {
     z-index: 3;
@@ -454,12 +453,24 @@
     font-size: 0.7rem;
     font-weight: 400;
   }
-  th.item {
-    min-width: 11rem;
-  }
   th.ref {
     text-decoration: underline;
     text-underline-offset: 3px;
+  }
+  tr.clickable {
+    cursor: pointer;
+  }
+  tr.clickable.focused > td {
+    background-color: var(--cd-blue--lightest);
+  }
+  th.group {
+    font-weight: 600;
+    cursor: default;
+  }
+  .iso {
+    margin-right: 0.35em;
+    font-size: 0.75rem;
+    font-weight: 600;
   }
   .absent {
     outline: 1px dashed var(--cd-grey--600);

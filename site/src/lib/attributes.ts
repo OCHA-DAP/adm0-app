@@ -63,15 +63,13 @@ export const DEFAULT_FILTER: Filter = {
 };
 
 export type ItemType = "island" | "land" | "no_land";
-export const ITEM_TYPES: { id: ItemType; label: string }[] = [
-  { id: "island", label: "Island" },
-  { id: "land", label: "Land" },
-  { id: "no_land", label: "No OSM land" },
-];
 
-// A geometry difference from items.json; pairs are the map's source pairs it has patches in.
+// A geometry difference from items.json; title is its smallest entity's name, and pairs are the
+// map's source pairs it has patches in. items lists the differences merged into this row.
 export interface ItemRow {
   item: string;
+  items?: string[];
+  title: string | null;
   type: ItemType;
   same_code: boolean;
   missing: string[] | null;
@@ -92,14 +90,37 @@ export function prepareItems(items: ItemRow[]): ItemRow[] {
   return items;
 }
 
-// The name most sources give an item, ties broken alphabetically, so the heading favours no source.
+// A source's own text: the title, else the first code for items no source names.
 export function itemTitle(row: ItemRow): string {
-  const counts = new Map<string, number>();
-  for (const s of MAP_SOURCES) {
-    const v = String(row[`name_${s}`] ?? "").replace(/\s*\([A-Z]{2}\)$/, "");
-    if (v) counts.set(v, (counts.get(v) ?? 0) + 1);
+  const code = MAP_SOURCES.map((s) => row[`code_${s}`]).find(Boolean);
+  return row.title?.trim() || String(code ?? row.item);
+}
+
+// One box around all boxes; across the antimeridian, western boxes move east by 360 when that is narrower.
+export function unionBox(boxes: number[][]): number[] {
+  const union = (bs: number[][]) => [Math.min(...bs.map((b) => b[0])), Math.min(...bs.map((b) => b[1])), Math.max(...bs.map((b) => b[2])), Math.max(...bs.map((b) => b[3]))];
+  const plain = union(boxes);
+  const east = union(boxes.map((b) => (b[2] <= 0 ? [b[0] + 360, b[1], b[2] + 360, b[3]] : b)));
+  return plain[2] - plain[0] <= Math.max(180, east[2] - east[0]) ? plain : east;
+}
+
+// Differences that a and b assign to the same two entities read as one, so they merge into one row,
+// led by the first (largest) of them.
+export function mergeItems(items: ItemRow[], a: string, b: string): ItemRow[] {
+  const rows = new Map<string, ItemRow>();
+  for (const it of items) {
+    const key = [it.type === "no_land", it[`code_${a}`], it[`name_${a}`], it[`code_${b}`], it[`name_${b}`]].join("|");
+    const row = rows.get(key);
+    if (!row) {
+      rows.set(key, { ...it, items: [it.item] });
+      continue;
+    }
+    row.items!.push(it.item);
+    const boxes = [row.bbox, it.bbox].filter((x): x is number[] => !!x);
+    row.bbox = boxes.length ? unionBox(boxes) : null;
+    row.pairs = [...new Set([...(row.pairs ?? []), ...(it.pairs ?? [])])];
   }
-  return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? row.item;
+  return [...rows.values()];
 }
 
 export function groupsInScope(groups: AttributeGroup[], filter: Filter): AttributeGroup[] {

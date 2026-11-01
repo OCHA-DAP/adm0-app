@@ -1,14 +1,14 @@
 [
-  { "id": "gaul_l0", "source": "gaul", "label": "FAO GAUL", "kind": "polygon", "code": "ISO3_CODE", "name": "GAUL0_NAME" },
+  { "id": "gaul_l0", "source": "gaul", "label": "FAO GAUL", "kind": "polygon", "code": "ISO3_CODE", "name": "GAUL0_NAME", "entity": "GAUL0_NAME" },
   { "id": "gaul_lines", "source": "gaul", "label": "FAO GAUL", "kind": "line" },
   { "id": "gaul_voronoi", "source": "gaul", "label": "FAO GAUL", "kind": "voronoi" },
-  { "id": "ungeodata_polygons", "source": "ungeodata", "label": "UN Geodata", "kind": "polygon", "code": "iso3cd", "name": "maplab" },
+  { "id": "ungeodata_polygons", "source": "ungeodata", "label": "UN Geodata", "kind": "polygon", "code": "iso3cd", "name": "maplab", "entity": "romnam" },
   { "id": "ungeodata_lines", "source": "ungeodata", "label": "UN Geodata", "kind": "line" },
   { "id": "ungeodata_voronoi", "source": "ungeodata", "label": "UN Geodata", "kind": "voronoi" },
-  { "id": "fieldmaps_polygons", "source": "fieldmaps", "label": "FieldMaps", "kind": "polygon", "code": "iso_3", "name": "adm0_name" },
+  { "id": "fieldmaps_polygons", "source": "fieldmaps", "label": "FieldMaps", "kind": "polygon", "code": "iso_3", "name": "adm0_name", "entity": "adm0_name" },
   { "id": "fieldmaps_lines", "source": "fieldmaps", "label": "FieldMaps", "kind": "line" },
   { "id": "fieldmaps_voronoi", "source": "fieldmaps", "label": "FieldMaps", "kind": "voronoi" },
-  { "id": "wp_polygons", "source": "wp", "label": "US State Dept", "kind": "polygon", "code": "GENC_3", "name": "Map_Label" },
+  { "id": "wp_polygons", "source": "wp", "label": "US State Dept", "kind": "polygon", "code": "GENC_3", "name": "Map_Label", "entity": "WP_Name" },
   { "id": "lsib_lines", "source": "wp", "label": "US State Dept", "kind": "line" },
   { "id": "wp_voronoi", "source": "wp", "label": "US State Dept", "kind": "voronoi" }
 ]

@@ -1,11 +1,12 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import AttributesTable from "$lib/AttributesTable.svelte";
   import { CompareState, type View } from "$lib/compare.svelte";
   import ComparePanel from "$lib/components/ComparePanel.svelte";
   import GlobeMap from "$lib/components/GlobeMap.svelte";
   import HitsPanel from "$lib/components/HitsPanel.svelte";
   import PasswordGate from "$lib/components/PasswordGate.svelte";
-  import { prepareItems, type AttributeRow, type ItemRow, type Part } from "$lib/attributes";
+  import { itemTitle, mergeItems, prepareItems, unionBox, type AttributeRow, type ItemRow, type Part } from "$lib/attributes";
   import { layerFor } from "$lib/layers";
 
   type Tab = "map" | "split" | "table";
@@ -21,6 +22,7 @@
   const compare = new CompareState();
   let rows = $state.raw<AttributeRow[]>([]);
   let items = $state.raw<ItemRow[]>([]);
+  const merged = $derived(mergeItems(items, compare.pair.a, compare.pair.b));
   let failed = $state(false);
 
   $effect(() => {
@@ -45,8 +47,8 @@
 
   function show(next: Tab) {
     tab = next;
-    // Click results belong to the views that show the map.
-    if (next === "table") compare.hits = [];
+    // Click results belong to the Map tab; Geometry clicks pick codes and differences.
+    if (next !== "map") compare.hits = [];
   }
 
   // The table pane's width in Geometry, which the map pads its camera by.
@@ -74,11 +76,7 @@
     const layers = compare.view === "a" ? [drawn[0]] : compare.view === "b" ? [drawn[1]] : drawn;
     const boxes = (row.parts ?? []).filter((p) => layers.includes(p.layer)).map((p) => p.bbox);
     if (!boxes.length) return row.bbox;
-    const union = (bs: number[][]) => [Math.min(...bs.map((b) => b[0])), Math.min(...bs.map((b) => b[1])), Math.max(...bs.map((b) => b[2])), Math.max(...bs.map((b) => b[3]))];
-    const plain = union(boxes);
-    // Matches the pipeline's antimeridian shift: western parts move east by 360 when that is narrower.
-    const east = union(boxes.map((b) => (b[2] <= 0 ? [b[0] + 360, b[1], b[2] + 360, b[3]] : b)));
-    return plain[2] - plain[0] <= Math.max(180, east[2] - east[0]) ? plain : east;
+    return unionBox(boxes);
   }
 
   // A code restored from a dev URL has no bbox until the rows arrive.
@@ -94,22 +92,44 @@
     if (tab === "table") show("split");
   }
 
-  // Picking a part in the table shows its source alone; clearing the part restores the view.
-  let viewBeforePart: View | null = null;
+  // A picked part shows its source alone, and a difference or a code in Voronoi shows in Fade;
+  // the view picked before them returns once the table's pick is cleared.
+  let viewBefore: View | null = null;
+  function borrowView(next: View) {
+    viewBefore ??= compare.view;
+    compare.setView(next);
+  }
+  function restoreView() {
+    if (!viewBefore) return;
+    const back = viewBefore;
+    viewBefore = null;
+    untrack(() => compare.setView(back));
+  }
+  $effect(() => {
+    if (!compare.item && !compare.focus) restoreView();
+  });
+
   function focusFromTable(row: AttributeRow, part: Part | null = null) {
-    if (part) {
-      viewBeforePart ??= compare.view;
-      compare.setView(part.layer === drawn[0] ? "a" : "b");
-    } else if (viewBeforePart) {
-      compare.setView(viewBeforePart);
-      viewBeforePart = null;
-    }
+    if (part) borrowView(part.layer === drawn[0] ? "a" : "b");
+    else if (compare.mode === "voronoi") borrowView("fade");
+    else restoreView();
     focus(row, part);
   }
 
   function focusItem(row: ItemRow, label: string) {
+    borrowView("fade");
     compare.focusItem(row, label);
     if (tab === "table") show("split");
+  }
+
+  function pickItem(id: string | null) {
+    const row = id ? merged.find((it) => it.items?.includes(id)) : null;
+    if (!row) {
+      compare.item = null;
+      return;
+    }
+    borrowView("fade");
+    compare.focusItem(row, itemTitle(row), false);
   }
 
   // A map click narrows to the clicked feature only when its source splits the code.
@@ -139,13 +159,13 @@
     </header>
     <div class="views" style:--pane="{PANE_REM}rem" style:--shift={tab === "map" ? "100%" : tab === "split" ? `calc(100% - ${PANE_REM}rem)` : "0%"}>
       <div class="view map">
-        <GlobeMap {tilesBase} {compare} active={tab !== "table"} hits={tab !== "table"} {inset} onpick={pick} />
+        <GlobeMap {tilesBase} {compare} active={tab !== "table"} hits={tab === "map"} {inset} onpick={pick} onitempick={pickItem} />
         <HitsPanel {compare} {inset} />
         <ComparePanel {compare} />
       </div>
       <div class="view table" class:open={tab !== "map"}>
         <div class="slide" class:full={tab === "table"}>
-          <AttributesTable {rows} {items} {failed} focus={compare.focus} item={compare.item} {drawn} pair={compare.pair} split={tab === "split"} onfocus={focusFromTable} onitem={focusItem} />
+          <AttributesTable {rows} items={merged} {failed} focus={compare.focus} item={compare.item} {drawn} pair={compare.pair} split={tab === "split"} onfocus={focusFromTable} onitem={focusItem} />
         </div>
       </div>
     </div>

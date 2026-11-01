@@ -7,7 +7,7 @@
   import type { CompareState, Focus, Hit, ItemFocus } from "$lib/compare.svelte";
   import { LAYER_BY_ID } from "$lib/layers";
   import { SATELLITE_PROTOCOL, satelliteTile } from "$lib/map/satellite";
-  import { DIFFERENCES, DIFF_COLOR, DIFF_FILLS, applyBasemap, applyDifferenceFade, applyDifferences, applyDraws, applyItemFocus, applyFocus, applyOpacity, buildStyle, drawFor, pickLayerIds, queryLayerId } from "$lib/map/style";
+  import { DIFFERENCES, DIFF_COLOR, DIFF_FILLS, DIFF_PICK, applyBasemap, applyDifferenceFade, applyDifferences, applyDraws, applyFocus, applyOpacity, applyVoronoiFocus, buildStyle, drawFor, pickLayerIds, queryLayerId } from "$lib/map/style";
 
   let {
     tilesBase,
@@ -16,6 +16,7 @@
     hits,
     inset,
     onpick,
+    onitempick,
   }: {
     tilesBase: string;
     compare: CompareState;
@@ -23,6 +24,7 @@
     hits: boolean;
     inset: number;
     onpick: (iso3: string, layer: string, name: string) => void;
+    onitempick: (item: string | null) => void;
   } = $props();
   // Matches the table pane's slide so the globe moves with it.
   const SLIDE_MS = 300;
@@ -85,6 +87,13 @@
     });
     m.once("load", () => (loaded = true));
     m.on("click", (e) => {
+      // Without the hits panel, a Voronoi click picks the difference there, a patch before its area.
+      if (!hits && compare.mode === "voronoi") {
+        const box: [maplibregl.PointLike, maplibregl.PointLike] = [[e.point.x - CLICK_PAD, e.point.y - CLICK_PAD], [e.point.x + CLICK_PAD, e.point.y + CLICK_PAD]];
+        const found = m.queryRenderedFeatures(box, { layers: [DIFF_PICK] }).sort((x, y) => Number(x.properties.type === "voronoi") - Number(y.properties.type === "voronoi"));
+        onitempick(found[0]?.properties.item ?? null);
+        return;
+      }
       // Rendered order puts later sources first; A's feature should win.
       const ids = pickLayerIds(compare.draws);
       const picked = m.queryRenderedFeatures(e.point, { layers: ids }).sort((x, y) => ids.indexOf(x.layer.id) - ids.indexOf(y.layer.id));
@@ -141,7 +150,7 @@
 
   $effect(() => {
     const pair = compare.mode === "voronoi" ? compare.diffPair : null;
-    if (map && loaded) applyDifferences(map, pair, compare.view === "fade", compare.draws, compare.pair.a > compare.pair.b);
+    if (map && loaded) applyDifferences(map, pair, compare.view === "fade", compare.draws, compare.pair.a > compare.pair.b, compare.item?.ids ?? null);
   });
 
   $effect(() => {
@@ -149,7 +158,9 @@
   });
 
   $effect(() => {
-    if (map && loaded) applyFocus(map, compare.draws, compare.focus, compare.view === "fade", compare.basemap === "satellite");
+    // Voronoi tints a focused code's cells instead of outlining its land.
+    const focus = compare.mode === "voronoi" ? null : compare.focus;
+    if (map && loaded) applyFocus(map, compare.draws, focus, compare.view === "fade", compare.basemap === "satellite");
   });
 
   $effect(() => {
@@ -177,13 +188,15 @@
   });
 
   $effect(() => {
-    if (map && loaded) applyItemFocus(map, compare.mode === "voronoi" ? (compare.item?.id ?? null) : null, compare.diffPair);
+    const voronoi = compare.mode === "voronoi";
+    if (map && loaded) applyVoronoiFocus(map, compare.draws, voronoi ? compare.item : null, voronoi ? compare.focus : null);
   });
 
   $effect(() => {
     const item = compare.item;
     if (!map || !loaded || !active || !item?.bbox || item === framed) return;
     framed = item;
+    if (!item.fly) return;
     stopSpin();
     const [m, bbox] = [map, item.bbox as [number, number, number, number]];
     requestAnimationFrame(() => {

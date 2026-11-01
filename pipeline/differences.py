@@ -27,6 +27,7 @@ VERTICES = 256
 KM2 = "ST_Area_Spheroid({}) / 1e6"
 VORONOI = {lyr["source"]: lyr["id"] for lyr in layers() if lyr["kind"] == "voronoi"}
 LINES = [lyr["id"] for lyr in layers() if lyr["kind"] == "line"]
+POLYGONS = {lyr["source"]: lyr["id"] for lyr in layers() if lyr["kind"] == "polygon"}
 PAIRS = list(combinations(sorted(VORONOI), 2))
 
 
@@ -195,15 +196,40 @@ def _patches(conn: DuckDBPyConnection) -> None:
     conn.execute(f"""--sql
         CREATE OR REPLACE TABLE patches AS
         SELECT pair, 'land' AS type, side, item, a_entity, b_entity, a_code, a_name,
-                b_code, b_name, km2, geom::GEOMETRY AS geometry FROM land_review
+                b_code, b_name, km2, geom::GEOMETRY AS geometry, NULL::BIGINT AS fid
+        FROM land_review
         UNION ALL
         SELECT d.a || '|' || d.b, 'island', {SIDE}, r.item, d.a_entity, d.b_entity,
-               ae.code, ae.name, be.code, be.name, d.km2, l.geom::GEOMETRY
+               ae.code, ae.name, be.code, be.name, d.km2, l.geom::GEOMETRY, fid
         FROM island_pairs d JOIN matches m USING (a, b, a_entity, b_entity)
         JOIN land l USING (fid) LEFT JOIN item_islands r USING (fid)
         {_named("a")} {_named("b")} {_sided()}
         WHERE NOT m.mutual
     """)
+
+
+def _dots(conn: DuckDBPyConnection) -> None:
+    """Dot each island, skipping any within 10 widths of a larger one in its item."""
+    conn.execute("""--sql
+        CREATE TEMP TABLE dot_islands AS
+        SELECT row_number() OVER () AS id, pair, item, km2, geometry,
+            ST_XMin(geometry) AS x0, ST_XMax(geometry) AS x1,
+            ST_YMin(geometry) AS y0, ST_YMax(geometry) AS y1,
+            (x0 + x1) / 2 AS cx, (y0 + y1) / 2 AS cy,
+            10 * greatest(x1 - x0, y1 - y0) AS reach
+        FROM patches WHERE type = 'island'
+    """)
+    write_parquet(
+        conn,
+        """SELECT pair, item, ST_MaximumInscribedCircle(geometry).center AS geometry
+        FROM dot_islands s WHERE id NOT IN (
+            SELECT s.id FROM dot_islands s JOIN dot_islands b
+                ON s.pair = b.pair AND s.item = b.item
+                AND (b.km2 > s.km2 OR (b.km2 = s.km2 AND b.id < s.id))
+                AND s.cx BETWEEN b.x0 - b.reach AND b.x1 + b.reach
+                AND s.cy BETWEEN b.y0 - b.reach AND b.y1 + b.reach)""",
+        prepare_dir / "differences_dots.parquet",
+    )
 
 
 def _areas(conn: DuckDBPyConnection) -> None:
@@ -306,24 +332,51 @@ def _write(conn: DuckDBPyConnection) -> None:
         geo=False,
     )
     _patches(conn)
+    _dots(conn)
     _areas(conn)
     write_parquet(
         conn,
-        """SELECT * EXCLUDE (a_entity, b_entity) FROM patches
+        """SELECT * EXCLUDE (a_entity, b_entity, fid) FROM patches
         UNION ALL SELECT * FROM areas""",
         prepare_dir / "differences.parquet",
+    )
+    _items(conn)
+
+
+def _items(conn: DuckDBPyConnection) -> None:
+    """Write items.json, titling each item with its smallest entity's own name."""
+    areas = " UNION ALL ".join(
+        f"""SELECT '{s}' AS source, ({c["code"]})::VARCHAR AS code,
+            ({c.get("entity", c["name"])})::VARCHAR AS name,
+            sum(ST_Area_Spheroid(geometry)) AS m2
+        FROM read_parquet('{prepare_dir / POLYGONS[s]}.parquet') GROUP BY ALL"""
+        for s, c in SOURCE_COLUMNS.items()
+        if s in POLYGONS
+    )
+    named = " UNION ALL ".join(
+        f"SELECT item, '{s}' AS source, {s}_code AS code, {s}_name AS name FROM items"
+        for s in sorted(VORONOI)
+    )
+    _step(
+        conn,
+        "item titles",
+        f"""CREATE OR REPLACE TABLE titles AS
+        SELECT n.item, arg_min(n.name, a.m2) AS title
+        FROM ({named}) n JOIN ({areas}) a USING (source, code, name)
+        GROUP BY n.item""",
     )
     cols = ", ".join(
         f"{s}_code AS code_{s}, {s}_name AS name_{s}" for s in sorted(VORONOI)
     )
     out = tiles_dir / "items.json"
     conn.execute(f"""--sql
-        COPY (SELECT item, type, same_code, missing, s.islands, s.km2,
+        COPY (SELECT item, t.title, type, same_code, missing, s.islands, s.km2,
                 [s.xmin, s.ymin, s.xmax, s.ymax] AS bbox,
                 (SELECT list(DISTINCT pair ORDER BY pair) FROM patches p
                  WHERE p.item = i.item
                     AND NOT (p.type = 'land' AND p.side = 'both')) AS pairs, {cols}
             FROM items i LEFT JOIN stats s USING (item)
+            LEFT JOIN titles t USING (item)
             ORDER BY type, s.km2 DESC) TO '{out}' (FORMAT JSON, ARRAY true)
     """)
 

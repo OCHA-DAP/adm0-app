@@ -22,11 +22,14 @@ export interface Focus {
   fly: boolean;
 }
 
-// A geometry difference picked in the table; the map outlines its patches and frames its bbox.
+// A table row's merged geometry differences, by id; the map outlines their patches and each source's
+// cells for their entity, keyed by source as [code, name], and frames their bbox.
 export interface ItemFocus {
-  id: string;
+  ids: string[];
   label: string;
   bbox: number[] | null;
+  entities: Record<string, [unknown, unknown]>;
+  fly: boolean;
 }
 
 export const MODES: { id: Kind; label: string }[] = [
@@ -114,7 +117,7 @@ export class CompareState {
   }
 
   // Shows the item in Voronoi, moving to a pair it differs in when the current pair has no patches for it.
-  focusItem(row: ItemRow, label: string) {
+  focusItem(row: ItemRow, label: string, fly = true) {
     this.setMode("voronoi");
     const pairs = row.pairs ?? [];
     if (pairs.length && !pairs.includes(this.diffPair)) {
@@ -122,7 +125,8 @@ export class CompareState {
       this.pair = { a, b };
     }
     this.focus = null;
-    this.item = { id: row.item, label, bbox: row.bbox };
+    const entities = Object.fromEntries(SOURCES.map((s) => [s, [row[`code_${s}`], row[`name_${s}`]] as [unknown, unknown]]));
+    this.item = { ids: row.items ?? [row.item], label, bbox: row.bbox, entities, fly };
   }
 
   animate(on: boolean) {
