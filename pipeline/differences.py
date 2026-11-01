@@ -6,6 +6,7 @@ from os import getenv
 from time import perf_counter
 from typing import TYPE_CHECKING
 
+from . import review
 from .config import (
     SOURCE_COLUMNS,
     layers,
@@ -104,7 +105,8 @@ def _assign(conn: DuckDBPyConnection, source: str) -> None:
     """Clip land chunks to ``source``'s cells and put each island in one cell."""
     c = SOURCE_COLUMNS[source]
     cells = f"""SELECT coalesce(({c["id"]})::VARCHAR, '') AS entity,
-            ({c["code"]})::VARCHAR AS code, ({c["name"]})::VARCHAR AS name,
+            ({c["code"]})::VARCHAR AS code,
+            ({c.get("entity", c["name"])})::VARCHAR AS name,
             geometry AS geom
         FROM read_parquet('{prepare_dir / VORONOI[source]}.parquet')"""
     _step(conn, f"{source} cells", _chunks("cells", "entity, code, name", cells))
@@ -174,8 +176,26 @@ def _named(side: str) -> str:
         ON {side}e.source = d.{side} AND {side}e.entity = d.{side}_entity"""
 
 
+# A patch shows in the source whose entity has no mutual match in the other.
+SIDE = """CASE WHEN pa.entity IS NULL AND pb.entity IS NOT NULL THEN 'a'
+    WHEN pb.entity IS NULL AND pa.entity IS NOT NULL THEN 'b' ELSE 'both' END"""
+
+
+def _sided() -> str:
+    return " ".join(
+        f"""LEFT JOIN paired p{x} ON p{x}.a = d.a AND p{x}.b = d.b
+            AND p{x}.side = '{x}' AND p{x}.entity = d.{x}_entity"""
+        for x in "ab"
+    )
+
+
 def _write(conn: DuckDBPyConnection) -> None:
     register_dir.mkdir(parents=True, exist_ok=True)
+    conn.execute("""--sql
+        CREATE OR REPLACE TABLE paired AS
+        SELECT DISTINCT a, b, 'a' AS side, a_entity AS entity FROM matches WHERE mutual
+        UNION SELECT DISTINCT a, b, 'b', b_entity FROM matches WHERE mutual
+    """)
     cols = """d.a || '|' || d.b AS pair, d.a, d.b, d.a_entity, ae.code AS a_code,
         ae.name AS a_name, d.b_entity, be.code AS b_code, be.name AS b_name"""
     write_parquet(
@@ -188,15 +208,18 @@ def _write(conn: DuckDBPyConnection) -> None:
         conn,
         "land patches",
         f"""CREATE OR REPLACE TABLE land_diff AS
-        SELECT {cols}, {KM2.format("geom")} AS km2, geom FROM (
+        SELECT {cols}, {SIDE} AS side, {KM2.format("geom")} AS km2, geom FROM (
             SELECT a, b, a_entity, b_entity, unnest(ST_Dump(g)).geom AS geom FROM (
                 SELECT a, b, a_entity, b_entity, ST_Union_Agg(o.geom) AS g
                 FROM overlay o JOIN matches m USING (a, b, a_entity, b_entity)
-                WHERE NOT m.mutual GROUP BY ALL)) d {_named("a")} {_named("b")}""",
+                WHERE NOT m.mutual GROUP BY ALL)) d {_named("a")} {_named("b")}
+        {_sided()}""",
     )
+    review.build(conn)
     write_parquet(
         conn,
-        "SELECT * EXCLUDE geom, geom AS geometry FROM land_diff ORDER BY km2 DESC",
+        """SELECT * EXCLUDE (geom, lo, hi), geom AS geometry FROM land_review
+        ORDER BY km2 DESC""",
         register_dir / "land.parquet",
     )
     sources = sorted(VORONOI)
@@ -208,24 +231,24 @@ def _write(conn: DuckDBPyConnection) -> None:
     )
     write_parquet(
         conn,
-        f"""SELECT i.fid, i.km2, {entity},
-               fid IN (SELECT fid FROM island_pairs JOIN matches m
-                       USING (a, b, a_entity, b_entity) WHERE NOT m.mutual) AS differs
+        f"""SELECT i.fid, i.km2, {entity}, any_value(r.item) AS item
         FROM islands i JOIN placed p USING (fid)
         LEFT JOIN entities e USING (source, entity)
+        LEFT JOIN item_islands r USING (fid)
         GROUP BY i.fid, i.km2 ORDER BY i.km2 DESC""",
         register_dir / "islands.parquet",
         geo=False,
     )
     write_parquet(
         conn,
-        f"""SELECT pair, 'land' AS type, a_code, a_name, b_code, b_name, km2,
-                geom AS geometry FROM land_diff
+        f"""SELECT pair, 'land' AS type, side, item, a_code, a_name, b_code, b_name,
+                km2, geom AS geometry FROM land_review
         UNION ALL
-        SELECT d.a || '|' || d.b, 'island', ae.code, ae.name, be.code,
-               be.name, d.km2, l.geom
+        SELECT d.a || '|' || d.b, 'island', {SIDE}, r.item, ae.code, ae.name,
+               be.code, be.name, d.km2, l.geom
         FROM island_pairs d JOIN matches m USING (a, b, a_entity, b_entity)
-        JOIN land l USING (fid) {_named("a")} {_named("b")}
+        JOIN land l USING (fid) LEFT JOIN item_islands r USING (fid)
+        {_named("a")} {_named("b")} {_sided()}
         WHERE NOT m.mutual""",
         prepare_dir / "differences.parquet",
     )
