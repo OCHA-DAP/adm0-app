@@ -5,7 +5,7 @@
   import GlobeMap from "$lib/components/GlobeMap.svelte";
   import HitsPanel from "$lib/components/HitsPanel.svelte";
   import PasswordGate from "$lib/components/PasswordGate.svelte";
-  import type { AttributeRow, Part } from "$lib/attributes";
+  import { prepareItems, type AttributeRow, type ItemRow, type Part } from "$lib/attributes";
   import { layerFor } from "$lib/layers";
 
   type Tab = "map" | "split" | "table";
@@ -20,14 +20,18 @@
   let tab = $state<Tab>(startTab);
   const compare = new CompareState();
   let rows = $state.raw<AttributeRow[]>([]);
+  let items = $state.raw<ItemRow[]>([]);
   let failed = $state(false);
 
   $effect(() => {
     if (!tilesBase) return;
-    fetch(`${tilesBase}/attributes.json`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+    const load = (name: string) => fetch(`${tilesBase}/${name}`).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
+    load("attributes.json")
       .then((data: AttributeRow[]) => (rows = data))
       .catch(() => (failed = true));
+    load("items.json")
+      .then((data: ItemRow[]) => (items = prepareItems(data)))
+      .catch(() => (items = []));
   });
 
   // View state lives in the URL in dev only; written after unlock so the password page URL stays bare.
@@ -103,6 +107,11 @@
     focus(row, part);
   }
 
+  function focusItem(row: ItemRow, label: string) {
+    compare.focusItem(row, label);
+    if (tab === "table") show("split");
+  }
+
   // A map click narrows to the clicked feature only when its source splits the code.
   function pick(iso3: string, layer: string, name: string) {
     const row = rows.find((r) => r.iso3 === iso3);
@@ -136,7 +145,7 @@
       </div>
       <div class="view table" class:open={tab !== "map"}>
         <div class="slide" class:full={tab === "table"}>
-          <AttributesTable {rows} {failed} focus={compare.focus} {drawn} pair={compare.pair} split={tab === "split"} onfocus={focusFromTable} />
+          <AttributesTable {rows} {items} {failed} focus={compare.focus} item={compare.item} {drawn} pair={compare.pair} split={tab === "split"} onfocus={focusFromTable} onitem={focusItem} />
         </div>
       </div>
     </div>

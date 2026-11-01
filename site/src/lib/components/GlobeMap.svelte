@@ -4,10 +4,10 @@
   import * as maplibregl from "maplibre-gl";
   import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
   import { Protocol } from "pmtiles";
-  import type { CompareState, Focus, Hit } from "$lib/compare.svelte";
+  import type { CompareState, Focus, Hit, ItemFocus } from "$lib/compare.svelte";
   import { LAYER_BY_ID } from "$lib/layers";
   import { SATELLITE_PROTOCOL, satelliteTile } from "$lib/map/satellite";
-  import { DIFFERENCES, DIFF_COLOR, DIFF_FILLS, DIFF_MARKER, applyBasemap, applyDifferenceFade, applyDifferences, applyDraws, applyFocus, applyOpacity, buildStyle, drawFor, pickLayerIds, queryLayerId } from "$lib/map/style";
+  import { DIFFERENCES, DIFF_COLOR, DIFF_FILLS, applyBasemap, applyDifferenceFade, applyDifferences, applyDraws, applyItemFocus, applyFocus, applyOpacity, buildStyle, drawFor, pickLayerIds, queryLayerId } from "$lib/map/style";
 
   let {
     tilesBase,
@@ -42,7 +42,7 @@
   let map = $state.raw<maplibregl.Map | null>(null);
   let loaded = $state(false);
   let stopSpin = () => {};
-  let framed: Focus | null = null;
+  let framed: Focus | ItemFocus | null = null;
 
   // picked is the click's pick-layer features, reused for the polygons under a line click.
   function query(m: maplibregl.Map, point: maplibregl.Point, picked: maplibregl.MapGeoJSONFeature[]): Hit[] {
@@ -52,12 +52,12 @@
         [point.x - CLICK_PAD, point.y - CLICK_PAD],
         [point.x + CLICK_PAD, point.y + CLICK_PAD],
       ],
-      { layers: [...draws.map((d) => queryLayerId(d.id)), ...(compare.mode === "difference" ? [...DIFF_FILLS, DIFF_MARKER] : [])] },
+      { layers: [...draws.map((d) => queryLayerId(d.id)), ...(compare.mode === "difference" ? DIFF_FILLS : [])] },
     );
     // Lines mode also reports the polygon under the click, so a click inside a country has attributes to show.
     const lines = compare.mode === "line";
     return [...features, ...(lines ? picked : [])].flatMap((f) => {
-      if (f.sourceLayer === DIFFERENCES) return [{ slot: null, label: f.properties.side === "marker" ? "Review item" : "Difference", color: DIFF_COLOR, properties: f.properties }];
+      if (f.sourceLayer === DIFFERENCES) return [{ slot: null, label: "Difference", color: DIFF_COLOR, properties: f.properties }];
       const layer = LAYER_BY_ID.get(f.sourceLayer ?? "");
       const draw = drawFor(draws, f.sourceLayer ?? "");
       if (!draw || !layer) return [];
@@ -140,7 +140,7 @@
 
   $effect(() => {
     const pair = compare.mode === "difference" ? compare.diffPair : null;
-    if (map && loaded) applyDifferences(map, pair, compare.view === "fade", compare.draws, compare.pair.a > compare.pair.b, compare.borders);
+    if (map && loaded) applyDifferences(map, pair, compare.view === "fade", compare.draws, compare.pair.a > compare.pair.b);
   });
 
   $effect(() => {
@@ -176,6 +176,22 @@
   });
 
   $effect(() => {
+    if (map && loaded) applyItemFocus(map, compare.mode === "difference" ? (compare.item?.id ?? null) : null, compare.diffPair);
+  });
+
+  $effect(() => {
+    const item = compare.item;
+    if (!map || !loaded || !active || !item?.bbox || item === framed) return;
+    framed = item;
+    stopSpin();
+    const [m, bbox] = [map, item.bbox as [number, number, number, number]];
+    requestAnimationFrame(() => {
+      m.resize();
+      m.fitBounds(bbox, { padding: FOCUS_PAD, maxZoom: FOCUS_MAX_ZOOM });
+    });
+  });
+
+  $effect(() => {
     if (map && loaded) applyBasemap(map, compare.basemap === "satellite");
   });
 
@@ -196,6 +212,8 @@
 <div class="map" bind:this={container} style:--inset="{inset}px"></div>
 {#if compare.focus}
   <button class="focus" style:--inset="{inset}px" aria-label="Clear highlight" onclick={() => (compare.focus = null)}>{compare.focus.iso3} <span aria-hidden="true">×</span></button>
+{:else if compare.item}
+  <button class="focus" style:--inset="{inset}px" aria-label="Clear highlight" onclick={() => (compare.item = null)}>{compare.item.label} <span aria-hidden="true">×</span></button>
 {/if}
 
 <style>

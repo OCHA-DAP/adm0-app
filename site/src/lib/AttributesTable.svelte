@@ -1,100 +1,136 @@
 <script lang="ts">
-  import { SLOT_COLORS, type Focus } from "$lib/compare.svelte";
+  import { SLOT_COLORS, type Focus, type ItemFocus } from "$lib/compare.svelte";
   import Segmented from "$lib/components/Segmented.svelte";
   import {
     DEFAULT_FILTER,
+    ENTITY,
+    ITEM_TYPES,
     SOURCES,
     attributeGroups,
     groupsInScope,
-    majority,
+    itemTitle,
+    marked,
     matches,
     sourcesFor,
-    TIE,
     value,
     type AttributeGroup,
     type AttributeRow,
-    type Part,
     type DiffType,
     type Filter,
+    type ItemRow,
+    type Part,
   } from "$lib/attributes";
 
   let {
     rows,
+    items,
     failed,
     focus,
+    item,
     drawn,
     pair,
     split = false,
     onfocus,
+    onitem,
   }: {
     rows: AttributeRow[];
+    items: ItemRow[];
     failed: boolean;
     focus: Focus | null;
+    item: ItemFocus | null;
     drawn: string[];
     pair: { a: string; b: string };
     split?: boolean;
     onfocus: (row: AttributeRow, part?: Part | null) => void;
+    onitem: (row: ItemRow, label: string) => void;
   } = $props();
 
   // The swatches double as the legend for the cell colors.
   const SHOW: { id: DiffType; label: string; swatch?: string }[] = [
     { id: "all", label: "All" },
     { id: "differs", label: "Differs", swatch: "var(--cd-orange--300)" },
-    { id: "missing", label: "Missing", swatch: "var(--cd-grey--300)" },
   ];
+  const TYPE_LABEL = Object.fromEntries(ITEM_TYPES.map((t) => [t.id, t.label]));
 
   let filter = $state<Filter>({ ...DEFAULT_FILTER });
-  // With the map pair in charge, the table shows and compares only A and B.
+  let table = $state<"attributes" | "geometry">("attributes");
+  const geometry = $derived(table === "geometry");
+
+  // With the map pair in charge, the table shows and compares only A and B, against A.
   const ab = $derived([pair.a, pair.b]);
-  // Split shows only the map's A and B; the full table shows the sources toggled on.
-  const ALL = Object.keys(SOURCES);
-  const scope = $derived(split ? { ...filter, sources: ab } : filter);
-  const on = $derived(filter.sources.length ? filter.sources : ALL);
-  const columns = $derived(split ? ab : on);
+  const diffPair = $derived([...ab].sort().join("|"));
+  const ALL = $derived(geometry ? ENTITY.sources : Object.keys(SOURCES));
+  const scope = $derived(split ? { ...filter, sources: ab, ref: pair.a } : filter);
+  const on = $derived(filter.sources.length ? ALL.filter((s) => filter.sources.includes(s)) : ALL);
+  const columns = $derived.by(() => {
+    const cols = split ? ab : on;
+    return scope.ref && cols.includes(scope.ref) ? [scope.ref, ...cols.filter((s) => s !== scope.ref)] : cols;
+  });
 
   // At least two sources stay on; all on is stored as empty.
   function toggle(source: string) {
     const next = on.includes(source) ? on.filter((s) => s !== source) : ALL.filter((s) => s === source || on.includes(s));
     if (next.length < 2) return;
-    filter.sources = next.length === ALL.length ? [] : next;
+    filter.sources = next.length === Object.keys(SOURCES).length ? [] : next;
   }
-  // A single picked attribute is already named by its active chip.
-  const labelled = $derived(!filter.group);
   let body = $state<HTMLElement>();
 
-  // The focused code stays listed even when the filters would hide it.
-  const allGroups = $derived(attributeGroups(rows[0]));
-  const shown = $derived(rows.filter((row) => row.iso3 === focus?.iso3 || matches(row, allGroups, scope)));
+  const attrGroups = $derived(attributeGroups(rows[0]));
+  const groups = $derived(groupsInScope(attrGroups, filter));
+  const labelled = $derived(!filter.group);
 
-  // Scrolls once per code, so picking its parts leaves the table still. scrollIntoView would also
-  // scroll the hidden pane's ancestors and slide the table over the map-only view.
-  const focusedCode = $derived(focus?.iso3);
+  // Items listed for the current scope: in Split only those with patches in the map's pair.
+  const itemScope = $derived({ ...scope, group: ENTITY.key });
+  function itemShown(it: ItemRow) {
+    if (split && !(it.pairs ?? []).includes(diffPair)) return false;
+    return matches(it, [ENTITY], itemScope);
+  }
+  const shownItems = $derived(items.filter((it) => it.item === item?.id || itemShown(it)));
+
+  const shown = $derived(rows.filter((row) => row.iso3 === focus?.iso3 || matches(row, attrGroups, scope)));
+
+  // Scrolls once per code or item. scrollIntoView would also scroll the hidden pane's ancestors
+  // and slide the table over the map-only view.
   let scroller = $state<HTMLElement>();
-  $effect(() => {
-    const iso3 = focusedCode;
-    if (!iso3) return;
+  function scrollTo(selector: string) {
     requestAnimationFrame(() => {
-      const row = body?.querySelector<HTMLElement>(`[data-iso3="${iso3}"]`);
+      const row = body?.querySelector<HTMLElement>(selector);
       if (!row || !scroller) return;
       const margin = parseFloat(getComputedStyle(row).scrollMarginTop);
       scroller.scrollTop += row.getBoundingClientRect().top - scroller.getBoundingClientRect().top - margin;
     });
+  }
+  const focusedCode = $derived(focus?.iso3);
+  $effect(() => {
+    if (focusedCode) scrollTo(`[data-iso3="${focusedCode}"]`);
   });
-  const groups = $derived(groupsInScope(allGroups, filter));
-  const visible = $derived(columns.filter((s) => groups.some((g) => g.sources.includes(s))));
+  const focusedItem = $derived(item?.id);
+  $effect(() => {
+    if (focusedItem) scrollTo(`[data-item="${focusedItem}"]`);
+  });
 
+  const visible = $derived(geometry ? columns : columns.filter((s) => groups.some((g) => g.sources.includes(s))));
   const dirty = $derived(JSON.stringify(filter) !== JSON.stringify(DEFAULT_FILTER));
+  function reset() {
+    filter = { ...DEFAULT_FILTER };
+  }
 
-  function cellClass(row: AttributeRow, group: AttributeGroup, source: string) {
-    const v = value(row, group.key, source);
+  function cellClass(row: AttributeRow | ItemRow, group: AttributeGroup, source: string) {
+    const v = value(row as AttributeRow, group.key, source);
     const sources = sourcesFor(group, scope);
     const inPair = sources.includes(source);
-    let diff = false;
-    if (v && inPair) {
-      const top = majority(row, group, sources);
-      diff = top !== null && (scope.sources.length === 2 || top === TIE || v !== top);
-    }
-    return { empty: !v, diff, dim: !inPair };
+    const diff = !!v && inPair && marked(row, group, sources, scope.ref).has(source);
+    return { empty: !v, diff, dim: !inPair, ref: source === scope.ref };
+  }
+  const count = $derived(
+    geometry ? `${shownItems.length} of ${items.length} geometry differences` : `${shown.length} of ${rows.length} codes`,
+  );
+  const fmt = (n: number | null) => (n == null ? "" : n.toLocaleString("en", { maximumFractionDigits: n < 10 ? 1 : 0 }));
+  function itemMeta(it: ItemRow) {
+    const parts = [TYPE_LABEL[it.type]];
+    if (it.islands) parts.push(`${fmt(it.islands)} islands`);
+    if (it.km2) parts.push(`${fmt(it.km2)} km²`);
+    return parts.join(" · ");
   }
 </script>
 
@@ -103,10 +139,23 @@
     {@render partChips(row, source)}
   {:else if group.sources.includes(source)}
     {@const c = cellClass(row, group, source)}
-    <td class:empty={c.empty} class:diff={c.diff} class:dim={c.dim}>{value(row, group.key, source)}</td>
+    <td class:empty={c.empty} class:diff={c.diff} class:dim={c.dim} class:ref={c.ref}>{value(row, group.key, source)}</td>
   {:else}
     <td class="na"></td>
   {/if}
+{/snippet}
+
+{#snippet entityCell(it: ItemRow, source: string)}
+  {@const c = cellClass(it, ENTITY, source)}
+  {#if !ENTITY.sources.includes(source)}<td class="na"></td>{:else}
+  <td class:empty={c.empty} class:diff={c.diff} class:dim={c.dim} class:ref={c.ref} class:absent={it.missing?.includes(source)} title={it.missing?.includes(source) ? "No entity of its own here" : undefined}
+    >{value(it as unknown as AttributeRow, ENTITY.key, source)}</td
+  >{/if}
+{/snippet}
+
+{#snippet itemHead(it: ItemRow)}
+  <button type="button" class="code-link" title="Show on map" onclick={() => onitem(it, itemTitle(it))}>{itemTitle(it)}</button>
+  <div class="meta">{itemMeta(it)}</div>
 {/snippet}
 
 {#snippet partChips(row: AttributeRow, source: string)}
@@ -135,18 +184,28 @@
   {/if}
 {/snippet}
 
+{#snippet sourceHead(source: string)}
+  {@const slot = !split ? null : source === ab[0] ? "a" : "b"}
+  <th class:ref={source === scope.ref}>{#if slot}<span class="badge" style:--color={SLOT_COLORS[slot]}>{slot.toUpperCase()}</span>{/if}{SOURCES[source]}</th>
+{/snippet}
+
 <div class="table-view">
   <aside class="sidebar">
+    <section>
+      <Segmented label="Table" options={[{ id: "attributes", label: "Attributes" }, { id: "geometry", label: "Geometry" }]} current={table} pick={(id) => (table = id as typeof table)} />
+    </section>
     <section><input type="search" placeholder="Search code or name" bind:value={filter.query} /></section>
     <section>
       <h2>Show</h2>
       <Segmented label="Show" options={SHOW} current={filter.diff} pick={(id) => (filter.diff = id as DiffType)} />
-      <span class="count">{shown.length} of {rows.length} codes</span>
+      <span class="count">{count}</span>
     </section>
-    <section>
-      <h2>Attribute</h2>
-      <Segmented label="Attribute" options={[{ id: "", label: "All" }, ...allGroups.map((g) => ({ id: g.key, label: g.label }))]} current={filter.group} pick={(id) => (filter.group = id)} />
-    </section>
+    {#if !geometry}
+      <section>
+        <h2>Attribute</h2>
+        <Segmented label="Attribute" options={[{ id: "", label: "All" }, ...attrGroups.map((g) => ({ id: g.key, label: g.label }))]} current={filter.group} pick={(id) => (filter.group = id)} />
+      </section>
+    {/if}
     {#if !split}
       <section>
         <h2>Sources</h2>
@@ -157,7 +216,7 @@
         </div>
       </section>
     {/if}
-    {#if dirty}<button type="button" class="btn" onclick={() => (filter = { ...DEFAULT_FILTER })}>Reset</button>{/if}
+    {#if dirty}<button type="button" class="btn" onclick={reset}>Reset</button>{/if}
   </aside>
   {#if failed}
     <p>Could not load attributes.json.</p>
@@ -166,29 +225,35 @@
       <table>
         <thead>
           <tr>
-            <th class="code">ISO3</th>
-            {#if labelled}<th class="attr">Attribute</th>{/if}
-            {#each visible as source (source)}
-              {@const slot = !split ? null : source === ab[0] ? "a" : "b"}
-              <th>{#if slot}<span class="badge" style:--color={SLOT_COLORS[slot]}>{slot.toUpperCase()}</span>{/if}{SOURCES[source]}</th>
-            {/each}
+            <th class="code">{geometry ? "Difference" : "ISO3"}</th>
+            {#if labelled && !geometry}<th class="attr">Attribute</th>{/if}
+            {#each visible as source (source)}{@render sourceHead(source)}{/each}
           </tr>
         </thead>
         <tbody bind:this={body}>
-          {#each shown as row (row.iso3)}
-            {@const focused = row.iso3 === focus?.iso3}
-            {#each groups as group, gi (group.key)}
-              <tr class:start={gi === 0} class:focused data-iso3={gi === 0 ? row.iso3 : undefined}>
-                {#if gi === 0}<th class="code" rowspan={groups.length}><button type="button" class="code-link" title="Show on map" onclick={() => onfocus(row)}>{row.iso3}</button></th>{/if}
-                {#if labelled}<td class="attr">{group.label}</td>{/if}
-                {#each visible as source (source)}{@render fixedCell(row, group, source)}{/each}
+          {#if geometry}
+            {#each shownItems as it (it.item)}
+              <tr class="start" class:focused={it.item === item?.id} data-item={it.item}>
+                <th class="code item">{@render itemHead(it)}</th>
+                {#each visible as source (source)}{@render entityCell(it, source)}{/each}
               </tr>
             {/each}
-          {/each}
+          {:else}
+            {#each shown as row (row.iso3)}
+              {@const focused = row.iso3 === focus?.iso3}
+              {#each groups as group, gi (group.key)}
+                <tr class:start={gi === 0} class:focused data-iso3={gi === 0 ? row.iso3 : undefined}>
+                  {#if gi === 0}<th class="code" rowspan={groups.length}><button type="button" class="code-link" title="Show on map" onclick={() => onfocus(row)}>{row.iso3}</button></th>{/if}
+                  {#if labelled}<td class="attr">{group.label}</td>{/if}
+                  {#each visible as source (source)}{@render fixedCell(row, group, source)}{/each}
+                </tr>
+              {/each}
+            {/each}
+          {/if}
         </tbody>
       </table>
-      {#if rows.length && !shown.length}
-        <p class="none">No codes match.</p>
+      {#if (geometry ? !shownItems.length : rows.length && !shown.length)}
+        <p class="none">Nothing matches.</p>
       {/if}
     </div>
   {/if}
@@ -374,5 +439,24 @@
   }
   .dim {
     opacity: 0.35;
+  }
+  th .code-link {
+    text-align: left;
+  }
+  .meta {
+    color: var(--brand-grey--text);
+    font-size: 0.7rem;
+    font-weight: 400;
+  }
+  th.item {
+    min-width: 11rem;
+  }
+  th.ref {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .absent {
+    outline: 1px dashed var(--cd-grey--600);
+    outline-offset: -3px;
   }
 </style>

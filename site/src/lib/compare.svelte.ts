@@ -1,5 +1,5 @@
 import { DEFAULT_PAIR, LAYERS, SOURCES, layerFor, type SourceLayer } from "$lib/layers";
-import type { Part } from "$lib/attributes";
+import type { ItemRow, Part } from "$lib/attributes";
 import type { Draw, Slot } from "$lib/map/style";
 
 // Differences draws each source's lines over the pair's difference patches.
@@ -20,6 +20,13 @@ export interface Focus {
   bbox: number[] | null;
   part: Part | null;
   fly: boolean;
+}
+
+// A geometry difference picked in the table; the map outlines its patches and frames its bbox.
+export interface ItemFocus {
+  id: string;
+  label: string;
+  bbox: number[] | null;
 }
 
 export const MODES: { id: Kind; label: string }[] = [
@@ -52,7 +59,7 @@ function fromUrl() {
   const basemap = pick("basemap", BASEMAPS.map((b) => b.id), "map");
   const code = q.get("focus");
   const focus: Focus | null = code ? { iso3: code.toUpperCase(), bbox: null, part: null, fly: false } : null;
-  return { mode, view: pick(VIEW_PARAM, VIEWS.map((v) => v.id), "overlay"), pair, basemap, focus, borders: q.get("borders") === "1" };
+  return { mode, view: pick(VIEW_PARAM, VIEWS.map((v) => v.id), "overlay"), pair, basemap, focus };
 }
 
 export class CompareState {
@@ -61,11 +68,10 @@ export class CompareState {
   view = $state<View>(this.#init.view);
   pair = $state(this.#init.pair);
   basemap = $state<Basemap>(this.#init.basemap);
-  // Border shifts stay off the Diffs map until asked for; review items always show.
-  borders = $state(this.#init.borders);
   sweep = $state(0);
   hits = $state<Hit[]>([]);
   focus = $state.raw<Focus | null>(this.#init.focus);
+  item = $state.raw<ItemFocus | null>(null);
   #frame = 0;
 
   #drawKind = $derived(this.mode === "difference" ? "line" : this.mode);
@@ -90,8 +96,6 @@ export class CompareState {
     params.set(VIEW_PARAM, this.view);
     params.set("basemap", this.basemap);
     for (const slot of ["a", "b"] as const) params.set(slot, this.pair[slot]);
-    if (this.borders) params.set("borders", "1");
-    else params.delete("borders");
     if (this.focus) params.set("focus", this.focus.iso3);
     else params.delete("focus");
   }
@@ -108,6 +112,19 @@ export class CompareState {
 
   focusOn(iso3: string, bbox: number[] | null, part: Part | null, fly: boolean) {
     this.focus = { iso3, bbox: part?.bbox ?? bbox, part, fly };
+    this.item = null;
+  }
+
+  // Shows the item in Diffs, moving to a pair it differs in when the current pair has no patches for it.
+  focusItem(row: ItemRow, label: string) {
+    this.setMode("difference");
+    const pairs = row.pairs ?? [];
+    if (pairs.length && !pairs.includes(this.diffPair)) {
+      const [a, b] = pairs[0].split("|");
+      this.pair = { a, b };
+    }
+    this.focus = null;
+    this.item = { id: row.item, label, bbox: row.bbox };
   }
 
   animate(on: boolean) {
@@ -123,7 +140,7 @@ export class CompareState {
 
   keydown(e: KeyboardEvent) {
     if (e.target instanceof HTMLElement && e.target.closest("input:not([type=radio]), select, textarea")) return;
-    if (e.key === "Escape") this.focus = null;
+    if (e.key === "Escape") this.focus = this.item = null;
     const by = KEY_STEP[e.key];
     if (by === undefined) return;
     const at = VIEWS.findIndex((v) => v.id === this.view) + by;

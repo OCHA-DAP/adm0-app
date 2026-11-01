@@ -13,6 +13,7 @@ from .config import (
     open_db,
     prepare_dir,
     register_dir,
+    tiles_dir,
     tmp_dir,
     write_parquet,
 )
@@ -189,6 +190,71 @@ def _sided() -> str:
     )
 
 
+def _patches(conn: DuckDBPyConnection) -> None:
+    """Land and island patches where a source pair's entities aren't mutual matches."""
+    conn.execute(f"""--sql
+        CREATE OR REPLACE TABLE patches AS
+        SELECT pair, 'land' AS type, side, item, a_entity, b_entity, a_code, a_name,
+                b_code, b_name, km2, geom::GEOMETRY AS geometry FROM land_review
+        UNION ALL
+        SELECT d.a || '|' || d.b, 'island', {SIDE}, r.item, d.a_entity, d.b_entity,
+               ae.code, ae.name, be.code, be.name, d.km2, l.geom::GEOMETRY
+        FROM island_pairs d JOIN matches m USING (a, b, a_entity, b_entity)
+        JOIN land l USING (fid) LEFT JOIN item_islands r USING (fid)
+        {_named("a")} {_named("b")} {_sided()}
+        WHERE NOT m.mutual
+    """)
+
+
+def _areas(conn: DuckDBPyConnection) -> None:
+    """Voronoi areas a pair assigns differently, each with its largest patch's item."""
+    conn.execute("""--sql
+        CREATE OR REPLACE TABLE targets AS
+        SELECT DISTINCT pair, split_part(pair, '|', 1) AS a,
+            split_part(pair, '|', 2) AS b, a_entity, b_entity
+        FROM patches WHERE NOT (type = 'land' AND side = 'both')
+            AND a_entity IS NOT NULL AND b_entity IS NOT NULL
+    """)
+    cells = " UNION ALL ".join(
+        f"""SELECT '{s}' AS source, coalesce(({c["id"]})::VARCHAR, '') AS entity,
+            geometry AS geom FROM read_parquet('{prepare_dir / VORONOI[s]}.parquet')
+        WHERE entity IN (SELECT a_entity FROM targets WHERE a = '{s}'
+            UNION SELECT b_entity FROM targets WHERE b = '{s}')"""
+        for s, c in ((s, SOURCE_COLUMNS[s]) for s in sorted(VORONOI))
+    )
+    _step(conn, "area cells", _chunks("vcells", "source, entity", cells))
+    _step(
+        conn,
+        "area overlay",
+        """CREATE OR REPLACE TABLE area_parts AS
+        SELECT row_number() OVER () AS id, pair, a_entity, b_entity, geom FROM (
+            SELECT pair, a_entity, b_entity, unnest(ST_Dump(g)).geom AS geom FROM (
+                SELECT t.pair, t.a_entity, t.b_entity, ST_Union_Agg(
+                    ST_CollectionExtract(ST_Intersection(ca.geom, cb.geom), 3)) AS g
+                FROM targets t
+                JOIN vcells ca ON ca.source = t.a AND ca.entity = t.a_entity
+                JOIN vcells cb ON cb.source = t.b AND cb.entity = t.b_entity
+                    AND ST_Intersects(ca.env, cb.env)
+                    AND ST_Intersects(ca.geom, cb.geom)
+                GROUP BY ALL))""",
+    )
+    _step(
+        conn,
+        "area items",
+        f"""CREATE OR REPLACE TABLE areas AS
+        SELECT any_value(v.pair) AS pair, 'voronoi' AS type,
+            arg_max(p.side, p.km2) AS side, arg_max(p.item, p.km2) AS item,
+            arg_max(p.a_code, p.km2) AS a_code, arg_max(p.a_name, p.km2) AS a_name,
+            arg_max(p.b_code, p.km2) AS b_code, arg_max(p.b_name, p.km2) AS b_name,
+            {KM2.format("any_value(v.geom)")} AS km2, any_value(v.geom) AS geometry
+        FROM area_parts v JOIN patches p ON p.pair = v.pair
+            AND p.a_entity = v.a_entity AND p.b_entity = v.b_entity
+            AND NOT (p.type = 'land' AND p.side = 'both')
+            AND ST_Intersects(v.geom, p.geometry)
+        GROUP BY v.id""",
+    )
+
+
 def _write(conn: DuckDBPyConnection) -> None:
     register_dir.mkdir(parents=True, exist_ok=True)
     conn.execute("""--sql
@@ -239,29 +305,27 @@ def _write(conn: DuckDBPyConnection) -> None:
         register_dir / "islands.parquet",
         geo=False,
     )
-    conn.execute(f"""--sql
-        CREATE OR REPLACE TABLE patches AS
-        SELECT pair, 'land' AS type, side, item, a_code, a_name, b_code, b_name,
-                km2, geom::GEOMETRY AS geometry FROM land_review
-        UNION ALL
-        SELECT d.a || '|' || d.b, 'island', {SIDE}, r.item, ae.code, ae.name,
-               be.code, be.name, d.km2, l.geom::GEOMETRY
-        FROM island_pairs d JOIN matches m USING (a, b, a_entity, b_entity)
-        JOIN land l USING (fid) LEFT JOIN item_islands r USING (fid)
-        {_named("a")} {_named("b")} {_sided()}
-        WHERE NOT m.mutual
-    """)
-    # One point per review item and pair, so small items still show zoomed out.
+    _patches(conn)
+    _areas(conn)
     write_parquet(
         conn,
-        """SELECT * FROM patches UNION ALL
-        SELECT p.pair, any_value(p.type), 'marker', p.item, any_value(p.a_code),
-            any_value(p.a_name), any_value(p.b_code), any_value(p.b_name),
-            sum(p.km2),
-            any_value(ST_Point((s.xmin + s.xmax) / 2, (s.ymin + s.ymax) / 2))
-        FROM patches p JOIN stats s USING (item) GROUP BY p.pair, p.item""",
+        """SELECT * EXCLUDE (a_entity, b_entity) FROM patches
+        UNION ALL SELECT * FROM areas""",
         prepare_dir / "differences.parquet",
     )
+    cols = ", ".join(
+        f"{s}_code AS code_{s}, {s}_name AS name_{s}" for s in sorted(VORONOI)
+    )
+    out = tiles_dir / "items.json"
+    conn.execute(f"""--sql
+        COPY (SELECT item, type, same_code, missing, s.islands, s.km2,
+                [s.xmin, s.ymin, s.xmax, s.ymax] AS bbox,
+                (SELECT list(DISTINCT pair ORDER BY pair) FROM patches p
+                 WHERE p.item = i.item
+                    AND NOT (p.type = 'land' AND p.side = 'both')) AS pairs, {cols}
+            FROM items i LEFT JOIN stats s USING (item)
+            ORDER BY type, s.km2 DESC) TO '{out}' (FORMAT JSON, ARRAY true)
+    """)
 
 
 def main() -> None:

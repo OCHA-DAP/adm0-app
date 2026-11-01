@@ -28,9 +28,6 @@
   <Segmented stretch label="Geometry" options={MODES} current={compare.mode} pick={(id) => compare.setMode(id as Kind)} />
   <h2>View</h2>
   <Segmented stretch label="View" options={VIEWS} current={compare.view} pick={(id) => compare.setView(id as View)} />
-  {#if compare.mode === "difference"}
-    <label class="toggle"><input type="checkbox" bind:checked={compare.borders} /> Show border shifts</label>
-  {/if}
   <h2>Compare</h2>
   {@render matrix((["a", "b"] as const).map((slot) => ({ id: slot, color: SLOT_COLORS[slot], current: compare.pair[slot], pick: (id: string) => (compare.pair[slot] = id) })))}
   <p class="hint">Press [ or ] to switch views.</p>
@@ -49,13 +46,6 @@
     font-size: 0.75rem;
     line-height: 1.4;
     margin: 0.75rem 0 0;
-  }
-  .toggle {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    margin-top: 0.5rem;
-    font-size: 0.75rem;
   }
   .matrix {
     width: 100%;
