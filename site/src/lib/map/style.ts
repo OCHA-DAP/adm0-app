@@ -37,7 +37,7 @@ const LINE_WIDTHS = byType((t) => t.width);
 
 // The layer that click queries hit for a source.
 export function queryLayerId(id: string) {
-  return LAYER_BY_ID.get(id)?.kind === "polygon" ? `${id}-fill` : `${id}-line`;
+  return LAYER_BY_ID.get(id)?.kind === "line" ? `${id}-line` : `${id}-fill`;
 }
 
 function layersFor(layer: SourceLayer, draws: Draw[]): LayerSpecification[] {
@@ -133,7 +133,7 @@ export function applyOpacity(map: Map, draws: Draw[], opacities: number[], satel
     const layer = LAYER_BY_ID.get(d.id)!;
     const polygon = layerFor(layer.source, "polygon").id;
     map.setPaintProperty(`${d.id}-line`, "line-opacity", o);
-    if (layer.kind === "polygon") map.setPaintProperty(`${d.id}-fill`, "fill-opacity", FILL_OPACITY * o);
+    if (layer.kind !== "line") map.setPaintProperty(`${d.id}-fill`, "fill-opacity", FILL_OPACITY * o);
     map.setPaintProperty(`${polygon}-focus`, "line-opacity", o);
     map.setPaintProperty(`${polygon}-dim`, "fill-opacity", dim * o);
   });

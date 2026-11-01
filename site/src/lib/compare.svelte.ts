@@ -24,6 +24,7 @@ export interface Focus {
 export const MODES: { id: Kind; label: string }[] = [
   { id: "line", label: "Lines" },
   { id: "polygon", label: "Polygons" },
+  { id: "voronoi", label: "Voronoi" },
 ];
 export const VIEWS: { id: View; label: string }[] = [
   { id: "overlay", label: "Overlay" },
