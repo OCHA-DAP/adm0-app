@@ -35,6 +35,27 @@ function byType(value: (t: (typeof LINE_TYPES)[keyof typeof LINE_TYPES]) => unkn
 const LINE_DASH = byType((t) => ["literal", t.dash]);
 const LINE_WIDTHS = byType((t) => t.width);
 
+export const DIFFERENCES = "differences";
+export const DIFF_COLOR = "#7B3FA0";
+const DIFF_FILL_OPACITY = 0.45;
+
+function differenceLayers(): LayerSpecification[] {
+  const common = { source: DIFFERENCES, "source-layer": DIFFERENCES, layout: { visibility: "none" } } as const;
+  return [
+    { ...common, id: `${DIFFERENCES}-fill`, type: "fill", paint: { "fill-color": DIFF_COLOR, "fill-opacity": DIFF_FILL_OPACITY } },
+    // Islands get a heavier outline so a small one still shows at low zoom.
+    { ...common, id: `${DIFFERENCES}-line`, type: "line", paint: { "line-color": DIFF_COLOR, "line-width": ["match", ["get", "type"], "island", 2, 0.5] } },
+  ];
+}
+
+// Shows the given source pair's patches, or hides them all when null.
+export function applyDifferences(map: Map, pair: string | null) {
+  for (const { id } of differenceLayers()) {
+    map.setLayoutProperty(id, "visibility", pair ? "visible" : "none");
+    if (pair) map.setFilter(id, ["==", ["get", "pair"], pair]);
+  }
+}
+
 // The layer that click queries hit for a source.
 export function queryLayerId(id: string) {
   return LAYER_BY_ID.get(id)?.kind === "line" ? `${id}-line` : `${id}-fill`;
@@ -157,12 +178,13 @@ export function buildStyle(tilesBase: string, draws: Draw[]): StyleSpecification
       ...(positron.sources as StyleSpecification["sources"]),
       satellite: SATELLITE,
       ...Object.fromEntries(
-        LAYERS.map((l) => [l.id, { type: "vector" as const, url: `pmtiles://${tilesBase}/${l.id}.pmtiles` }]),
+        [...LAYERS.map((l) => l.id), DIFFERENCES].map((id) => [id, { type: "vector" as const, url: `pmtiles://${tilesBase}/${id}.pmtiles` }]),
       ),
     },
     layers: [
       ...(positron.layers as LayerSpecification[]),
       { id: "satellite", type: "raster", source: "satellite", layout: { visibility: "none" } },
+      ...differenceLayers(),
       ...LAYERS.flatMap((l) => layersFor(l, draws)),
       // Every dim sits under every outline, so one source's dim never covers the other's outline.
       ...focus.filter((l) => l.type === "fill"),

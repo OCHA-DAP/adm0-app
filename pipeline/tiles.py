@@ -22,7 +22,11 @@ KEEP_ALL = {
 def main() -> None:
     """Build an overview and PMTiles for each prepared layer."""
     tiles_dir.mkdir(parents=True, exist_ok=True)
-    for name in (layer["id"] for layer in layers()):
+    names = [layer["id"] for layer in layers()]
+    # Written by the optional differences step.
+    if (prepare_dir / "differences.parquet").exists():
+        names.append("differences")
+    for name in names:
         src = prepare_dir / f"{name}.parquet"
         overview = tiles_dir / f"{name}.overview.parquet"
         tylertoo.overview(str(src), str(overview), max_zoom=MAX_ZOOM, **KEEP_ALL)

@@ -42,7 +42,7 @@ SOURCE_COLUMNS = {
         "region": "contcd",
     },
     "fieldmaps": {
-        "id": "id",
+        "id": "adm0_id",
         "code": "iso_3",
         "entity": "adm0_name",
         "name": "adm0_name1",
@@ -52,6 +52,7 @@ SOURCE_COLUMNS = {
         "region": "region1_nm",
     },
     "wp": {
+        "id": "WP_ID",
         "code": "GENC_3",
         "name": "WP_Name",
         "mapname": "Map_Label",

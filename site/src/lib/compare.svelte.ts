@@ -2,7 +2,8 @@ import { DEFAULT_PAIR, LAYERS, SOURCES, layerFor, type SourceLayer } from "$lib/
 import type { Part } from "$lib/attributes";
 import type { Draw, Slot } from "$lib/map/style";
 
-export type Kind = SourceLayer["kind"];
+// Differences draws each source's lines over the pair's difference patches.
+export type Kind = SourceLayer["kind"] | "difference";
 export type View = "overlay" | "fade" | Slot;
 export type Basemap = "map" | "satellite";
 
@@ -25,6 +26,7 @@ export const MODES: { id: Kind; label: string }[] = [
   { id: "line", label: "Lines" },
   { id: "polygon", label: "Polygons" },
   { id: "voronoi", label: "Voronoi" },
+  { id: "difference", label: "Diffs" },
 ];
 export const VIEWS: { id: View; label: string }[] = [
   { id: "overlay", label: "Overlay" },
@@ -64,7 +66,10 @@ export class CompareState {
   focus = $state.raw<Focus | null>(this.#init.focus);
   #frame = 0;
 
-  kindLayers = $derived(LAYERS.filter((l) => l.kind === this.mode));
+  #drawKind = $derived(this.mode === "difference" ? "line" : this.mode);
+  kindLayers = $derived(LAYERS.filter((l) => l.kind === this.#drawKind));
+  // Difference tiles key each source pair as its sorted ids.
+  diffPair = $derived([this.pair.a, this.pair.b].sort().join("|"));
 
   draws = $derived.by<Draw[]>(() => {
     if (this.view === "a" || this.view === "b") return [this.#slotDraw(this.view)];
@@ -75,7 +80,7 @@ export class CompareState {
   opacities = $derived(this.view === "fade" ? [1 - this.sweep, this.sweep] : this.draws.map(() => 1));
 
   #slotDraw(slot: Slot): Draw {
-    return { id: layerFor(this.pair[slot], this.mode).id, color: SLOT_COLORS[slot], slot };
+    return { id: layerFor(this.pair[slot], this.#drawKind).id, color: SLOT_COLORS[slot], slot };
   }
 
   writeParams(params: URLSearchParams) {
