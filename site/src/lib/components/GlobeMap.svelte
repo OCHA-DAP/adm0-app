@@ -52,12 +52,12 @@
         [point.x - CLICK_PAD, point.y - CLICK_PAD],
         [point.x + CLICK_PAD, point.y + CLICK_PAD],
       ],
-      { layers: [...draws.map((d) => queryLayerId(d.id)), ...(compare.mode === "difference" ? DIFF_FILLS : [])] },
+      { layers: [...draws.map((d) => queryLayerId(d.id)), ...(compare.mode === "voronoi" ? DIFF_FILLS : [])] },
     );
     // Lines mode also reports the polygon under the click, so a click inside a country has attributes to show.
     const lines = compare.mode === "line";
     return [...features, ...(lines ? picked : [])].flatMap((f) => {
-      if (f.sourceLayer === DIFFERENCES) return [{ slot: null, label: "Difference", color: DIFF_COLOR, properties: f.properties }];
+      if (f.sourceLayer === DIFFERENCES) return [{ slot: null, label: "Difference", color: DIFF_COLOR, properties: { type: f.properties.type, km2: Number(f.properties.km2).toFixed(2) } }];
       const layer = LAYER_BY_ID.get(f.sourceLayer ?? "");
       const draw = drawFor(draws, f.sourceLayer ?? "");
       if (!draw || !layer) return [];
@@ -90,7 +90,8 @@
       const picked = m.queryRenderedFeatures(e.point, { layers: ids }).sort((x, y) => ids.indexOf(x.layer.id) - ids.indexOf(y.layer.id));
       const hit = picked[0];
       const layer = hit && LAYER_BY_ID.get(hit.sourceLayer);
-      if (layer?.code) onpick(String(hit.properties[layer.code] ?? "").toUpperCase(), layer.id, String(hit.properties[layer.name!] ?? ""));
+      // Voronoi clicks only report what each source assigns there, so the patches stay unobscured.
+      if (layer?.code && compare.mode !== "voronoi") onpick(String(hit.properties[layer.code] ?? "").toUpperCase(), layer.id, String(hit.properties[layer.name!] ?? ""));
       if (!hits) return;
       const all = query(m, e.point, picked);
       const seen = new Set<string>();
@@ -139,12 +140,12 @@
   });
 
   $effect(() => {
-    const pair = compare.mode === "difference" ? compare.diffPair : null;
+    const pair = compare.mode === "voronoi" ? compare.diffPair : null;
     if (map && loaded) applyDifferences(map, pair, compare.view === "fade", compare.draws, compare.pair.a > compare.pair.b);
   });
 
   $effect(() => {
-    if (map && loaded && compare.mode === "difference" && compare.view === "fade") applyDifferenceFade(map, compare.sweep, compare.pair.a > compare.pair.b);
+    if (map && loaded && compare.mode === "voronoi" && compare.view === "fade") applyDifferenceFade(map, compare.sweep, compare.pair.a > compare.pair.b);
   });
 
   $effect(() => {
@@ -176,7 +177,7 @@
   });
 
   $effect(() => {
-    if (map && loaded) applyItemFocus(map, compare.mode === "difference" ? (compare.item?.id ?? null) : null, compare.diffPair);
+    if (map && loaded) applyItemFocus(map, compare.mode === "voronoi" ? (compare.item?.id ?? null) : null, compare.diffPair);
   });
 
   $effect(() => {

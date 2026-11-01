@@ -2,8 +2,8 @@ import { DEFAULT_PAIR, LAYERS, SOURCES, layerFor, type SourceLayer } from "$lib/
 import type { ItemRow, Part } from "$lib/attributes";
 import type { Draw, Slot } from "$lib/map/style";
 
-// Differences draws each source's lines over the pair's difference patches.
-export type Kind = SourceLayer["kind"] | "difference";
+// Voronoi also draws the pair's differing OSM land and islands over the sources' cells.
+export type Kind = SourceLayer["kind"];
 export type View = "overlay" | "fade" | Slot;
 export type Basemap = "map" | "satellite";
 
@@ -33,7 +33,6 @@ export const MODES: { id: Kind; label: string }[] = [
   { id: "line", label: "Lines" },
   { id: "polygon", label: "Polygons" },
   { id: "voronoi", label: "Voronoi" },
-  { id: "difference", label: "Diffs" },
 ];
 export const VIEWS: { id: View; label: string }[] = [
   { id: "overlay", label: "Overlay" },
@@ -74,8 +73,7 @@ export class CompareState {
   item = $state.raw<ItemFocus | null>(null);
   #frame = 0;
 
-  #drawKind = $derived(this.mode === "difference" ? "line" : this.mode);
-  kindLayers = $derived(LAYERS.filter((l) => l.kind === this.#drawKind));
+  kindLayers = $derived(LAYERS.filter((l) => l.kind === this.mode));
   // Difference tiles key each source pair as its sorted ids.
   diffPair = $derived([this.pair.a, this.pair.b].sort().join("|"));
 
@@ -88,7 +86,7 @@ export class CompareState {
   opacities = $derived(this.view === "fade" ? [1 - this.sweep, this.sweep] : this.draws.map(() => 1));
 
   #slotDraw(slot: Slot): Draw {
-    return { id: layerFor(this.pair[slot], this.#drawKind).id, color: SLOT_COLORS[slot], slot };
+    return { id: layerFor(this.pair[slot], this.mode).id, color: SLOT_COLORS[slot], slot };
   }
 
   writeParams(params: URLSearchParams) {
@@ -115,9 +113,9 @@ export class CompareState {
     this.item = null;
   }
 
-  // Shows the item in Diffs, moving to a pair it differs in when the current pair has no patches for it.
+  // Shows the item in Voronoi, moving to a pair it differs in when the current pair has no patches for it.
   focusItem(row: ItemRow, label: string) {
-    this.setMode("difference");
+    this.setMode("voronoi");
     const pairs = row.pairs ?? [];
     if (pairs.length && !pairs.includes(this.diffPair)) {
       const [a, b] = pairs[0].split("|");

@@ -66,7 +66,7 @@ export type ItemType = "island" | "land" | "no_land";
 export const ITEM_TYPES: { id: ItemType; label: string }[] = [
   { id: "island", label: "Island" },
   { id: "land", label: "Land" },
-  { id: "no_land", label: "No land" },
+  { id: "no_land", label: "No OSM land" },
 ];
 
 // A geometry difference from items.json; pairs are the map's source pairs it has patches in.
@@ -92,14 +92,14 @@ export function prepareItems(items: ItemRow[]): ItemRow[] {
   return items;
 }
 
-// Every name the sources give an item, most common first, so the heading favours no source.
+// The name most sources give an item, ties broken alphabetically, so the heading favours no source.
 export function itemTitle(row: ItemRow): string {
   const counts = new Map<string, number>();
   for (const s of MAP_SOURCES) {
     const v = String(row[`name_${s}`] ?? "").replace(/\s*\([A-Z]{2}\)$/, "");
     if (v) counts.set(v, (counts.get(v) ?? 0) + 1);
   }
-  return [...counts].sort((a, b) => b[1] - a[1]).map(([n]) => n).join(" / ") || row.item;
+  return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? row.item;
 }
 
 export function groupsInScope(groups: AttributeGroup[], filter: Filter): AttributeGroup[] {

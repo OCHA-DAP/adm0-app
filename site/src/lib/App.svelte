@@ -11,8 +11,8 @@
   type Tab = "map" | "split" | "table";
   const TABS: { id: Tab; label: string }[] = [
     { id: "map", label: "Map" },
-    { id: "split", label: "Split" },
-    { id: "table", label: "Table" },
+    { id: "split", label: "Geometry" },
+    { id: "table", label: "Attributes" },
   ];
 
   let tilesBase = $state<string | null>(null);
@@ -45,11 +45,11 @@
 
   function show(next: Tab) {
     tab = next;
-    // Click results belong to the map-only view.
-    if (next !== "map") compare.hits = [];
+    // Click results belong to the views that show the map.
+    if (next === "table") compare.hits = [];
   }
 
-  // The table pane's width in Split, which the map pads its camera by.
+  // The table pane's width in Geometry, which the map pads its camera by.
   const PANE_REM = 36;
   const inset = $derived(tab === "map" ? 0 : PANE_REM * parseFloat(getComputedStyle(document.documentElement).fontSize));
 
@@ -139,8 +139,8 @@
     </header>
     <div class="views" style:--pane="{PANE_REM}rem" style:--shift={tab === "map" ? "100%" : tab === "split" ? `calc(100% - ${PANE_REM}rem)` : "0%"}>
       <div class="view map">
-        <GlobeMap {tilesBase} {compare} active={tab !== "table"} hits={tab === "map"} {inset} onpick={pick} />
-        <HitsPanel {compare} />
+        <GlobeMap {tilesBase} {compare} active={tab !== "table"} hits={tab !== "table"} {inset} onpick={pick} />
+        <HitsPanel {compare} {inset} />
         <ComparePanel {compare} />
       </div>
       <div class="view table" class:open={tab !== "map"}>

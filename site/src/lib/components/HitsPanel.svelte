@@ -2,11 +2,11 @@
   import type { CompareState } from "$lib/compare.svelte";
   import Swatch from "$lib/components/Swatch.svelte";
 
-  let { compare }: { compare: CompareState } = $props();
+  let { compare, inset }: { compare: CompareState; inset: number } = $props();
 </script>
 
 {#if compare.hits.length}
-  <div class="panel">
+  <div class="panel" style:--inset="{inset}px">
     <header>
       <h2>At this point</h2>
       <button aria-label="Close" onclick={() => (compare.hits = [])}>×</button>
@@ -31,7 +31,7 @@
 
 <style>
   .panel {
-    right: 0.75rem;
+    right: calc(var(--inset) + 0.75rem);
     width: 22rem;
   }
   header {

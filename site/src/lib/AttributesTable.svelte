@@ -53,8 +53,10 @@
   const TYPE_LABEL = Object.fromEntries(ITEM_TYPES.map((t) => [t.id, t.label]));
 
   let filter = $state<Filter>({ ...DEFAULT_FILTER });
-  let table = $state<"attributes" | "geometry">("attributes");
-  const geometry = $derived(table === "geometry");
+  // Split lists what the map can show; the full table lists attributes unrelated to geometry.
+  let list = $state<"differences" | "features">("differences");
+  const view = $derived(split ? list : "attributes");
+  const geometry = $derived(view === "differences");
 
   // With the map pair in charge, the table shows and compares only A and B, against A.
   const ab = $derived([pair.a, pair.b]);
@@ -75,19 +77,21 @@
   }
   let body = $state<HTMLElement>();
 
-  const attrGroups = $derived(attributeGroups(rows[0]));
-  const groups = $derived(groupsInScope(attrGroups, filter));
-  const labelled = $derived(!filter.group);
+  const allGroups = $derived(attributeGroups(rows[0]));
+  const attrGroups = $derived(allGroups.filter((g) => (g.key === "count") === (view === "features")));
+  const rowScope = $derived(view === "features" ? { ...scope, group: "count" } : scope);
+  const groups = $derived(groupsInScope(attrGroups, rowScope));
+  const labelled = $derived(view === "attributes" && !filter.group);
 
-  // Items listed for the current scope: in Split only those with patches in the map's pair.
+  // Items with patches in the map's pair, plus those with no OSM land to patch.
   const itemScope = $derived({ ...scope, group: ENTITY.key });
   function itemShown(it: ItemRow) {
-    if (split && !(it.pairs ?? []).includes(diffPair)) return false;
+    if (it.type !== "no_land" && !(it.pairs ?? []).includes(diffPair)) return false;
     return matches(it, [ENTITY], itemScope);
   }
   const shownItems = $derived(items.filter((it) => it.item === item?.id || itemShown(it)));
 
-  const shown = $derived(rows.filter((row) => row.iso3 === focus?.iso3 || matches(row, attrGroups, scope)));
+  const shown = $derived(rows.filter((row) => row.iso3 === focus?.iso3 || matches(row, attrGroups, rowScope)));
 
   // Scrolls once per code or item. scrollIntoView would also scroll the hidden pane's ancestors
   // and slide the table over the map-only view.
@@ -123,7 +127,7 @@
     return { empty: !v, diff, dim: !inPair, ref: source === scope.ref };
   }
   const count = $derived(
-    geometry ? `${shownItems.length} of ${items.length} geometry differences` : `${shown.length} of ${rows.length} codes`,
+    geometry ? `${shownItems.length} differences` : `${shown.length} of ${rows.length} codes`,
   );
   const fmt = (n: number | null) => (n == null ? "" : n.toLocaleString("en", { maximumFractionDigits: n < 10 ? 1 : 0 }));
   function itemMeta(it: ItemRow) {
@@ -191,16 +195,18 @@
 
 <div class="table-view">
   <aside class="sidebar">
-    <section>
-      <Segmented label="Table" options={[{ id: "attributes", label: "Attributes" }, { id: "geometry", label: "Geometry" }]} current={table} pick={(id) => (table = id as typeof table)} />
-    </section>
+    {#if split}
+      <section>
+        <Segmented label="List" options={[{ id: "differences", label: "Differences" }, { id: "features", label: "Features" }]} current={list} pick={(id) => (list = id as typeof list)} />
+      </section>
+    {/if}
     <section><input type="search" placeholder="Search code or name" bind:value={filter.query} /></section>
     <section>
       <h2>Show</h2>
       <Segmented label="Show" options={SHOW} current={filter.diff} pick={(id) => (filter.diff = id as DiffType)} />
       <span class="count">{count}</span>
     </section>
-    {#if !geometry}
+    {#if view === "attributes"}
       <section>
         <h2>Attribute</h2>
         <Segmented label="Attribute" options={[{ id: "", label: "All" }, ...attrGroups.map((g) => ({ id: g.key, label: g.label }))]} current={filter.group} pick={(id) => (filter.group = id)} />
@@ -243,7 +249,7 @@
               {@const focused = row.iso3 === focus?.iso3}
               {#each groups as group, gi (group.key)}
                 <tr class:start={gi === 0} class:focused data-iso3={gi === 0 ? row.iso3 : undefined}>
-                  {#if gi === 0}<th class="code" rowspan={groups.length}><button type="button" class="code-link" title="Show on map" onclick={() => onfocus(row)}>{row.iso3}</button></th>{/if}
+                  {#if gi === 0}<th class="code" rowspan={groups.length}><button type="button" class="code-link" title="Show on map" onclick={() => { if (!split) list = "features"; onfocus(row); }}>{row.iso3}</button></th>{/if}
                   {#if labelled}<td class="attr">{group.label}</td>{/if}
                   {#each visible as source (source)}{@render fixedCell(row, group, source)}{/each}
                 </tr>

@@ -38,20 +38,18 @@ const LINE_WIDTHS = byType((t) => t.width);
 export const DIFFERENCES = "differences";
 export const DIFF_COLOR = "#7B3FA0";
 const DIFF_FILL_OPACITY = 0.45;
-const DIFF_AREA_OPACITY = 0.15;
 
-// "all" draws every patch outside Fade; in Fade, "a" and "b" each draw one tile side's half with a fixed filter and color.
+// "all" draws every patch outside Fade; in Fade, "a" and "b" each draw every patch in one source's color.
 const DIFF_SETS = ["all", "a", "b"] as const;
-export const DIFF_FILLS = DIFF_SETS.flatMap((k) => [`${DIFFERENCES}-${k}-area`, `${DIFFERENCES}-${k}-fill`]);
-// Voronoi areas are a light backdrop; the land and island patches inside them draw solid.
-const AREA: ExpressionSpecification = ["==", ["get", "type"], "voronoi"];
+export const DIFF_FILLS = DIFF_SETS.map((k) => `${DIFFERENCES}-${k}-fill`);
+// Voronoi area rows only outline a focused item; the sources' own Voronoi show the rest.
+const PATCH: ExpressionSpecification = ["!=", ["get", "type"], "voronoi"];
 const DIFF_FOCUS = `${DIFFERENCES}-focus`;
 
 function differenceLayers(): LayerSpecification[] {
   const common = { source: DIFFERENCES, "source-layer": DIFFERENCES, layout: { visibility: "none" } } as const;
   return [
     ...DIFF_SETS.flatMap((k): LayerSpecification[] => [
-      { ...common, id: `${DIFFERENCES}-${k}-area`, type: "fill", paint: { "fill-color": DIFF_COLOR, "fill-opacity": DIFF_AREA_OPACITY } },
       { ...common, id: `${DIFFERENCES}-${k}-fill`, type: "fill", paint: { "fill-color": DIFF_COLOR, "fill-opacity": DIFF_FILL_OPACITY } },
       // Islands get a heavier outline so a small one still shows at low zoom.
       { ...common, id: `${DIFFERENCES}-${k}-line`, type: "line", paint: { "line-color": DIFF_COLOR, "line-width": ["match", ["get", "type"], "island", 2, 0.5] } },
@@ -63,13 +61,6 @@ function differenceLayers(): LayerSpecification[] {
 // Land border shifts (land patches on side "both") never draw.
 const NOT_BORDER: ExpressionSpecification = ["!", ["all", ["==", ["get", "type"], "land"], ["==", ["get", "side"], "both"]]];
 
-// An island both sources have but assign differently goes to the alphabetically first code's side.
-function sideFilter(side: "a" | "b"): ExpressionSpecification {
-  const other = side === "a" ? "b" : "a";
-  const code = (s: string): ExpressionSpecification => ["upcase", ["coalesce", ["get", `${s}_code`], ""]];
-  return ["any", ["==", ["get", "side"], side], ["all", ["==", ["get", "side"], "both"], ["<", code(side), code(other)]]];
-}
-
 // Shows the pair's patches, or hides them all when pair is null. Tiles name sides by
 // sorted source id, so swapped means slot A holds tile side "b".
 export function applyDifferences(map: Map, pair: string | null, fade: boolean, draws: Draw[], swapped: boolean) {
@@ -78,13 +69,11 @@ export function applyDifferences(map: Map, pair: string | null, fade: boolean, d
   for (const k of DIFF_SETS) {
     const shown = !!pair && (k === "all") !== split;
     const color = k === "all" ? DIFF_COLOR : draws[(k === "b") !== swapped ? 1 : 0]?.color ?? DIFF_COLOR;
-    const sides: ExpressionSpecification = k === "all" ? NOT_BORDER : ["all", NOT_BORDER, sideFilter(k)];
-    const parts: ["area" | "fill" | "line", "fill" | "line", ExpressionSpecification | boolean][] = [["area", "fill", AREA], ["fill", "fill", ["!", AREA]], ["line", "line", true]];
-    for (const [layer, type, only] of parts) {
-      const id = `${DIFFERENCES}-${k}-${layer}`;
+    for (const type of ["fill", "line"] as const) {
+      const id = `${DIFFERENCES}-${k}-${type}`;
       map.setLayoutProperty(id, "visibility", shown ? "visible" : "none");
       if (!shown) continue;
-      map.setFilter(id, ["all", byPair, sides, only]);
+      map.setFilter(id, ["all", byPair, NOT_BORDER, PATCH]);
       map.setPaintProperty(id, `${type}-color`, color);
     }
   }
@@ -97,13 +86,10 @@ export function applyItemFocus(map: Map, item: string | null, pair: string) {
 }
 
 // Fade calls this every frame with plain numbers only, so nothing is re-evaluated per feature.
-// Each half's patches fade out to the midpoint, then the other half's fade in.
+// Each source's patches crossfade with its own layers, as in CompareState.opacities.
 export function applyDifferenceFade(map: Map, sweep: number, swapped: boolean) {
-  const pulse = Math.abs(1 - 2 * sweep);
-  const slotB = sweep >= 0.5;
   for (const k of ["a", "b"] as const) {
-    const o = (k === "b") !== swapped === slotB ? pulse : 0;
-    map.setPaintProperty(`${DIFFERENCES}-${k}-area`, "fill-opacity", DIFF_AREA_OPACITY * o);
+    const o = (k === "b") !== swapped ? sweep : 1 - sweep;
     map.setPaintProperty(`${DIFFERENCES}-${k}-fill`, "fill-opacity", DIFF_FILL_OPACITY * o);
     map.setPaintProperty(`${DIFFERENCES}-${k}-line`, "line-opacity", o);
   }
