@@ -7,7 +7,7 @@
   import type { CompareState, Focus, Hit } from "$lib/compare.svelte";
   import { LAYER_BY_ID } from "$lib/layers";
   import { SATELLITE_PROTOCOL, satelliteTile } from "$lib/map/satellite";
-  import { DIFFERENCES, DIFF_COLOR, DIFF_FILLS, applyBasemap, applyDifferenceFade, applyDifferences, applyDraws, applyFocus, applyOpacity, buildStyle, drawFor, pickLayerIds, queryLayerId } from "$lib/map/style";
+  import { DIFFERENCES, DIFF_COLOR, DIFF_FILLS, DIFF_MARKER, applyBasemap, applyDifferenceFade, applyDifferences, applyDraws, applyFocus, applyOpacity, buildStyle, drawFor, pickLayerIds, queryLayerId } from "$lib/map/style";
 
   let {
     tilesBase,
@@ -52,12 +52,12 @@
         [point.x - CLICK_PAD, point.y - CLICK_PAD],
         [point.x + CLICK_PAD, point.y + CLICK_PAD],
       ],
-      { layers: [...draws.map((d) => queryLayerId(d.id)), ...(compare.mode === "difference" ? DIFF_FILLS : [])] },
+      { layers: [...draws.map((d) => queryLayerId(d.id)), ...(compare.mode === "difference" ? [...DIFF_FILLS, DIFF_MARKER] : [])] },
     );
     // Lines mode also reports the polygon under the click, so a click inside a country has attributes to show.
     const lines = compare.mode === "line";
     return [...features, ...(lines ? picked : [])].flatMap((f) => {
-      if (f.sourceLayer === DIFFERENCES) return [{ slot: null, label: "Difference", color: DIFF_COLOR, properties: f.properties }];
+      if (f.sourceLayer === DIFFERENCES) return [{ slot: null, label: f.properties.side === "marker" ? "Review item" : "Difference", color: DIFF_COLOR, properties: f.properties }];
       const layer = LAYER_BY_ID.get(f.sourceLayer ?? "");
       const draw = drawFor(draws, f.sourceLayer ?? "");
       if (!draw || !layer) return [];
@@ -140,7 +140,7 @@
 
   $effect(() => {
     const pair = compare.mode === "difference" ? compare.diffPair : null;
-    if (map && loaded) applyDifferences(map, pair, compare.view === "fade", compare.draws, compare.pair.a > compare.pair.b);
+    if (map && loaded) applyDifferences(map, pair, compare.view === "fade", compare.draws, compare.pair.a > compare.pair.b, compare.borders);
   });
 
   $effect(() => {

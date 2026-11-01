@@ -239,17 +239,27 @@ def _write(conn: DuckDBPyConnection) -> None:
         register_dir / "islands.parquet",
         geo=False,
     )
-    write_parquet(
-        conn,
-        f"""SELECT pair, 'land' AS type, side, item, a_code, a_name, b_code, b_name,
-                km2, geom AS geometry FROM land_review
+    conn.execute(f"""--sql
+        CREATE OR REPLACE TABLE patches AS
+        SELECT pair, 'land' AS type, side, item, a_code, a_name, b_code, b_name,
+                km2, geom::GEOMETRY AS geometry FROM land_review
         UNION ALL
         SELECT d.a || '|' || d.b, 'island', {SIDE}, r.item, ae.code, ae.name,
-               be.code, be.name, d.km2, l.geom
+               be.code, be.name, d.km2, l.geom::GEOMETRY
         FROM island_pairs d JOIN matches m USING (a, b, a_entity, b_entity)
         JOIN land l USING (fid) LEFT JOIN item_islands r USING (fid)
         {_named("a")} {_named("b")} {_sided()}
-        WHERE NOT m.mutual""",
+        WHERE NOT m.mutual
+    """)
+    # One point per review item and pair, so small items still show zoomed out.
+    write_parquet(
+        conn,
+        """SELECT * FROM patches UNION ALL
+        SELECT p.pair, any_value(p.type), 'marker', p.item, any_value(p.a_code),
+            any_value(p.a_name), any_value(p.b_code), any_value(p.b_name),
+            sum(p.km2),
+            any_value(ST_Point((s.xmin + s.xmax) / 2, (s.ymin + s.ymax) / 2))
+        FROM patches p JOIN stats s USING (item) GROUP BY p.pair, p.item""",
         prepare_dir / "differences.parquet",
     )
 

@@ -42,14 +42,23 @@ const DIFF_FILL_OPACITY = 0.45;
 // "all" draws every patch outside Fade; in Fade, "a" and "b" each draw one tile side's half with a fixed filter and color.
 const DIFF_SETS = ["all", "a", "b"] as const;
 export const DIFF_FILLS = DIFF_SETS.map((k) => `${DIFFERENCES}-${k}-fill`);
+export const DIFF_MARKER = `${DIFFERENCES}-marker`;
 
 function differenceLayers(): LayerSpecification[] {
   const common = { source: DIFFERENCES, "source-layer": DIFFERENCES, layout: { visibility: "none" } } as const;
-  return DIFF_SETS.flatMap((k) => [
-    { ...common, id: `${DIFFERENCES}-${k}-fill`, type: "fill", paint: { "fill-color": DIFF_COLOR, "fill-opacity": DIFF_FILL_OPACITY } },
-    // Islands get a heavier outline so a small one still shows at low zoom.
-    { ...common, id: `${DIFFERENCES}-${k}-line`, type: "line", paint: { "line-color": DIFF_COLOR, "line-width": ["match", ["get", "type"], "island", 2, 0.5] } },
-  ]);
+  return [
+    ...DIFF_SETS.flatMap((k): LayerSpecification[] => [
+      { ...common, id: `${DIFFERENCES}-${k}-fill`, type: "fill", paint: { "fill-color": DIFF_COLOR, "fill-opacity": DIFF_FILL_OPACITY } },
+      // Islands get a heavier outline so a small one still shows at low zoom.
+      { ...common, id: `${DIFFERENCES}-${k}-line`, type: "line", paint: { "line-color": DIFF_COLOR, "line-width": ["match", ["get", "type"], "island", 2, 0.5] } },
+    ]),
+    {
+      ...common,
+      id: DIFF_MARKER,
+      type: "circle",
+      paint: { "circle-color": DIFF_COLOR, "circle-radius": 5, "circle-stroke-color": "#FFFFFF", "circle-stroke-width": 1.5 },
+    },
+  ];
 }
 
 // A tile side's half: patches only it has, plus border shifts it gives to the alphabetically first country.
@@ -59,19 +68,24 @@ function sideFilter(side: "a" | "b"): ExpressionSpecification {
   return ["any", ["==", ["get", "side"], side], ["all", ["==", ["get", "side"], "both"], ["<", code(side), code(other)]]];
 }
 
-// Shows the pair's patches, or hides them all when pair is null. Tiles name sides by sorted source id,
-// so swapped means slot A holds tile side "b".
-export function applyDifferences(map: Map, pair: string | null, fade: boolean, draws: Draw[], swapped: boolean) {
+// Shows the pair's patches and review markers, or hides them all when pair is null. Tiles name sides by
+// sorted source id, so swapped means slot A holds tile side "b". Border shifts draw only when borders is set.
+export function applyDifferences(map: Map, pair: string | null, fade: boolean, draws: Draw[], swapped: boolean, borders: boolean) {
   const split = fade && draws.length === 2;
+  const byPair: ExpressionSpecification = ["==", ["get", "pair"], pair];
+  const side = (v: string): ExpressionSpecification => ["==", ["get", "side"], v];
+  map.setLayoutProperty(DIFF_MARKER, "visibility", pair ? "visible" : "none");
+  if (pair) map.setFilter(DIFF_MARKER, ["all", byPair, side("marker")]);
   for (const k of DIFF_SETS) {
     const shown = !!pair && (k === "all") !== split;
     const color = k === "all" ? DIFF_COLOR : draws[(k === "b") !== swapped ? 1 : 0]?.color ?? DIFF_COLOR;
+    const sides: ExpressionSpecification =
+      k === "all" ? ["!", ["in", ["get", "side"], ["literal", borders ? ["marker"] : ["marker", "both"]]]] : borders ? sideFilter(k) : side(k);
     for (const type of ["fill", "line"] as const) {
       const id = `${DIFFERENCES}-${k}-${type}`;
       map.setLayoutProperty(id, "visibility", shown ? "visible" : "none");
       if (!shown) continue;
-      const byPair: ExpressionSpecification = ["==", ["get", "pair"], pair];
-      map.setFilter(id, k === "all" ? byPair : ["all", byPair, sideFilter(k)]);
+      map.setFilter(id, ["all", byPair, sides]);
       map.setPaintProperty(id, `${type}-color`, color);
     }
   }

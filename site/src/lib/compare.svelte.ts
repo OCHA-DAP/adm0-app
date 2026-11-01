@@ -52,7 +52,7 @@ function fromUrl() {
   const basemap = pick("basemap", BASEMAPS.map((b) => b.id), "map");
   const code = q.get("focus");
   const focus: Focus | null = code ? { iso3: code.toUpperCase(), bbox: null, part: null, fly: false } : null;
-  return { mode, view: pick(VIEW_PARAM, VIEWS.map((v) => v.id), "overlay"), pair, basemap, focus };
+  return { mode, view: pick(VIEW_PARAM, VIEWS.map((v) => v.id), "overlay"), pair, basemap, focus, borders: q.get("borders") === "1" };
 }
 
 export class CompareState {
@@ -61,6 +61,8 @@ export class CompareState {
   view = $state<View>(this.#init.view);
   pair = $state(this.#init.pair);
   basemap = $state<Basemap>(this.#init.basemap);
+  // Border shifts stay off the Diffs map until asked for; review items always show.
+  borders = $state(this.#init.borders);
   sweep = $state(0);
   hits = $state<Hit[]>([]);
   focus = $state.raw<Focus | null>(this.#init.focus);
@@ -88,6 +90,8 @@ export class CompareState {
     params.set(VIEW_PARAM, this.view);
     params.set("basemap", this.basemap);
     for (const slot of ["a", "b"] as const) params.set(slot, this.pair[slot]);
+    if (this.borders) params.set("borders", "1");
+    else params.delete("borders");
     if (this.focus) params.set("focus", this.focus.iso3);
     else params.delete("focus");
   }
