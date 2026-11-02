@@ -83,6 +83,7 @@ export interface ItemRow {
   pairs: string[] | null;
   mapped: string[] | null;
   list?: GeometryList;
+  entities?: Record<string, [unknown, unknown][]>;
   [column: string]: unknown;
 }
 
@@ -116,7 +117,7 @@ export function mergeItems(items: ItemRow[], a: string, b: string): ItemRow[] {
   const pair = [a, b].sort().join("|");
   const rows = new Map<string, ItemRow>();
   const entity = (it: ItemRow, s: string) => [it[`code_${s}`], it[`name_${s}`]].join("|");
-  const seen = new Map<string, Set<unknown>>();
+  const own = (it: ItemRow) => Object.fromEntries([a, b].map((s) => [s, [[it[`code_${s}`], it[`name_${s}`]] as [unknown, unknown]]]));
   // A no_land entity exists in one source only, so it counts when A or B holds it.
   const relevant = items.filter((it) => (it.type === "no_land" ? [a, b].some((s) => it[`entity_${s}`]) : it.pairs?.includes(pair)));
   for (const it of relevant) {
@@ -124,7 +125,7 @@ export function mergeItems(items: ItemRow[], a: string, b: string): ItemRow[] {
     const list: GeometryList = it.type !== "island" ? "land" : it.mapped?.includes(pair) ? "islands" : "unmapped";
     const row = rows.get(key);
     if (!row) {
-      rows.set(key, { ...it, items: [it.item], list });
+      rows.set(key, { ...it, items: [it.item], list, entities: own(it) });
       continue;
     }
     row.items!.push(it.item);
@@ -134,14 +135,22 @@ export function mergeItems(items: ItemRow[], a: string, b: string): ItemRow[] {
     row.km2 = (row.km2 ?? 0) + (it.km2 ?? 0);
     row.islands = (row.islands ?? 0) + (it.islands ?? 0) || null;
     for (const s of [a, b]) {
-      for (const g of ["code", "name", "entity"]) {
-        const col = `${g}_${s}`;
-        const values = seen.get(key + col) ?? seen.set(key + col, new Set([row[col]])).get(key + col)!;
-        values.add(it[col]);
-        row[col] = [...values].filter(Boolean).join(", ");
-      }
+      const ents = row.entities![s];
+      if (!ents.some(([c, n]) => c === it[`code_${s}`] && n === it[`name_${s}`])) ents.push([it[`code_${s}`], it[`name_${s}`]]);
     }
+    if (list === "land" && row.list !== "land") row.type = it.type;
     if (list === "land" || (list === "islands" && row.list === "unmapped")) row.list = list;
+  }
+  // Two-way rows show each source's territories together.
+  for (const row of rows.values()) {
+    for (const s of [a, b]) {
+      const ents = row.entities![s];
+      if (ents.length < 2) continue;
+      const join = (vs: unknown[]) => [...new Set(vs.filter(Boolean))].join(", ");
+      row[`code_${s}`] = join(ents.map(([c]) => c));
+      row[`name_${s}`] = join(ents.map(([, n]) => n));
+      row[`entity_${s}`] = join(ents.map(([c, n]) => [c, n].filter(Boolean).join(" ")));
+    }
   }
   return [...rows.values()];
 }

@@ -23,12 +23,12 @@ export interface Focus {
 }
 
 // A table row's merged geometry differences, by id; the map outlines their patches and each source's
-// cells for their entity, keyed by source as [code, name], and frames their bbox.
+// cells for their territories, keyed by source as [code, name] lists, and frames their bbox.
 export interface ItemFocus {
   ids: string[];
   label: string;
   bbox: number[] | null;
-  entities: Record<string, [unknown, unknown]>;
+  entities: Record<string, [unknown, unknown][]>;
   fly: boolean;
 }
 
@@ -125,7 +125,7 @@ export class CompareState {
       this.pair = { a, b };
     }
     this.focus = null;
-    const entities = Object.fromEntries(SOURCES.map((s) => [s, [row[`code_${s}`], row[`name_${s}`]] as [unknown, unknown]]));
+    const entities = Object.fromEntries(SOURCES.map((s) => [s, row.entities?.[s] ?? [[row[`code_${s}`], row[`name_${s}`]] as [unknown, unknown]]]));
     this.item = { ids: row.items ?? [row.item], label, bbox: row.bbox, entities, fly };
   }
 

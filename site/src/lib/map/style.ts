@@ -113,9 +113,9 @@ function entityLayersFor(layer: SourceLayer): LayerSpecification[] {
 function cellFilter(source: string, item: ItemFocus | null, focus: Focus | null): FilterSpecification | null {
   const polygon = layerFor(source, "polygon");
   if (item) {
-    const [code, name] = item.entities[source] ?? [null, null];
-    if (code == null && name == null) return null;
-    return ["all", ["==", ["get", polygon.code!], code ?? null], ["==", ["get", polygon.entity!], name ?? null]] as FilterSpecification;
+    const ents = (item.entities[source] ?? []).filter(([code, name]) => code != null || name != null);
+    if (!ents.length) return null;
+    return ["any", ...ents.map(([code, name]) => ["all", ["==", ["get", polygon.code!], code ?? null], ["==", ["get", polygon.entity!], name ?? null]])] as FilterSpecification;
   }
   if (!focus) return null;
   const byCode: FilterSpecification = ["==", ["upcase", ["to-string", ["coalesce", ["get", polygon.code!], ""]]], focus.iso3];

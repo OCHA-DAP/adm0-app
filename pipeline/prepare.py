@@ -170,19 +170,41 @@ def _key(name: str) -> str:
     return name.replace("\N{RIGHT SINGLE QUOTATION MARK}", "'").strip().lower()
 
 
-def _m49_rows() -> list[list[str]]:
+M49_COLUMNS = (
+    "Region Name",
+    "Sub-region Name",
+    "Intermediate Region Name",
+    "Country or Area",
+    "M49 Code",
+    "ISO-alpha2 Code",
+    "ISO-alpha3 Code",
+)
+
+
+def _m49_rows() -> list[dict[str, str]]:
+    """Rows of the UNSD M49 overview table, keyed by its header names."""
     page = (download_dir / "ref/m49.html").read_text(encoding="utf-8")
     start = page.find('id="ENG_Overview"')
-    table = page[start : page.find("</table>", start)]
-    rows = []
-    for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", table, re.DOTALL):
-        cells = [
+    if start < 0:
+        msg = "M49 page has no ENG_Overview table"
+        raise ValueError(msg)
+    table = re.sub(
+        r"<!--.*?-->", "", page[start : page.find("</table>", start)], flags=re.DOTALL
+    )
+    head, *body = [
+        [
             html.unescape(re.sub("<[^>]+>", "", td)).strip()
             for td in re.findall(r"<td[^>]*>(.*?)</td>", tr, re.DOTALL)
         ]
-        if len(cells) >= 16 and cells[9].isdigit():  # noqa: PLR2004
-            rows.append(cells)
-    return rows
+        for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", table, re.DOTALL)
+    ]
+    if missing := [c for c in M49_COLUMNS if c not in head]:
+        msg = f"M49 table lacks columns: {missing}"
+        raise ValueError(msg)
+    rows = [
+        dict(zip(head, cells, strict=True)) for cells in body if len(cells) == len(head)
+    ]
+    return [r for r in rows if r["M49 Code"].isdigit()]
 
 
 def ref(conn: DuckDBPyConnection) -> None:
@@ -199,27 +221,27 @@ def ref(conn: DuckDBPyConnection) -> None:
     }
     out, used = [], set()
     for m in _m49_rows():
-        u = by_key.get(_key(m[8]))
+        u = by_key.get(_key(m["Country or Area"]))
         if u:
-            used.add(_key(m[8]))
+            used.add(_key(m["Country or Area"]))
         short = u["English short"] if u else ""
         stars = len(short.strip()) - len(short.strip().rstrip("*"))
         clean = {k: _strip_stars((v or "").strip()) for k, v in (u or {}).items()}
         out.append(
             {
-                "iso3": m[11],
-                "iso2": m[10],
-                "m49": m[9],
-                "name_m49": m[8],
+                "iso3": m["ISO-alpha3 Code"],
+                "iso2": m["ISO-alpha2 Code"],
+                "m49": m["M49 Code"],
+                "name_m49": m["Country or Area"],
                 "un_status": UNTERM_STATUS[stars] if u else "Other area",
                 **{
                     f"name_{lang[:2].lower()}_{form}": clean.get(f"{lang} {form}", "")
                     for lang in UNTERM_LANGS
                     for form in ("short", "formal")
                 },
-                "region": m[3],
-                "subregion": m[5],
-                "intermediate_region": m[7],
+                "region": m["Region Name"],
+                "subregion": m["Sub-region Name"],
+                "intermediate_region": m["Intermediate Region Name"],
             }
         )
     missing = sorted(set(by_key) - used)
