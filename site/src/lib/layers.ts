@@ -1,21 +1,25 @@
-// One entry per PMTiles file from pipeline/tiles.py; the source-layer name is the id.
+import layers from "$lib/layers.json";
+
+// One entry per PMTiles file; pipeline/tiles.py and pipeline/attributes.py read the same layers.json, and the source-layer name is the id.
 export interface SourceLayer {
   id: string;
+  // Shared by a source's polygon, line and voronoi layers, so a pick carries across modes; also its attributes.json source.
+  source: string;
   label: string;
-  group: string;
-  kind: "polygon" | "line";
-  color: string;
-  visible: boolean;
+  kind: "polygon" | "line" | "voronoi";
+  // Polygon layers only: the feature properties holding the ISO3 code and the feature's name.
+  code?: string;
+  name?: string;
+  // The property naming the entity a geometry difference refers to; Voronoi cells carry it too.
+  entity?: string;
 }
 
-export const LAYERS: SourceLayer[] = [
-  { id: "gaul_l0", label: "GAUL 2025 L0", group: "FAO", kind: "polygon", color: "#009EDB", visible: true },
-  { id: "ungeodata_polygons", label: "UN Geodata polygons", group: "UN Geodata 1M", kind: "polygon", color: "#CF3F0B", visible: true },
-  { id: "ungeodata_lines", label: "UN Geodata lines", group: "UN Geodata 1M", kind: "line", color: "#CF3F0B", visible: false },
-  { id: "fieldmaps_wp_polygons", label: "fieldmaps polygons (WP land)", group: "fieldmaps", kind: "polygon", color: "#27833A", visible: false },
-  { id: "fieldmaps_wp_lines", label: "fieldmaps lines (WP land)", group: "fieldmaps", kind: "line", color: "#27833A", visible: false },
-  { id: "fieldmaps_osm_polygons", label: "fieldmaps polygons (OSM land)", group: "fieldmaps", kind: "polygon", color: "#733D96", visible: false },
-  { id: "fieldmaps_osm_lines", label: "fieldmaps lines (OSM land)", group: "fieldmaps", kind: "line", color: "#733D96", visible: false },
-  { id: "wp_polygons", label: "World Polygons", group: "US State Dept", kind: "polygon", color: "#7C7067", visible: false },
-  { id: "lsib_lines", label: "LSIB lines", group: "US State Dept", kind: "line", color: "#262626", visible: false },
-];
+export const LAYERS = layers as SourceLayer[];
+export const LAYER_BY_ID = new Map(LAYERS.map((l) => [l.id, l]));
+
+export const SOURCES = [...new Set(LAYERS.map((l) => l.source))];
+export const DEFAULT_PAIR = { a: "gaul", b: "ungeodata" };
+
+export function layerFor(source: string, kind: SourceLayer["kind"]) {
+  return LAYERS.find((l) => l.source === source && l.kind === kind)!;
+}

@@ -1,65 +1,55 @@
 """Build the GAUL-to-source overlap crosswalk under ``outputs/register/``."""
 
 from logging import getLogger
+from typing import TYPE_CHECKING
 
-from duckdb import DuckDBPyConnection, connect
+from .config import (
+    BASELINE,
+    SOURCE_COLUMNS,
+    open_db,
+    prepare_dir,
+    register_dir,
+    tmp_dir,
+    write_parquet,
+)
 
-from .config import fieldmaps_dir, prepare_dir, register_dir, tmp_dir
+if TYPE_CHECKING:
+    from duckdb import DuckDBPyConnection
 
 logger = getLogger(__name__)
 
-# Each comparison source: (id expression, code, sovereign, name, status, region).
+# Each register source's polygons file, keyed as in SOURCE_COLUMNS.
 SOURCES = {
-    "ungeodata": {
-        "path": prepare_dir / "ungeodata_polygons.parquet",
-        "id": "iso3cd || coalesce('-' || romnam, '')",
-        "code": "iso3cd",
-        "sovereign": "isoclr",
-        "name": "romnam",
-        "status": "stscod::VARCHAR",
-        "region": "contcd",
-    },
-    **{
-        f"fieldmaps_{land}": {
-            "path": fieldmaps_dir / f"{land}_polygons.parquet",
-            "id": "id",
-            "code": "iso_3",
-            "sovereign": "iso_3_grp",
-            "name": "adm0_name",
-            "status": "status_nm",
-            "region": "region1_nm",
-        }
-        for land in ("wp", "osm")
-    },
+    BASELINE: prepare_dir / "gaul_l0.parquet",
+    "ungeodata": prepare_dir / "ungeodata_polygons.parquet",
+    "fieldmaps": prepare_dir / "fieldmaps_polygons.parquet",
 }
 
 
 def _entities(conn: DuckDBPyConnection) -> None:
     """Load every source's entities into one long table with common columns."""
-    conn.execute(f"""--sql
-        CREATE OR REPLACE TABLE entities AS
-        SELECT 'gaul' AS source, gaul_id AS id, iso3_code AS code,
-               map_code AS sovereign, gaul0_name AS name, NULL::VARCHAR AS status,
-               continent AS region, geometry AS geom
-        FROM read_parquet('{prepare_dir / "gaul_l0.parquet"}')
+    conn.execute("""--sql
+        CREATE OR REPLACE TABLE entities (
+            source VARCHAR, id VARCHAR, code VARCHAR, sovereign VARCHAR,
+            name VARCHAR, status VARCHAR, region VARCHAR, area DOUBLE,
+            xmin DOUBLE, ymin DOUBLE, xmax DOUBLE, ymax DOUBLE, geom GEOMETRY
+        )
     """)
-    for source, s in SOURCES.items():
-        if not s["path"].exists():
-            logger.warning("%s: %s missing, skipping", source, s["path"].name)
+    for source, path in SOURCES.items():
+        if not path.exists():
+            logger.warning("%s: %s missing, skipping", source, path.name)
             continue
+        c = SOURCE_COLUMNS[source]
+        sovereign = c.get("sovereign", "NULL")
         conn.execute(f"""--sql
             INSERT INTO entities
-            SELECT '{source}', {s["id"]}, {s["code"]}, {s["sovereign"]}, {s["name"]},
-                   {s["status"]}, {s["region"]}, geometry
-            FROM read_parquet('{s["path"]}')
+            SELECT '{source}', {c["id"]}, {c["code"]}, {sovereign},
+                   {c.get("entity", c["name"])},
+                   {c.get("status", "NULL")}, {c["region"]}, ST_Area(geometry),
+                   ST_XMin(geometry), ST_YMin(geometry), ST_XMax(geometry),
+                   ST_YMax(geometry), geometry
+            FROM read_parquet('{path}')
         """)
-    conn.execute("""--sql
-        CREATE OR REPLACE TABLE entities AS
-        SELECT * EXCLUDE geom, ST_Area(geom) AS area,
-               ST_XMin(geom) AS xmin, ST_YMin(geom) AS ymin,
-               ST_XMax(geom) AS xmax, ST_YMax(geom) AS ymax, geom
-        FROM entities
-    """)
 
 
 def _crosswalk(conn: DuckDBPyConnection) -> None:
@@ -69,12 +59,12 @@ def _crosswalk(conn: DuckDBPyConnection) -> None:
             gaul_id VARCHAR, source VARCHAR, other_id VARCHAR, overlap DOUBLE
         )
     """)
-    pairs = conn.execute("""--sql
+    pairs = conn.execute(f"""--sql
         SELECT g.id, o.source, o.id,
                greatest(g.xmin, o.xmin), greatest(g.ymin, o.ymin),
                least(g.xmax, o.xmax), least(g.ymax, o.ymax)
         FROM entities g JOIN entities o
-          ON g.source = 'gaul' AND o.source != 'gaul'
+          ON g.source = '{BASELINE}' AND o.source != '{BASELINE}'
          AND g.xmin <= o.xmax AND g.xmax >= o.xmin
          AND g.ymin <= o.ymax AND g.ymax >= o.ymin
         ORDER BY g.id
@@ -85,42 +75,34 @@ def _crosswalk(conn: DuckDBPyConnection) -> None:
             logger.info("crosswalk: %d/%d pairs", i, len(pairs))
         # Clipping both sides to the shared bbox first is exact and much cheaper.
         conn.execute(
-            """--sql
+            f"""--sql
             INSERT INTO crosswalk
             SELECT $1, $2, $3, ST_Area(ST_Intersection(
                 ST_Intersection(g.geom, ST_MakeEnvelope($4, $5, $6, $7)),
                 ST_Intersection(o.geom, ST_MakeEnvelope($4, $5, $6, $7))
             ))
             FROM entities g, entities o
-            WHERE g.source = 'gaul' AND g.id = $1 AND o.source = $2 AND o.id = $3
+            WHERE g.source = '{BASELINE}' AND g.id = $1 AND o.source = $2 AND o.id = $3
             """,
             [gid, source, oid, *box],
         )
-    conn.execute("""--sql
+    conn.execute(f"""--sql
         CREATE OR REPLACE TABLE crosswalk AS
         SELECT c.*, c.overlap / g.area AS gaul_share, c.overlap / o.area AS other_share
         FROM crosswalk c
-        JOIN entities g ON g.source = 'gaul' AND g.id = c.gaul_id
+        JOIN entities g ON g.source = '{BASELINE}' AND g.id = c.gaul_id
         JOIN entities o ON o.source = c.source AND o.id = c.other_id
         WHERE c.overlap > 0
     """)
 
 
-def _write(conn: DuckDBPyConnection, table: str) -> None:
-    out = register_dir / f"{table}.parquet"
-    conn.execute(f"COPY \"{table}\" TO '{out}' (FORMAT PARQUET, COMPRESSION ZSTD)")
-    n = conn.execute(f'SELECT count(*) FROM "{table}"').fetchall()[0][0]
-    logger.info("%s: %d rows", table, n)
-
-
 def main() -> None:
     """Build and write the crosswalk."""
     register_dir.mkdir(parents=True, exist_ok=True)
-    db = tmp_dir / "register.duckdb"
-    db.unlink(missing_ok=True)
-    conn = connect(db)
-    conn.execute("LOAD spatial")
+    conn = open_db(tmp_dir / "register.duckdb")
     _entities(conn)
     _crosswalk(conn)
-    _write(conn, "crosswalk")
+    write_parquet(
+        conn, "SELECT * FROM crosswalk", register_dir / "crosswalk.parquet", geo=False
+    )
     conn.close()

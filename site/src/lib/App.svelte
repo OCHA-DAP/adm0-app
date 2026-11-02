@@ -1,285 +1,295 @@
 <script lang="ts">
-  import "maplibre-gl/dist/maplibre-gl.css";
-  import * as maplibregl from "maplibre-gl";
-  import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
-  import { Protocol } from "pmtiles";
+  import { untrack } from "svelte";
   import AttributesTable from "$lib/AttributesTable.svelte";
-  import { LAYERS } from "$lib/layers";
-  import { buildStyle } from "$lib/map/style";
-  import { unlock } from "$lib/unlock";
-  import { MAP_DISCLAIMER } from "$lib/utils/mapDisclaimer";
+  import { CompareState, type View } from "$lib/compare.svelte";
+  import ComparePanel from "$lib/components/ComparePanel.svelte";
+  import GlobeMap from "$lib/components/GlobeMap.svelte";
+  import HitsPanel from "$lib/components/HitsPanel.svelte";
+  import PasswordGate from "$lib/components/PasswordGate.svelte";
+  import { itemTitle, mergeItems, prepareItems, unionBox, type AttributeRow, type GeometryList, type ItemRow, type Part } from "$lib/attributes";
+  import { layerFor } from "$lib/layers";
 
-  const STORAGE_KEY = "adm0-site-password";
-
-  maplibregl.setWorkerUrl(workerUrl);
-
-  interface Hit {
-    layerId: string;
-    label: string;
-    color: string;
-    properties: Record<string, unknown>;
-  }
+  type Tab = "map" | "split" | "table";
+  const TABS: { id: Tab; label: string }[] = [
+    { id: "map", label: "Map" },
+    { id: "split", label: "Geometry" },
+    { id: "table", label: "Attributes" },
+  ];
 
   let tilesBase = $state<string | null>(null);
-  let password = $state("");
-  let error = $state(false);
-  let visible = $state(Object.fromEntries(LAYERS.map((l) => [l.id, l.visible])));
-  let hits = $state<Hit[]>([]);
-  let container = $state<HTMLDivElement>();
-  let tab = $state<"map" | "table">("map");
-  let map: maplibregl.Map | null = null;
-
-  async function tryUnlock(value: string, remember: boolean) {
-    const url = await unlock(value);
-    if (url) {
-      if (remember) sessionStorage.setItem(STORAGE_KEY, value);
-      tilesBase = url;
-    }
-    return url !== null;
-  }
-
-  async function submit(event: SubmitEvent) {
-    event.preventDefault();
-    error = !(await tryUnlock(password, true));
-  }
+  const startTab = TABS.find((t) => t.id === new URLSearchParams(import.meta.env.DEV ? location.search : "").get("tab"))?.id ?? "map";
+  let tab = $state<Tab>(startTab);
+  const compare = new CompareState();
+  let rows = $state.raw<AttributeRow[]>([]);
+  let items = $state.raw<ItemRow[]>([]);
+  const merged = $derived(mergeItems(items, compare.pair.a, compare.pair.b));
+  // The map draws only the differences the Geometry pane lists, and both kinds otherwise.
+  let list = $state<GeometryList>("land");
+  const diffKind = $derived(tab !== "split" ? null : list);
+  const listItems = $derived(diffKind ? merged.filter((r) => r.list === diffKind).flatMap((r) => r.items ?? []) : null);
+  let failed = $state(false);
 
   $effect(() => {
-    const saved = sessionStorage.getItem(STORAGE_KEY);
-    if (saved) tryUnlock(saved, false);
+    if (!tilesBase) return;
+    const load = (name: string) => fetch(`${tilesBase}/${name}`).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
+    load("attributes.json")
+      .then((data: AttributeRow[]) => (rows = data))
+      .catch(() => (failed = true));
+    load("items.json")
+      .then((data: ItemRow[]) => (items = prepareItems(data)))
+      .catch(() => (items = []));
   });
 
+  // View state lives in the URL in dev only; written after unlock so the password page URL stays bare.
   $effect(() => {
-    if (!tilesBase || !container) return;
-    const protocol = new Protocol();
-    maplibregl.addProtocol("pmtiles", protocol.tile);
-    const m = new maplibregl.Map({
-      container,
-      style: buildStyle(tilesBase),
-      center: [20, 10],
-      zoom: 2,
-      hash: true,
-      attributionControl: { compact: true, customAttribution: MAP_DISCLAIMER },
-    });
-    m.addControl(new maplibregl.NavigationControl(), "top-right");
-    m.on("click", (e) => {
-      const ids = LAYERS.filter((l) => visible[l.id]).flatMap((l) =>
-        l.kind === "polygon" ? [`${l.id}-fill`] : [`${l.id}-line`],
-      );
-      const pad = 3;
-      const features = m.queryRenderedFeatures(
-        [
-          [e.point.x - pad, e.point.y - pad],
-          [e.point.x + pad, e.point.y + pad],
-        ],
-        { layers: ids },
-      );
-      const seen = new Set<string>();
-      hits = features.flatMap((f) => {
-        const layer = LAYERS.find((l) => l.id === f.sourceLayer);
-        const key = `${f.sourceLayer}:${JSON.stringify(f.properties)}`;
-        if (!layer || seen.has(key)) return [];
-        seen.add(key);
-        return [{ layerId: layer.id, label: layer.label, color: layer.color, properties: f.properties }];
-      });
-    });
-    map = m;
-    return () => {
-      m.remove();
-      map = null;
-      maplibregl.removeProtocol("pmtiles");
-    };
+    if (!tilesBase || !import.meta.env.DEV) return;
+    const url = new URL(location.href);
+    url.searchParams.set("tab", tab);
+    compare.writeParams(url.searchParams);
+    history.replaceState(null, "", url);
   });
 
-  function show(next: "map" | "table") {
+  function show(next: Tab) {
     tab = next;
-    if (next === "map") requestAnimationFrame(() => map?.resize());
+    // Click results belong to the Map tab; Geometry clicks pick codes and differences.
+    if (next !== "map") compare.hits = [];
   }
 
-  function toggle(id: string) {
-    visible[id] = !visible[id];
-    const layer = LAYERS.find((l) => l.id === id);
-    if (!map || !layer) return;
-    for (const suffix of layer.kind === "polygon" ? ["fill", "line"] : ["line"]) {
-      map.setLayoutProperty(`${id}-${suffix}`, "visibility", visible[id] ? "visible" : "none");
+  // The table pane's width in Geometry, which the map pads its camera by.
+  const PANE_REM = 36;
+  const inset = $derived(tab === "map" ? 0 : PANE_REM * parseFloat(getComputedStyle(document.documentElement).fontSize));
+
+  // The highlight slides under the current tab.
+  const tabButtons: HTMLButtonElement[] = [];
+  let pill = $state({ left: 0, width: 0 });
+  function placePill() {
+    const b = tabButtons[TABS.findIndex((t) => t.id === tab)];
+    if (b) pill = { left: b.offsetLeft, width: b.offsetWidth };
+  }
+  $effect(() => {
+    if (!tilesBase) return;
+    void tab;
+    placePill();
+    document.fonts.ready.then(placePill);
+  });
+
+  const drawn = $derived((["a", "b"] as const).map((slot) => layerFor(compare.pair[slot], "polygon").id));
+
+  // Sources can share a code for different places, so frame only the shown sources' parts.
+  function shownBox(row: AttributeRow): number[] | null {
+    const layers = compare.view === "a" ? [drawn[0]] : compare.view === "b" ? [drawn[1]] : drawn;
+    const boxes = (row.parts ?? []).filter((p) => layers.includes(p.layer)).map((p) => p.bbox);
+    if (!boxes.length) return row.bbox;
+    return unionBox(boxes);
+  }
+
+  // A code restored from a dev URL has no bbox until the rows arrive.
+  $effect(() => {
+    const restored = compare.focus;
+    if (!restored || restored.bbox || !rows.length) return;
+    const row = rows.find((r) => r.iso3 === restored.iso3);
+    const bbox = row && shownBox(row);
+    // A code with no geometry stays unframed; refocusing it with a null bbox would retrigger this effect.
+    if (bbox) compare.focusOn(restored.iso3, bbox, [], false);
+  });
+
+  function focus(row: AttributeRow, parts: Part[] = [], fly = true) {
+    compare.focusOn(row.iso3, shownBox(row), parts, fly);
+    if (tab === "table") show("split");
+  }
+
+  // A picked part shows its source alone, and a difference or a code in Voronoi shows in Fade;
+  // the view picked before them returns once the table's pick is cleared.
+  let viewBefore: View | null = null;
+  function borrowView(next: View) {
+    viewBefore ??= compare.view;
+    compare.setView(next);
+  }
+  function restoreView() {
+    if (!viewBefore) return;
+    const back = viewBefore;
+    viewBefore = null;
+    untrack(() => compare.setView(back));
+  }
+  $effect(() => {
+    if (!compare.item && !compare.focus) restoreView();
+  });
+
+  // A focused difference of the other kind clears when the list switches.
+  $effect(() => {
+    const kind = list;
+    untrack(() => {
+      const row = compare.item && merged.find((it) => it.item === compare.item!.ids[0]);
+      if (row && row.list !== kind) compare.item = null;
+    });
+  });
+
+  function focusFromTable(row: AttributeRow) {
+    if (compare.mode === "voronoi") borrowView("fade");
+    else restoreView();
+    focus(row);
+  }
+
+  function focusItem(row: ItemRow, label: string) {
+    borrowView("fade");
+    compare.focusItem(row, label);
+    if (tab === "table") show("split");
+  }
+
+  function pickItem(id: string | null) {
+    const row = id ? merged.find((it) => it.items?.includes(id)) : null;
+    if (!row || (diffKind && row.list !== list)) {
+      compare.item = null;
+      return;
     }
+    borrowView("fade");
+    compare.focusItem(row, itemTitle(row), false);
   }
 
-  const groups = [...new Set(LAYERS.map((l) => l.group))];
+  // A map click narrows to the clicked feature only when its source splits the code.
+  function pick(iso3: string, layer: string, name: string) {
+    const row = rows.find((r) => r.iso3 === iso3);
+    if (!row) return;
+    const own = (row.parts ?? []).filter((p) => p.layer === layer);
+    const part = own.length > 1 ? (own.find((p) => p.name === name) ?? null) : null;
+    // A click inside the focused code keeps its picked part unless it lands on another one.
+    if (!part && compare.focus?.iso3 === iso3) return;
+    focus(row, part ? [part] : [], false);
+  }
 </script>
 
 {#if !tilesBase}
-  <form class="gate" onsubmit={submit}>
-    <label>
-      Password
-      <!-- svelte-ignore a11y_autofocus -->
-      <input type="password" bind:value={password} autofocus />
-    </label>
-    <button type="submit">Open</button>
-    {#if error}<p class="error">Incorrect password.</p>{/if}
-  </form>
+  <PasswordGate onunlock={(url) => (tilesBase = url)} />
 {:else}
   <div class="app">
-    <nav>
-      <button class:active={tab === "map"} onclick={() => show("map")}>Map</button>
-      <button class:active={tab === "table"} onclick={() => show("table")}>Names and attributes</button>
-    </nav>
-    <div class="view" class:hidden={tab !== "map"}>
-    <aside>
-      {#each groups as group (group)}
-        <h2>{group}</h2>
-        {#each LAYERS.filter((l) => l.group === group) as layer (layer.id)}
-          <label class="layer">
-            <input type="checkbox" checked={visible[layer.id]} onchange={() => toggle(layer.id)} />
-            <span class="swatch {layer.kind}" style:--color={layer.color}></span>
-            {layer.label}
-          </label>
+    <header class="bar">
+      <span class="title">Boundary comparison</span>
+      <nav aria-label="Views">
+        <span class="pill" style:transform="translateX({pill.left}px)" style:width="{pill.width}px"></span>
+        {#each TABS as t, i (t.id)}
+          <button bind:this={tabButtons[i]} aria-current={tab === t.id ? "page" : undefined} onclick={() => show(t.id)}>{t.label}</button>
         {/each}
-      {/each}
-      <h2>At this point</h2>
-      {#if hits.length === 0}
-        <p class="hint">Click the map to compare what each visible source says here.</p>
-      {/if}
-      {#each hits as hit, i (i)}
-        <section class="hit">
-          <h3><span class="swatch" style:--color={hit.color}></span>{hit.label}</h3>
-          <table>
-            <tbody>
-              {#each Object.entries(hit.properties) as [key, value] (key)}
-                <tr><th>{key}</th><td>{value}</td></tr>
-              {/each}
-            </tbody>
-          </table>
-        </section>
-      {/each}
-    </aside>
-    <div class="map" bind:this={container}></div>
+      </nav>
+    </header>
+    <div class="views" style:--pane="{PANE_REM}rem" style:--shift={tab === "map" ? "100%" : tab === "split" ? `calc(100% - ${PANE_REM}rem)` : "0%"}>
+      <div class="view map">
+        <GlobeMap {tilesBase} {compare} active={tab !== "table"} hits={tab === "map"} {inset} {listItems} onpick={pick} onitempick={pickItem} />
+        <HitsPanel {compare} {inset} />
+        <ComparePanel {compare} />
+      </div>
+      <div class="view table" class:open={tab !== "map"}>
+        <div class="slide" class:full={tab === "table"}>
+          <AttributesTable {rows} items={merged} {failed} focus={compare.focus} item={compare.item} pair={compare.pair} split={tab === "split"} bind:list onfocus={focusFromTable} onitem={focusItem} />
+        </div>
+      </div>
     </div>
-    {#if tab === "table"}
-      <div class="view"><AttributesTable {tilesBase} /></div>
-    {/if}
   </div>
 {/if}
 
 <style>
-  .gate {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    width: 18rem;
-    margin: 20vh auto;
-  }
-  .gate label {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-  .gate input,
-  .gate button {
-    padding: 0.5rem;
-    font-size: 1rem;
-  }
-  .gate button {
-    background: var(--cd-ocha-blue);
-    color: var(--cd-white, #fff);
-    border: 0;
-    cursor: pointer;
-  }
-  .error {
-    color: var(--cd-red--aa);
-    margin: 0;
-  }
   .app {
     display: flex;
     flex-direction: column;
     height: 100vh;
   }
-  nav {
+  .bar {
     display: flex;
-    border-bottom: 1px solid var(--cd-grey--400);
+    flex-shrink: 0;
+    gap: 1rem;
+    justify-content: space-between;
+    align-items: center;
+    height: 3.5rem;
+    padding: 0 1.5rem;
+    background: var(--cd-white);
+    border-bottom: 1px solid var(--brand-grey--border);
+  }
+  .title {
+    font-family: var(--brand-font-heading);
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--brand-primary--text);
+  }
+  nav {
+    position: relative;
+    display: flex;
+    padding: 3px;
+    border-radius: 999px;
+    background: var(--cd-grey--300);
+  }
+  .pill {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    left: 0;
+    border-radius: 999px;
+    background: var(--brand-primary--text);
+    transition:
+      transform 250ms cubic-bezier(0.2, 0, 0, 1),
+      width 250ms cubic-bezier(0.2, 0, 0, 1);
   }
   nav button {
-    padding: 0.6rem 1rem;
+    position: relative;
+    padding: 0.3rem 0.9rem;
     border: 0;
-    border-bottom: 3px solid transparent;
     background: none;
-    font-size: 0.875rem;
+    color: var(--cd-grey--800);
+    font-size: 0.85rem;
+    font-weight: 500;
+    white-space: nowrap;
     cursor: pointer;
+    transition: color 250ms;
   }
-  nav button.active {
-    border-bottom-color: var(--cd-ocha-blue);
-    font-weight: 600;
+  nav button:hover:not([aria-current]) {
+    color: var(--brand-primary--dark);
   }
+  nav button[aria-current="page"] {
+    color: var(--cd-white);
+  }
+  .views {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+  /* Keeps the map's floating panels beneath the sliding table. */
   .view {
     display: flex;
     flex: 1;
+    min-width: 0;
     min-height: 0;
   }
-  .view > :global(.table-view) {
+  .view.map {
+    position: absolute;
+    inset: 0;
+    isolation: isolate;
+  }
+  /* The table pane slides over the full-width map with a transform, so nothing re-lays out mid-slide. */
+  .view.table {
+    position: absolute;
+    inset: 0;
+    background: var(--cd-white);
+    transform: translateX(var(--shift));
+    transition: transform 300ms cubic-bezier(0.2, 0, 0, 1);
+    will-change: transform;
+  }
+  .view.table.open {
+    border-left: 1px solid var(--cd-grey--400);
+  }
+  .slide {
+    display: flex;
+    width: var(--pane);
+  }
+  .slide.full {
+    width: 100%;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pill,
+    .view.table {
+      transition: none;
+    }
+  }
+  .slide > :global(.table-view) {
     flex: 1;
     min-width: 0;
-  }
-  .hidden {
-    display: none;
-  }
-  aside {
-    width: 22rem;
-    overflow-y: auto;
-    padding: 1rem;
-    border-right: 1px solid var(--cd-grey--400);
-    font-size: 0.875rem;
-  }
-  h2 {
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    color: var(--cd-grey--700);
-    margin: 1rem 0 0.25rem;
-  }
-  .layer {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.15rem 0;
-    cursor: pointer;
-  }
-  .swatch {
-    display: inline-block;
-    width: 0.9rem;
-    height: 0.9rem;
-    margin-right: 0.3rem;
-    border: 2px solid var(--color);
-    background: color-mix(in srgb, var(--color) 15%, transparent);
-    vertical-align: middle;
-  }
-  .swatch.line {
-    height: 0;
-    border-width: 2px 0 0;
-  }
-  .hint {
-    color: var(--cd-grey--700);
-  }
-  .hit h3 {
-    font-size: 0.875rem;
-    margin: 0.75rem 0 0.25rem;
-  }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.75rem;
-  }
-  th,
-  td {
-    text-align: left;
-    vertical-align: top;
-    padding: 0.15rem 0.3rem;
-    border-bottom: 1px solid var(--cd-grey--300);
-    word-break: break-word;
-  }
-  th {
-    color: var(--cd-grey--700);
-    font-weight: 400;
-    width: 40%;
-  }
-  .map {
-    flex: 1;
   }
 </style>

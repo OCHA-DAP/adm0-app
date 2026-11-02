@@ -1,75 +1,166 @@
-// Column groups for attributes.json from pipeline/attributes.py; each column is `${group}_${source}`.
+import { LAYERS, SOURCES as MAP_SOURCES } from "$lib/layers";
+
+// Columns in attributes.json from pipeline/attributes.py are `${group}_${source}`; map sources keep their map label.
 export const SOURCES: Record<string, string> = {
-  gaul: "GAUL",
-  ungeodata: "UN Geodata",
-  fieldmaps: "fieldmaps",
-  wp: "World Polygons",
-  unterm: "UNTERM",
+  ...Object.fromEntries(LAYERS.map((l) => [l.source, l.label])),
   m49: "M49",
+  unterm: "UNTERM",
 };
 
 export interface AttributeGroup {
   key: string;
   label: string;
   sources: string[];
-  compare: boolean;
 }
 
-// Status and region use different vocabularies per source, so only a source pair compares them.
-export const GROUPS: AttributeGroup[] = [
-  { key: "name", label: "Name", sources: ["gaul", "ungeodata", "fieldmaps", "wp", "unterm", "m49"], compare: true },
-  { key: "mapcode", label: "Map code", sources: ["gaul"], compare: false },
-  { key: "sovereign", label: "Sovereign", sources: ["ungeodata", "fieldmaps"], compare: true },
-  { key: "status", label: "Status", sources: ["ungeodata", "fieldmaps", "wp", "unterm"], compare: false },
-  { key: "region", label: "Region", sources: ["gaul", "ungeodata", "fieldmaps", "m49"], compare: false },
+const GROUP_LABELS = [
+  { key: "name", label: "Name" },
+  { key: "mapname", label: "Label" },
+  { key: "count", label: "Features" },
+  { key: "sovereign", label: "Sovereign" },
+  { key: "status", label: "Status" },
+  { key: "region", label: "Region" },
 ];
 
-// Sources that publish their own entity list, as opposed to M49 which shares the ref table with UNTERM.
-const ENTITY_SOURCES = ["gaul", "ungeodata", "fieldmaps", "wp", "unterm"];
-
-export const DIFF_TYPES = {
-  any: "Any difference",
-  differs: "Value differs",
-  missing: "Missing from a source",
-  several: "Several features under one code",
-  only: "Code in only one source",
-  none: "No differences",
-  all: "All rows",
-} as const;
-export type DiffType = keyof typeof DIFF_TYPES;
-type DiffKind = "differs" | "missing" | "several" | "only";
-
-export interface Lens {
-  group: string;
-  diff: DiffType;
-  pair: string;
-  status: string;
-  region: string;
-  sovereign: string;
-  query: string;
+// Each group covers the sources the pipeline wrote a column for.
+export function attributeGroups(row: AttributeRow | undefined): AttributeGroup[] {
+  return GROUP_LABELS.map((g) => ({ ...g, sources: row ? Object.keys(SOURCES).filter((s) => `${g.key}_${s}` in row) : [] }));
 }
 
-export type AttributeRow = Record<string, string | number | null>;
+export type DiffType = "differs" | "all";
 
-export function value(row: AttributeRow, group: string, source: string): string {
+// One feature of a code in one source; s is the attributes source, layer its polygon tile layer,
+// name the map label tiles match on, label the map label or else the source's name.
+export interface Part {
+  s: string;
+  id: string;
+  layer: string;
+  name: string;
+  label: string | null;
+  bbox: number[];
+}
+
+// bbox is [west, south, east, north]; east can pass 180 for codes across the antimeridian.
+export interface AttributeRow {
+  iso3: string;
+  bbox: number[] | null;
+  parts: Part[] | null;
+  [column: string]: unknown;
+}
+
+export function value(row: AttributeRow | ItemRow, group: string, source: string): string {
   return String(row[`${group}_${source}`] ?? "").trim();
 }
 
-// Facets take the UN view first and fall back to fieldmaps, which follows it.
-export const FACETS = {
-  status: { label: "Status (UN Geodata)", get: (r: AttributeRow) => value(r, "status", "ungeodata") || value(r, "status", "fieldmaps") },
-  region: { label: "Region (M49)", get: (r: AttributeRow) => value(r, "region", "m49") || value(r, "region", "fieldmaps") },
-  sovereign: { label: "Sovereign (UN Geodata)", get: (r: AttributeRow) => value(r, "sovereign", "ungeodata") || value(r, "sovereign", "fieldmaps") },
-} as const;
-export type Facet = keyof typeof FACETS;
-export const NONE = "(none)";
+// sources limits the table to those sources; empty means all. ref is the source cells are compared
+// against, or unset for the majority.
+export type Filter = { group: string; diff: DiffType; sources: string[]; query: string; ref?: string };
+export const DEFAULT_FILTER: Filter = {
+  group: "name",
+  diff: "differs",
+  sources: [],
+  query: "",
+};
 
-export function groupsInScope(lens: Lens): AttributeGroup[] {
-  return lens.group ? GROUPS.filter((g) => g.key === lens.group) : GROUPS;
+export type ItemType = "island" | "land" | "no_land";
+
+// The Geometry pane's lists: differences split by kind.
+export type GeometryList = "islands" | "unmapped" | "land";
+
+// A geometry difference from items.json; title is its smallest entity's name, and pairs are the
+// map's source pairs it has patches in, and mapped those where both sources hold a polygon at
+// its islands. items lists the differences merged into this row, list the one list it shows in.
+export interface ItemRow {
+  item: string;
+  items?: string[];
+  title: string | null;
+  type: ItemType;
+  same_code: boolean;
+  missing: string[] | null;
+  islands: number | null;
+  km2: number | null;
+  bbox: number[] | null;
+  pairs: string[] | null;
+  mapped: string[] | null;
+  list?: GeometryList;
+  entities?: Record<string, [unknown, unknown][]>;
+  [column: string]: unknown;
 }
 
-export function sourcesFor(group: AttributeGroup, lens: Lens): string[] {
-  return lens.pair ? group.sources.filter((s) => s === "gaul" || s === lens.pair) : group.sources;
+// Item tables compare each source's entity as "CODE name".
+export const ENTITY: AttributeGroup = { key: "entity", label: "Territory", sources: MAP_SOURCES };
+
+export function prepareItems(items: ItemRow[]): ItemRow[] {
+  for (const row of items) {
+    for (const s of MAP_SOURCES) row[`entity_${s}`] = [row[`code_${s}`], row[`name_${s}`]].filter(Boolean).join(" ");
+  }
+  return items;
+}
+
+// A source's own text: the title, else the first code for items no source names.
+export function itemTitle(row: ItemRow): string {
+  const code = MAP_SOURCES.map((s) => row[`code_${s}`]).find(Boolean);
+  return row.title?.trim() || String(code ?? row.item);
+}
+
+// One box around all boxes; across the antimeridian, western boxes move east by 360 when that is narrower.
+export function unionBox(boxes: number[][]): number[] {
+  const union = (bs: number[][]) => [Math.min(...bs.map((b) => b[0])), Math.min(...bs.map((b) => b[1])), Math.max(...bs.map((b) => b[2])), Math.max(...bs.map((b) => b[3]))];
+  const plain = union(boxes);
+  const east = union(boxes.map((b) => (b[2] <= 0 ? [b[0] + 360, b[1], b[2] + 360, b[3]] : b)));
+  return plain[2] - plain[0] <= Math.max(180, east[2] - east[0]) ? plain : east;
+}
+
+// All of a and b's differences between the same two entities, either way round, share one cause, so
+// they merge into one row in one list: land over mapped islands over unmapped islands.
+export function mergeItems(items: ItemRow[], a: string, b: string): ItemRow[] {
+  const pair = [a, b].sort().join("|");
+  const rows = new Map<string, ItemRow>();
+  const entity = (it: ItemRow, s: string) => [it[`code_${s}`], it[`name_${s}`]].join("|");
+  const own = (it: ItemRow) => Object.fromEntries([a, b].map((s) => [s, [[it[`code_${s}`], it[`name_${s}`]] as [unknown, unknown]]]));
+  // A no_land entity exists in one source only, so it counts when A or B holds it.
+  const relevant = items.filter((it) => (it.type === "no_land" ? [a, b].some((s) => it[`entity_${s}`]) : it.pairs?.includes(pair)));
+  for (const it of relevant) {
+    const key = [entity(it, a), entity(it, b)].sort().join("||");
+    const list: GeometryList = it.type !== "island" ? "land" : it.mapped?.includes(pair) ? "islands" : "unmapped";
+    const row = rows.get(key);
+    if (!row) {
+      rows.set(key, { ...it, items: [it.item], list, entities: own(it) });
+      continue;
+    }
+    row.items!.push(it.item);
+    const boxes = [row.bbox, it.bbox].filter((x): x is number[] => !!x);
+    row.bbox = boxes.length ? unionBox(boxes) : null;
+    row.pairs = [...new Set([...(row.pairs ?? []), ...(it.pairs ?? [])])];
+    row.km2 = (row.km2 ?? 0) + (it.km2 ?? 0);
+    row.islands = (row.islands ?? 0) + (it.islands ?? 0) || null;
+    for (const s of [a, b]) {
+      const ents = row.entities![s];
+      if (!ents.some(([c, n]) => c === it[`code_${s}`] && n === it[`name_${s}`])) ents.push([it[`code_${s}`], it[`name_${s}`]]);
+    }
+    if (list === "land" && row.list !== "land") row.type = it.type;
+    if (list === "land" || (list === "islands" && row.list === "unmapped")) row.list = list;
+  }
+  // Two-way rows show each source's territories together.
+  for (const row of rows.values()) {
+    for (const s of [a, b]) {
+      const ents = row.entities![s];
+      if (ents.length < 2) continue;
+      const join = (vs: unknown[]) => [...new Set(vs.filter(Boolean))].join(", ");
+      row[`code_${s}`] = join(ents.map(([c]) => c));
+      row[`name_${s}`] = join(ents.map(([, n]) => n));
+      row[`entity_${s}`] = join(ents.map(([c, n]) => [c, n].filter(Boolean).join(" ")));
+    }
+  }
+  return [...rows.values()];
+}
+
+export function groupsInScope(groups: AttributeGroup[], filter: Filter): AttributeGroup[] {
+  return filter.group ? groups.filter((g) => g.key === filter.group) : groups;
+}
+
+export function sourcesFor(group: AttributeGroup, filter: Filter): string[] {
+  return filter.sources.length ? group.sources.filter((s) => filter.sources.includes(s)) : group.sources;
 }
 
 export const TIE = Symbol("tie");
@@ -90,30 +181,37 @@ export function majority(
   return first[1] === second[1] ? TIE : first[0];
 }
 
-function diffKinds(row: AttributeRow, lens: Lens): Set<DiffKind> {
-  const kinds = new Set<DiffKind>();
-  const scoped = new Set<string>();
-  for (const group of groupsInScope(lens)) {
-    const sources = sourcesFor(group, lens);
-    sources.forEach((s) => scoped.add(s));
-    if (sources.length < 2) continue;
-    const present = sources.map((s) => value(row, group.key, s)).filter(Boolean);
-    if (present.length > 0 && present.length < sources.length) kinds.add("missing");
-    if ((lens.pair || group.compare) && new Set(present).size > 1) kinds.add("differs");
+// Sources whose value is marked as differing: from ref's value when ref is in scope, else from the majority.
+export function marked(row: AttributeRow | ItemRow, group: AttributeGroup, sources: string[], ref = ""): Set<string> {
+  const out = new Set<string>();
+  if (ref && sources.includes(ref)) {
+    const base = value(row as AttributeRow, group.key, ref);
+    for (const s of sources) {
+      const v = value(row as AttributeRow, group.key, s);
+      if (s !== ref && v && base && v !== base) out.add(s);
+    }
+    return out;
   }
-  if ([...scoped].some((s) => Number(row[`count_${s}`] ?? 0) > 1)) kinds.add("several");
-  const entities = ENTITY_SOURCES.filter((s) => scoped.has(s));
-  if (entities.length > 1 && entities.filter((s) => Number(row[`count_${s}`] ?? 0) > 0).length === 1) {
-    kinds.add("only");
+  const top = majority(row as AttributeRow, group, sources);
+  if (top === null) return out;
+  for (const s of sources) {
+    const v = value(row as AttributeRow, group.key, s);
+    if (v && (sources.length === 2 || top === TIE || v !== top)) out.add(s);
   }
-  return kinds;
+  return out;
 }
 
-// Rows are loaded once and never mutated, so per-row derived values are cached for the option counts.
+function differs(row: AttributeRow, groups: AttributeGroup[], filter: Filter): boolean {
+  return groupsInScope(groups, filter).some((group) => {
+    const sources = sourcesFor(group, filter);
+    return sources.length >= 2 && marked(row, group, sources, filter.ref).size > 0;
+  });
+}
+
+// Rows are loaded once and never mutated, so per-row derived values are cached.
 interface RowCache {
   haystack: string;
-  facets: Record<Facet, string>;
-  kinds: Map<string, Set<DiffKind>>;
+  differs: Map<string, boolean>;
 }
 const cache = new WeakMap<AttributeRow, RowCache>();
 
@@ -124,29 +222,21 @@ function cached(row: AttributeRow): RowCache {
       haystack: Object.values(row)
         .map((v) => String(v ?? "").toLowerCase())
         .join("\n"),
-      facets: Object.fromEntries(
-        (Object.keys(FACETS) as Facet[]).map((f) => [f, FACETS[f].get(row) || NONE]),
-      ) as Record<Facet, string>,
-      kinds: new Map(),
+      differs: new Map(),
     };
     cache.set(row, c);
   }
   return c;
 }
 
-export function matches(row: AttributeRow, lens: Lens): boolean {
-  const c = cached(row);
-  for (const facet of Object.keys(FACETS) as Facet[]) {
-    if (lens[facet] && c.facets[facet] !== lens[facet]) return false;
+export function matches(row: AttributeRow | ItemRow, groups: AttributeGroup[], filter: Filter): boolean {
+  const c = cached(row as AttributeRow);
+  if (filter.diff !== "all") {
+    const key = `${filter.group}|${filter.sources.join()}|${filter.ref ?? ""}`;
+    let hit = c.differs.get(key);
+    if (hit === undefined) c.differs.set(key, (hit = differs(row as AttributeRow, groups, filter)));
+    if (!hit) return false;
   }
-  if (lens.diff !== "all") {
-    const key = `${lens.group}|${lens.pair}`;
-    let kinds = c.kinds.get(key);
-    if (!kinds) c.kinds.set(key, (kinds = diffKinds(row, lens)));
-    if (lens.diff === "any" ? kinds.size === 0 : lens.diff === "none" ? kinds.size > 0 : !kinds.has(lens.diff)) {
-      return false;
-    }
-  }
-  const q = lens.query.trim().toLowerCase();
+  const q = filter.query.trim().toLowerCase();
   return !q || c.haystack.includes(q);
 }

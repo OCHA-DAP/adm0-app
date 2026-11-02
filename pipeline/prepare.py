@@ -3,10 +3,14 @@
 import html
 import re
 from logging import getLogger
+from typing import TYPE_CHECKING
 
-from duckdb import DuckDBPyConnection, connect
+from .config import download_dir, input_dir, open_db, prepare_dir, write_parquet
 
-from .config import CRS, PARQUET_OPTS, download_dir, input_dir, prepare_dir
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from duckdb import DuckDBPyConnection
 
 logger = getLogger(__name__)
 
@@ -16,17 +20,35 @@ UNTERM_STATUS = {
     1: "Observer State",
     2: "Member of specialized agencies",
 }
+UNGEODATA_STATUS = {
+    0: "Antarctica",
+    1: "State",
+    2: "Occupied Palestinian Territory",
+    3: "Non-Self-Governing Territory",
+    4: "Territory",
+    5: "Special Region or Province",
+    99: "Undetermined",
+}
+# Line types from the UN Guidelines for the Publication of Maps, as line_type.
+UNGEODATA_LINE_TYPE = {
+    2: "special",
+    3: "armistice",
+    4: "separation",
+    8: "autonomous",
+    9: "sovereign",
+}
+LSIB_LINE_TYPE = """CASE WHEN label LIKE '%Line of Control%' THEN 'separation'
+    WHEN status = 'Special Line' THEN 'special'
+    WHEN status = 'Other Line of International Separation' THEN 'armistice'
+    ELSE 'international' END AS line_type"""
 
 
 def _copy(conn: DuckDBPyConnection, query: str, name: str) -> None:
-    out = prepare_dir / f"{name}.parquet"
-    conn.execute(f"""--sql
-        COPY (SELECT * REPLACE (ST_SetCRS(geometry, '{CRS}') AS geometry)
-              FROM ({query}))
-        TO '{out}' {PARQUET_OPTS}
-    """)
-    n = conn.execute(f"SELECT count(*) FROM read_parquet('{out}')").fetchall()[0][0]
-    logger.info("%s: %d rows", name, n)
+    write_parquet(conn, query, prepare_dir / f"{name}.parquet")
+
+
+def _strip_stars(s: str) -> str:
+    return re.sub(r"\s*\*+$", "", s)
 
 
 def gaul(conn: DuckDBPyConnection) -> None:
@@ -50,7 +72,7 @@ def gaul(conn: DuckDBPyConnection) -> None:
                END AS gaul_id,
                * EXCLUDE geometry, geometry
         FROM (
-            SELECT {attrs}, count(*) AS gaul1_count,
+            SELECT {attrs},
                    ST_Multi(ST_CollectionExtract(
                        ST_MakeValid(ST_Union_Agg(geom)), 3)) AS geometry
             FROM gaul_l1 GROUP BY ALL
@@ -61,42 +83,74 @@ def gaul(conn: DuckDBPyConnection) -> None:
     )
 
 
-def lsib(conn: DuckDBPyConnection) -> None:
-    """Copy LSIB boundary lines."""
-    path = download_dir / "lsib/LSIB.gpkg"
+def gaul_lines(conn: DuckDBPyConnection) -> None:
+    """Derive GAUL L0 boundary lines from edges shared by neighbouring polygons."""
+    path = prepare_dir / "gaul_l0.parquet"
+    conn.execute(f"""--sql
+        CREATE TEMP TABLE gaul_boundary AS
+        SELECT gaul_id, ISO3_CODE, GAUL0_NAME, ST_Boundary(geometry) AS boundary,
+               ST_XMin(geometry) AS xmin, ST_YMin(geometry) AS ymin,
+               ST_XMax(geometry) AS xmax, ST_YMax(geometry) AS ymax
+        FROM read_parquet('{path}')
+    """)
+    conn.execute("""--sql
+        CREATE TEMP TABLE gaul_pairs AS
+        SELECT a.gaul_id AS id_1, b.gaul_id AS id_2
+        FROM gaul_boundary a JOIN gaul_boundary b ON a.gaul_id < b.gaul_id
+         AND a.xmin <= b.xmax AND b.xmin <= a.xmax
+         AND a.ymin <= b.ymax AND b.ymin <= a.ymax
+    """)
+    _copy(
+        conn,
+        """--sql
+        SELECT * FROM (
+            SELECT a.gaul_id AS gaul_id_1, a.ISO3_CODE AS iso3_1,
+                   a.GAUL0_NAME AS name_1, b.gaul_id AS gaul_id_2,
+                   b.ISO3_CODE AS iso3_2, b.GAUL0_NAME AS name_2,
+                   ST_LineMerge(ST_CollectionExtract(
+                       ST_Intersection(a.boundary, b.boundary), 2)) AS geometry
+            FROM gaul_pairs p
+            JOIN gaul_boundary a ON a.gaul_id = p.id_1
+            JOIN gaul_boundary b ON b.gaul_id = p.id_2
+        )
+        WHERE NOT ST_IsEmpty(geometry)
+        ORDER BY gaul_id_1, gaul_id_2
+        """,
+        "gaul_lines",
+    )
+
+
+def _gpkg(
+    conn: DuckDBPyConnection, path: Path, where: str, name: str, extra: str = ""
+) -> None:
+    """Copy the one GeoPackage layer whose name matches ``where``, plus ``extra``."""
     layer = conn.execute(f"""--sql
         SELECT name FROM (
             SELECT UNNEST(layers).name AS name FROM ST_Read_Meta('{path}')
         )
-        WHERE starts_with(name, 'Department of State LSIB')
-    """).fetchall()[0][0]
+        WHERE {where}
+    """).fetchone()[0]
     _copy(
         conn,
         f"""--sql
-        SELECT * EXCLUDE (fid, geom), geom AS geometry
+        SELECT * EXCLUDE (fid, geom){extra}, geom AS geometry
         FROM ST_Read('{path}', layer='{layer}')
         """,
-        "lsib_lines",
+        name,
     )
+
+
+def lsib(conn: DuckDBPyConnection) -> None:
+    """Copy LSIB boundary lines."""
+    path = download_dir / "lsib/LSIB.gpkg"
+    where = "starts_with(name, 'Department of State LSIB')"
+    _gpkg(conn, path, where, "lsib_lines", f", {LSIB_LINE_TYPE}")
 
 
 def wp(conn: DuckDBPyConnection) -> None:
     """Copy State Department World Polygons (full resolution layer)."""
     path = next((download_dir / "wp").rglob("WorldPolygons*.gpkg"))
-    layer = conn.execute(f"""--sql
-        SELECT name FROM (
-            SELECT UNNEST(layers).name AS name FROM ST_Read_Meta('{path}')
-        )
-        WHERE regexp_full_match(name, 'DoS_WP_\\d+_\\d+')
-    """).fetchall()[0][0]
-    _copy(
-        conn,
-        f"""--sql
-        SELECT * EXCLUDE (fid, geom), geom AS geometry
-        FROM ST_Read('{path}', layer='{layer}')
-        """,
-        "wp_polygons",
-    )
+    _gpkg(conn, path, "regexp_full_match(name, 'DoS_WP_\\d+_\\d+')", "wp_polygons")
 
 
 def osm(conn: DuckDBPyConnection) -> None:
@@ -111,24 +165,46 @@ def osm(conn: DuckDBPyConnection) -> None:
 
 def _key(name: str) -> str:
     """Match UNTERM names ("Sudan (the)", "Côte d'Ivoire") to M49 names."""
-    name = re.sub(r"\s*\*+$", "", name.strip())
+    name = _strip_stars(name.strip())
     name = re.sub(r"\s*\((the|The)\)$", "", name)
     return name.replace("\N{RIGHT SINGLE QUOTATION MARK}", "'").strip().lower()
 
 
-def _m49_rows() -> list[list[str]]:
+M49_COLUMNS = (
+    "Region Name",
+    "Sub-region Name",
+    "Intermediate Region Name",
+    "Country or Area",
+    "M49 Code",
+    "ISO-alpha2 Code",
+    "ISO-alpha3 Code",
+)
+
+
+def _m49_rows() -> list[dict[str, str]]:
+    """Rows of the UNSD M49 overview table, keyed by its header names."""
     page = (download_dir / "ref/m49.html").read_text(encoding="utf-8")
     start = page.find('id="ENG_Overview"')
-    table = page[start : page.find("</table>", start)]
-    rows = []
-    for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", table, re.DOTALL):
-        cells = [
+    if start < 0:
+        msg = "M49 page has no ENG_Overview table"
+        raise ValueError(msg)
+    table = re.sub(
+        r"<!--.*?-->", "", page[start : page.find("</table>", start)], flags=re.DOTALL
+    )
+    head, *body = [
+        [
             html.unescape(re.sub("<[^>]+>", "", td)).strip()
             for td in re.findall(r"<td[^>]*>(.*?)</td>", tr, re.DOTALL)
         ]
-        if len(cells) >= 16 and cells[9].isdigit():  # noqa: PLR2004
-            rows.append(cells)
-    return rows
+        for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", table, re.DOTALL)
+    ]
+    if missing := [c for c in M49_COLUMNS if c not in head]:
+        msg = f"M49 table lacks columns: {missing}"
+        raise ValueError(msg)
+    rows = [
+        dict(zip(head, cells, strict=True)) for cells in body if len(cells) == len(head)
+    ]
+    return [r for r in rows if r["M49 Code"].isdigit()]
 
 
 def ref(conn: DuckDBPyConnection) -> None:
@@ -145,29 +221,27 @@ def ref(conn: DuckDBPyConnection) -> None:
     }
     out, used = [], set()
     for m in _m49_rows():
-        u = by_key.get(_key(m[8]))
+        u = by_key.get(_key(m["Country or Area"]))
         if u:
-            used.add(_key(m[8]))
+            used.add(_key(m["Country or Area"]))
         short = u["English short"] if u else ""
         stars = len(short.strip()) - len(short.strip().rstrip("*"))
-        clean = {
-            k: re.sub(r"\s*\*+$", "", (v or "").strip()) for k, v in (u or {}).items()
-        }
+        clean = {k: _strip_stars((v or "").strip()) for k, v in (u or {}).items()}
         out.append(
             {
-                "iso3": m[11],
-                "iso2": m[10],
-                "m49": m[9],
-                "name_m49": m[8],
+                "iso3": m["ISO-alpha3 Code"],
+                "iso2": m["ISO-alpha2 Code"],
+                "m49": m["M49 Code"],
+                "name_m49": m["Country or Area"],
                 "un_status": UNTERM_STATUS[stars] if u else "Other area",
                 **{
                     f"name_{lang[:2].lower()}_{form}": clean.get(f"{lang} {form}", "")
                     for lang in UNTERM_LANGS
                     for form in ("short", "formal")
                 },
-                "region": m[3],
-                "subregion": m[5],
-                "intermediate_region": m[7],
+                "region": m["Region Name"],
+                "subregion": m["Sub-region Name"],
+                "intermediate_region": m["Intermediate Region Name"],
             }
         )
     missing = sorted(set(by_key) - used)
@@ -181,18 +255,29 @@ def ref(conn: DuckDBPyConnection) -> None:
         f"INSERT INTO ref VALUES ({', '.join('?' * len(out[0]))})",
         [list(r.values()) for r in out],
     )
-    out_path = prepare_dir / "ref.parquet"
-    conn.execute(
-        f"COPY (SELECT * FROM ref ORDER BY iso3) TO '{out_path}' (FORMAT PARQUET)"
+    write_parquet(
+        conn, "SELECT * FROM ref ORDER BY iso3", prepare_dir / "ref.parquet", geo=False
     )
-    logger.info("ref: %d rows", len(out))
 
 
 def ungeodata(conn: DuckDBPyConnection) -> None:
-    """Copy UN Geodata 1M country polygons and boundary lines from ``inputs/``."""
-    for layer, name in (
-        ("bnda_cty", "ungeodata_polygons"),
-        ("bndl", "ungeodata_lines"),
+    """Copy UN Geodata 1M country polygons and international lines from ``inputs/``."""
+    status = " ".join(f"WHEN {k} THEN '{v}'" for k, v in UNGEODATA_STATUS.items())
+    line_type = " ".join(f"WHEN {k} THEN '{v}'" for k, v in UNGEODATA_LINE_TYPE.items())
+    # bdytyp 0 is coastline, 6 and 7 subnational, 99 other.
+    for layer, name, extra, where in (
+        (
+            "bnda_cty",
+            "ungeodata_polygons",
+            f", CASE stscod {status} END AS status_label",
+            "true",
+        ),
+        (
+            "bndl",
+            "ungeodata_lines",
+            f", CASE bdytyp {line_type} ELSE 'international' END AS line_type",
+            "bdytyp IN (1, 2, 3, 4, 8, 9)",
+        ),
     ):
         path = input_dir / f"ungeodata/{layer}.parquet"
         if not path.exists():
@@ -200,7 +285,8 @@ def ungeodata(conn: DuckDBPyConnection) -> None:
             raise FileNotFoundError(msg)
         _copy(
             conn,
-            f"SELECT * EXCLUDE globalid FROM read_parquet('{path}')",
+            f"SELECT * EXCLUDE globalid{extra} "
+            f"FROM read_parquet('{path}') WHERE {where}",
             name,
         )
 
@@ -208,13 +294,22 @@ def ungeodata(conn: DuckDBPyConnection) -> None:
 def fieldmaps(conn: DuckDBPyConnection) -> None:
     """Copy the published fieldmaps humanitarian polygons and lines."""
     for path in sorted((download_dir / "fieldmaps").glob("*.parquet")):
-        _copy(conn, f"SELECT * FROM read_parquet('{path}')", f"fieldmaps_{path.stem}")
+        # Published lines are two-point segments, which tiling drops at low zoom.
+        lines = path.stem == "lines"
+        merge = (
+            " REPLACE (ST_Multi(ST_LineMerge(geometry)) AS geometry)" if lines else ""
+        )
+        line_type = f", {LSIB_LINE_TYPE}" if lines else ""
+        _copy(
+            conn,
+            f"SELECT *{merge}{line_type} FROM read_parquet('{path}')",
+            f"fieldmaps_{path.stem}",
+        )
 
 
 def main() -> None:
     """Prepare every downloaded source."""
     prepare_dir.mkdir(parents=True, exist_ok=True)
-    conn = connect()
-    conn.execute("LOAD spatial")
-    for fn in (ref, gaul, lsib, wp, osm, ungeodata, fieldmaps):
+    conn = open_db()
+    for fn in (ref, gaul, gaul_lines, lsib, wp, osm, ungeodata, fieldmaps):
         fn(conn)
