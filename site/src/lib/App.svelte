@@ -6,8 +6,8 @@
   import GlobeMap from "$lib/components/GlobeMap.svelte";
   import HitsPanel from "$lib/components/HitsPanel.svelte";
   import PasswordGate from "$lib/components/PasswordGate.svelte";
-  import { itemTitle, mergeItems, prepareItems, unionBox, type AttributeRow, type ItemRow, type Part } from "$lib/attributes";
-  import { layerFor } from "$lib/layers";
+  import { featureRows, itemTitle, listOf, mergeItems, prepareItems, unionBox, type AttributeRow, type GeometryList, type ItemRow, type Part, sameParts } from "$lib/attributes";
+  import { LAYER_BY_ID, layerFor } from "$lib/layers";
 
   type Tab = "map" | "split" | "table";
   const TABS: { id: Tab; label: string }[] = [
@@ -23,6 +23,9 @@
   let rows = $state.raw<AttributeRow[]>([]);
   let items = $state.raw<ItemRow[]>([]);
   const merged = $derived(mergeItems(items, compare.pair.a, compare.pair.b));
+  // The map draws only the differences the Geometry pane lists, and both kinds otherwise.
+  let list = $state<GeometryList>("islands");
+  const diffKind = $derived(tab !== "split" || list === "features" ? null : list === "islands" ? "island" : "land");
   let failed = $state(false);
 
   $effect(() => {
@@ -84,11 +87,11 @@
     const restored = compare.focus;
     if (!restored || restored.bbox || !rows.length) return;
     const row = rows.find((r) => r.iso3 === restored.iso3);
-    if (row) compare.focusOn(restored.iso3, shownBox(row), null, false);
+    if (row) compare.focusOn(restored.iso3, shownBox(row), [], false);
   });
 
-  function focus(row: AttributeRow, part: Part | null = null, fly = true) {
-    compare.focusOn(row.iso3, shownBox(row), part, fly);
+  function focus(row: AttributeRow, parts: Part[] = [], fly = true) {
+    compare.focusOn(row.iso3, shownBox(row), parts, fly);
     if (tab === "table") show("split");
   }
 
@@ -109,11 +112,19 @@
     if (!compare.item && !compare.focus) restoreView();
   });
 
-  function focusFromTable(row: AttributeRow, part: Part | null = null) {
-    if (part) borrowView(part.layer === drawn[0] ? "a" : "b");
-    else if (compare.mode === "voronoi") borrowView("fade");
+  // A focused difference of the other kind clears when the list switches.
+  $effect(() => {
+    const kind = list;
+    untrack(() => {
+      const row = compare.item && merged.find((it) => it.item === compare.item!.ids[0]);
+      if (row && kind !== "features" && listOf(row.type) !== kind) compare.item = null;
+    });
+  });
+
+  function focusFromTable(row: AttributeRow, parts: Part[] = []) {
+    if (compare.mode === "voronoi") borrowView("fade");
     else restoreView();
-    focus(row, part);
+    focus(row, parts);
   }
 
   function focusItem(row: ItemRow, label: string) {
@@ -124,7 +135,7 @@
 
   function pickItem(id: string | null) {
     const row = id ? merged.find((it) => it.items?.includes(id)) : null;
-    if (!row) {
+    if (!row || (diffKind && listOf(row.type) !== list)) {
       compare.item = null;
       return;
     }
@@ -132,15 +143,27 @@
     compare.focusItem(row, itemTitle(row), false);
   }
 
+  // On the Features list a map click toggles the row holding the clicked feature, and the sea clears it.
+  function pickFeature(row: AttributeRow | undefined, layer: string, name: string) {
+    // Lines and Voronoi share their polygons' names, so the click's source finds the part.
+    const source = LAYER_BY_ID.get(layer)?.source;
+    const part = row?.parts?.find((p) => LAYER_BY_ID.get(p.layer)?.source === source && p.name === name);
+    const parts = (row && part ? featureRows(row, [compare.pair.a, compare.pair.b]).find((r) => r.includes(part)) : null)?.filter((p) => !!p) ?? [];
+    const f = compare.focus;
+    if (!row || (f?.iso3 === row.iso3 && sameParts(f.parts, parts))) compare.focus = null;
+    else focus(row, parts, false);
+  }
+
   // A map click narrows to the clicked feature only when its source splits the code.
   function pick(iso3: string, layer: string, name: string) {
     const row = rows.find((r) => r.iso3 === iso3);
+    if (tab === "split" && list === "features") return pickFeature(row, layer, name);
     if (!row) return;
     const own = (row.parts ?? []).filter((p) => p.layer === layer);
     const part = own.length > 1 ? (own.find((p) => p.name === name) ?? null) : null;
     // A click inside the focused code keeps its picked part unless it lands on another one.
     if (!part && compare.focus?.iso3 === iso3) return;
-    focus(row, part, false);
+    focus(row, part ? [part] : [], false);
   }
 </script>
 
@@ -159,13 +182,13 @@
     </header>
     <div class="views" style:--pane="{PANE_REM}rem" style:--shift={tab === "map" ? "100%" : tab === "split" ? `calc(100% - ${PANE_REM}rem)` : "0%"}>
       <div class="view map">
-        <GlobeMap {tilesBase} {compare} active={tab !== "table"} hits={tab === "map"} {inset} onpick={pick} onitempick={pickItem} />
+        <GlobeMap {tilesBase} {compare} active={tab !== "table"} hits={tab === "map"} {inset} {diffKind} onpick={pick} onitempick={pickItem} />
         <HitsPanel {compare} {inset} />
         <ComparePanel {compare} />
       </div>
       <div class="view table" class:open={tab !== "map"}>
         <div class="slide" class:full={tab === "table"}>
-          <AttributesTable {rows} items={merged} {failed} focus={compare.focus} item={compare.item} {drawn} pair={compare.pair} split={tab === "split"} onfocus={focusFromTable} onitem={focusItem} />
+          <AttributesTable {rows} items={merged} {failed} focus={compare.focus} item={compare.item} pair={compare.pair} split={tab === "split"} bind:list onfocus={focusFromTable} onitem={focusItem} />
         </div>
       </div>
     </div>

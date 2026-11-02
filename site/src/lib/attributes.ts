@@ -64,6 +64,10 @@ export const DEFAULT_FILTER: Filter = {
 
 export type ItemType = "island" | "land" | "no_land";
 
+// The Geometry pane's lists: differences split by kind, and the sources' features.
+export type GeometryList = "islands" | "land" | "features";
+export const listOf = (type: ItemType | undefined): GeometryList => (type === "island" ? "islands" : "land");
+
 // A geometry difference from items.json; title is its smallest entity's name, and pairs are the
 // map's source pairs it has patches in. items lists the differences merged into this row.
 export interface ItemRow {
@@ -96,6 +100,15 @@ export function itemTitle(row: ItemRow): string {
   return row.title?.trim() || String(code ?? row.item);
 }
 
+// A code's features side by side, row i holding each source's i-th feature; the Features list's rows.
+export function featureRows(row: AttributeRow, sources: string[]): (Part | undefined)[][] {
+  const bySource = sources.map((s) => (row.parts ?? []).filter((p) => p.s === s));
+  const n = Math.max(1, ...bySource.map((ps) => ps.length));
+  return Array.from({ length: n }, (_, i) => bySource.map((ps) => ps[i]));
+}
+
+export const sameParts = (x: Part[], y: Part[]) => x.length === y.length && x.every((p) => y.some((q) => q.id === p.id));
+
 // One box around all boxes; across the antimeridian, western boxes move east by 360 when that is narrower.
 export function unionBox(boxes: number[][]): number[] {
   const union = (bs: number[][]) => [Math.min(...bs.map((b) => b[0])), Math.min(...bs.map((b) => b[1])), Math.max(...bs.map((b) => b[2])), Math.max(...bs.map((b) => b[3]))];
@@ -104,12 +117,12 @@ export function unionBox(boxes: number[][]): number[] {
   return plain[2] - plain[0] <= Math.max(180, east[2] - east[0]) ? plain : east;
 }
 
-// Differences that a and b assign to the same two entities read as one, so they merge into one row,
-// led by the first (largest) of them.
+// Differences of one type that a and b assign to the same two entities read as one, so they merge
+// into one row, led by the first (largest) of them.
 export function mergeItems(items: ItemRow[], a: string, b: string): ItemRow[] {
   const rows = new Map<string, ItemRow>();
   for (const it of items) {
-    const key = [it.type === "no_land", it[`code_${a}`], it[`name_${a}`], it[`code_${b}`], it[`name_${b}`]].join("|");
+    const key = [it.type, it[`code_${a}`], it[`name_${a}`], it[`code_${b}`], it[`name_${b}`]].join("|");
     const row = rows.get(key);
     if (!row) {
       rows.set(key, { ...it, items: [it.item] });

@@ -7,7 +7,7 @@
   import type { CompareState, Focus, Hit, ItemFocus } from "$lib/compare.svelte";
   import { LAYER_BY_ID } from "$lib/layers";
   import { SATELLITE_PROTOCOL, satelliteTile } from "$lib/map/satellite";
-  import { DIFFERENCES, DIFF_COLOR, DIFF_FILLS, DIFF_PICK, applyBasemap, applyDifferenceFade, applyDifferences, applyDraws, applyFocus, applyOpacity, applyVoronoiFocus, buildStyle, drawFor, pickLayerIds, queryLayerId } from "$lib/map/style";
+  import { DIFFERENCES, DIFF_COLOR, FEATURE_DOTS, DIFF_FILLS, DIFF_PICK, applyBasemap, applyDifferenceFade, applyDifferences, applyDraws, applyFeatureDots, applyFocus, applyOpacity, applyVoronoiFocus, buildStyle, drawFor, pickLayerIds, queryLayerId } from "$lib/map/style";
 
   let {
     tilesBase,
@@ -15,6 +15,7 @@
     active,
     hits,
     inset,
+    diffKind,
     onpick,
     onitempick,
   }: {
@@ -23,6 +24,7 @@
     active: boolean;
     hits: boolean;
     inset: number;
+    diffKind: "island" | "land" | null;
     onpick: (iso3: string, layer: string, name: string) => void;
     onitempick: (item: string | null) => void;
   } = $props();
@@ -87,20 +89,23 @@
     });
     m.once("load", () => (loaded = true));
     m.on("click", (e) => {
-      // Without the hits panel, a Voronoi click picks the difference there, a patch before its area.
-      if (!hits && compare.mode === "voronoi") {
-        const box: [maplibregl.PointLike, maplibregl.PointLike] = [[e.point.x - CLICK_PAD, e.point.y - CLICK_PAD], [e.point.x + CLICK_PAD, e.point.y + CLICK_PAD]];
+      const box: [maplibregl.PointLike, maplibregl.PointLike] = [[e.point.x - CLICK_PAD, e.point.y - CLICK_PAD], [e.point.x + CLICK_PAD, e.point.y + CLICK_PAD]];
+      // On the Islands and Land lists, a Voronoi click picks the difference there, a patch before its area.
+      if (!hits && compare.mode === "voronoi" && diffKind) {
         const found = m.queryRenderedFeatures(box, { layers: [DIFF_PICK] }).sort((x, y) => Number(x.properties.type === "voronoi") - Number(y.properties.type === "voronoi"));
         onitempick(found[0]?.properties.item ?? null);
         return;
       }
+      const dot = !hits && m.getLayoutProperty(FEATURE_DOTS, "visibility") === "visible" ? m.queryRenderedFeatures(box, { layers: [FEATURE_DOTS] })[0] : undefined;
+      if (dot) return onpick(String(dot.properties.code), String(dot.properties.layer), String(dot.properties.name));
       // Rendered order puts later sources first; A's feature should win.
       const ids = pickLayerIds(compare.draws);
       const picked = m.queryRenderedFeatures(e.point, { layers: ids }).sort((x, y) => ids.indexOf(x.layer.id) - ids.indexOf(y.layer.id));
       const hit = picked[0];
       const layer = hit && LAYER_BY_ID.get(hit.sourceLayer);
-      // Voronoi clicks only report what each source assigns there, so the patches stay unobscured.
-      if (layer?.code && compare.mode !== "voronoi") onpick(String(hit.properties[layer.code] ?? "").toUpperCase(), layer.id, String(hit.properties[layer.name!] ?? ""));
+      // Voronoi clicks on the Map tab only report what each source assigns there, so the patches stay unobscured.
+      if (layer?.code && (compare.mode !== "voronoi" || !hits)) onpick(String(hit.properties[layer.code] ?? "").toUpperCase(), layer.id, String(hit.properties[layer.name!] ?? ""));
+      else if (!layer && !hits) onpick("", "", "");
       if (!hits) return;
       const all = query(m, e.point, picked);
       const seen = new Set<string>();
@@ -150,7 +155,7 @@
 
   $effect(() => {
     const pair = compare.mode === "voronoi" ? compare.diffPair : null;
-    if (map && loaded) applyDifferences(map, pair, compare.view === "fade", compare.draws, compare.pair.a > compare.pair.b, compare.item?.ids ?? null);
+    if (map && loaded) applyDifferences(map, pair, compare.view === "fade", compare.draws, compare.pair.a > compare.pair.b, compare.item?.ids ?? null, diffKind);
   });
 
   $effect(() => {
@@ -161,6 +166,10 @@
     // Voronoi tints a focused code's cells instead of outlining its land.
     const focus = compare.mode === "voronoi" ? null : compare.focus;
     if (map && loaded) applyFocus(map, compare.draws, focus, compare.view === "fade", compare.basemap === "satellite");
+  });
+
+  $effect(() => {
+    if (map && loaded) applyFeatureDots(map, compare.draws, compare.focus);
   });
 
   $effect(() => {

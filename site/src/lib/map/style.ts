@@ -49,8 +49,11 @@ export const DIFF_FILLS = DIFF_SETS.map((k) => `${DIFFERENCES}-${k}-fill`);
 const PATCH: ExpressionSpecification = ["!=", ["get", "type"], "voronoi"];
 // Transparent, so a click finds the difference under it, Voronoi area rows included.
 export const DIFF_PICK = `${DIFFERENCES}-pick`;
-// One point per island patch, on top of source lines; its edge thins out by z12 so it melts into its island.
+// One point per island difference, on top of source lines; its edge thins out by z12 so it melts into its island.
 const DIFF_DOTS = `${DIFFERENCES}_dots`;
+// One point per small part of a focused code's features, in its source's color, until the part is wider than the dot.
+export const FEATURE_DOTS = "feature_dots";
+const FEATURE_DOTS_LAYER: LayerSpecification = { id: FEATURE_DOTS, source: FEATURE_DOTS, "source-layer": FEATURE_DOTS, layout: { visibility: "none" }, type: "circle", paint: { "circle-radius": 4, "circle-stroke-color": "#FFFFFF", "circle-stroke-width": 1 } };
 const DOTS_LAYER: LayerSpecification = { id: DIFF_DOTS, source: DIFF_DOTS, "source-layer": DIFF_DOTS, layout: { visibility: "none" }, type: "circle", paint: { "circle-color": ISLAND_COLOR, "circle-radius": 4, "circle-stroke-color": "#FFFFFF", "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 8, 1, 12, 0] } };
 
 function differenceLayers(): LayerSpecification[] {
@@ -74,13 +77,16 @@ const NOT_BORDER: ExpressionSpecification = ["!", ["all", ["==", ["get", "type"]
 const OTHER_ITEM_COLOR = "#9E9E9E";
 // Focused land draws only through its entities' tint, so it never looks like a region of its own.
 const FOCUSED_LAND_HIDDEN = (items: string[]): ExpressionSpecification => ["!", ["all", ["==", ["get", "type"], "land"], ["in", ["get", "item"], ["literal", items]]]];
-export function applyDifferences(map: Map, pair: string | null, fade: boolean, draws: Draw[], swapped: boolean, items: string[] | null) {
+// kind limits the patches to islands or land; Voronoi areas stay pickable either way.
+export function applyDifferences(map: Map, pair: string | null, fade: boolean, draws: Draw[], swapped: boolean, items: string[] | null, kind: "island" | "land" | null) {
   const split = fade && draws.length === 2;
   const byPair: ExpressionSpecification = ["==", ["get", "pair"], pair];
+  const ofKind: ExpressionSpecification[] = kind ? [kind === "island" ? ISLAND : ["!", ISLAND]] : [];
   map.setLayoutProperty(DIFF_PICK, "visibility", pair ? "visible" : "none");
-  if (pair) map.setFilter(DIFF_PICK, ["all", byPair, NOT_BORDER]);
-  map.setLayoutProperty(DIFF_DOTS, "visibility", pair && items ? "visible" : "none");
-  if (pair && items) map.setFilter(DIFF_DOTS, ["all", byPair, ["in", ["get", "item"], ["literal", items]]]);
+  if (pair) map.setFilter(DIFF_PICK, ["all", byPair, NOT_BORDER, ["any", ["!", PATCH], ...(kind ? ofKind : [true])]]);
+  // Every island dot of the pair shows until a difference is picked, then only its own.
+  map.setLayoutProperty(DIFF_DOTS, "visibility", pair && kind !== "land" ? "visible" : "none");
+  if (pair) map.setFilter(DIFF_DOTS, items ? ["all", byPair, ["in", ["get", "item"], ["literal", items]]] : byPair);
   for (const k of DIFF_SETS) {
     const shown = !!pair && (k === "all" || split);
     const kinds: ExpressionSpecification[] = k === "all" ? (split ? [ISLAND] : []) : [["!", ISLAND]];
@@ -89,7 +95,7 @@ export function applyDifferences(map: Map, pair: string | null, fade: boolean, d
       const id = `${DIFFERENCES}-${k}-${type}`;
       map.setLayoutProperty(id, "visibility", shown ? "visible" : "none");
       if (!shown) continue;
-      map.setFilter(id, ["all", byPair, NOT_BORDER, PATCH, ...kinds, ...(items ? [FOCUSED_LAND_HIDDEN(items)] : [])]);
+      map.setFilter(id, ["all", byPair, NOT_BORDER, PATCH, ...kinds, ...ofKind, ...(items ? [FOCUSED_LAND_HIDDEN(items)] : [])]);
       const color: ExpressionSpecification = ["case", ISLAND, type === "line" ? "#FFFFFF" : ISLAND_COLOR, land];
       map.setPaintProperty(id, `${type}-color`, items ? ["case", ["in", ["get", "item"], ["literal", items]], color, ISLAND, type === "line" ? "#FFFFFF" : OTHER_ITEM_COLOR, OTHER_ITEM_COLOR] : color);
     }
@@ -117,7 +123,8 @@ function cellFilter(source: string, item: ItemFocus | null, focus: Focus | null)
   }
   if (!focus) return null;
   const byCode: FilterSpecification = ["==", ["upcase", ["to-string", ["coalesce", ["get", polygon.code!], ""]]], focus.iso3];
-  return focus.part?.layer === polygon.id ? ["all", byCode, ["==", ["get", polygon.name!], focus.part.name]] : byCode;
+  const names = focus.parts.filter((p) => p.layer === polygon.id).map((p) => p.name);
+  return names.length ? ["all", byCode, ["in", ["get", polygon.name!], ["literal", names]]] : byCode;
 }
 
 // Voronoi tints each drawn source's cells for the focused difference or code.
@@ -210,7 +217,18 @@ export function pickLayerIds(draws: Draw[]) {
 
 // A picked part narrows its own layer to that feature; other layers outline the whole code.
 function outlined(layer: SourceLayer, focus: Focus): string[] | null {
-  return focus.part?.layer === layer.id ? [focus.part.name] : null;
+  const names = focus.parts.filter((p) => p.layer === layer.id).map((p) => p.name);
+  return names.length ? names : null;
+}
+
+export function applyFeatureDots(map: Map, draws: Draw[], focus: Focus | null) {
+  const polygons = draws.map((d) => layerFor(LAYER_BY_ID.get(d.id)!.source, "polygon").id);
+  map.setLayoutProperty(FEATURE_DOTS, "visibility", focus ? "visible" : "none");
+  if (focus) {
+    const names = focus.parts.map((p) => p.name);
+    map.setFilter(FEATURE_DOTS, ["all", ["in", ["get", "layer"], ["literal", polygons]], ["==", ["get", "code"], focus.iso3], ["<", ["zoom"], ["get", "z"]], ...(names.length ? [["in", ["get", "name"], ["literal", names]] as ExpressionSpecification] : [])]);
+    map.setPaintProperty(FEATURE_DOTS, "circle-color", ["match", ["get", "layer"], ...polygons.flatMap((id, i) => [id, draws[i].color]), DIFF_COLOR] as unknown as ExpressionSpecification);
+  }
 }
 
 export function applyFocus(map: Map, draws: Draw[], focus: Focus | null, fade: boolean, satellite: boolean) {
@@ -272,7 +290,7 @@ export function buildStyle(tilesBase: string, draws: Draw[]): StyleSpecification
       ...(positron.sources as StyleSpecification["sources"]),
       satellite: SATELLITE,
       ...Object.fromEntries(
-        [...LAYERS.map((l) => l.id), DIFFERENCES, DIFF_DOTS].map((id) => [id, { type: "vector" as const, url: `pmtiles://${tilesBase}/${id}.pmtiles` }]),
+        [...LAYERS.map((l) => l.id), DIFFERENCES, DIFF_DOTS, FEATURE_DOTS].map((id) => [id, { type: "vector" as const, url: `pmtiles://${tilesBase}/${id}.pmtiles` }]),
       ),
     },
     layers: [
@@ -286,6 +304,7 @@ export function buildStyle(tilesBase: string, draws: Draw[]): StyleSpecification
       ...focus.filter((l) => l.type === "line"),
       ...LAYERS.flatMap(entityLayersFor).filter((l) => l.type === "line"),
       DOTS_LAYER,
+      FEATURE_DOTS_LAYER,
     ],
   };
 }

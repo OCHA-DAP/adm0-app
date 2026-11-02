@@ -1,5 +1,5 @@
 import { DEFAULT_PAIR, LAYERS, SOURCES, layerFor, type SourceLayer } from "$lib/layers";
-import type { ItemRow, Part } from "$lib/attributes";
+import { unionBox, type ItemRow, type Part } from "$lib/attributes";
 import type { Draw, Slot } from "$lib/map/style";
 
 // Voronoi also draws the pair's differing OSM land and islands over the sources' cells.
@@ -18,7 +18,7 @@ export interface Hit {
 export interface Focus {
   iso3: string;
   bbox: number[] | null;
-  part: Part | null;
+  parts: Part[];
   fly: boolean;
 }
 
@@ -60,8 +60,8 @@ function fromUrl() {
   const pair = { a: pick("a", SOURCES, DEFAULT_PAIR.a), b: pick("b", SOURCES, DEFAULT_PAIR.b) };
   const basemap = pick("basemap", BASEMAPS.map((b) => b.id), "map");
   const code = q.get("focus");
-  const focus: Focus | null = code ? { iso3: code.toUpperCase(), bbox: null, part: null, fly: false } : null;
-  return { mode, view: pick(VIEW_PARAM, VIEWS.map((v) => v.id), "overlay"), pair, basemap, focus };
+  const focus: Focus | null = code ? { iso3: code.toUpperCase(), bbox: null, parts: [], fly: false } : null;
+  return { mode, view: pick(VIEW_PARAM, VIEWS.map((v) => v.id), "fade"), pair, basemap, focus };
 }
 
 export class CompareState {
@@ -111,8 +111,8 @@ export class CompareState {
     this.hits = [];
   }
 
-  focusOn(iso3: string, bbox: number[] | null, part: Part | null, fly: boolean) {
-    this.focus = { iso3, bbox: part?.bbox ?? bbox, part, fly };
+  focusOn(iso3: string, bbox: number[] | null, parts: Part[], fly: boolean) {
+    this.focus = { iso3, bbox: parts.length ? unionBox(parts.map((p) => p.bbox)) : bbox, parts, fly };
     this.item = null;
   }
 

@@ -18,18 +18,21 @@ KEEP_ALL = {
     "polygon_visibility": 0,
 }
 
-# Island dots all stay, from the zoom a selected difference flies to at the widest.
-EXTRA = {"differences_dots": {"point_thinning": 0, "min_zoom": 3}}
+# Dots all stay at every zoom.
+EXTRA = {
+    "differences_dots": {"point_thinning": 0},
+    "feature_dots": {"point_thinning": 0},
+}
 
 
 def main() -> None:
     """Build an overview and PMTiles for each prepared layer."""
     tiles_dir.mkdir(parents=True, exist_ok=True)
     names = [layer["id"] for layer in layers()]
-    # Written by the optional differences step.
+    # Written by the dots and optional differences steps.
     names += [
         name
-        for name in ("differences", "differences_dots")
+        for name in ("differences", "differences_dots", "feature_dots")
         if (prepare_dir / f"{name}.parquet").exists()
     ]
     for name in names:

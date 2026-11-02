@@ -5,7 +5,7 @@ from importlib import import_module
 from logging import INFO, basicConfig
 from os import getenv
 
-STEPS = ("download", "prepare", "extend", "attributes", "tiles")
+STEPS = ("download", "prepare", "extend", "attributes", "dots", "tiles")
 OPTIONAL_STEPS = ("fieldmaps", "register", "differences")
 
 basicConfig(
