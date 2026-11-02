@@ -15,7 +15,7 @@
     active,
     hits,
     inset,
-    diffKind,
+    listItems,
     onpick,
     onitempick,
   }: {
@@ -24,7 +24,7 @@
     active: boolean;
     hits: boolean;
     inset: number;
-    diffKind: "island" | "land" | null;
+    listItems: string[] | null;
     onpick: (iso3: string, layer: string, name: string) => void;
     onitempick: (item: string | null) => void;
   } = $props();
@@ -89,8 +89,8 @@
     });
     m.once("load", () => (loaded = true));
     m.on("click", (e) => {
-      // On the Islands and Land lists, a Voronoi click picks the difference there, a patch before its area.
-      if (!hits && compare.mode === "voronoi" && diffKind) {
+      // On a Geometry list, a Voronoi click picks the difference there, a patch before its area.
+      if (!hits && compare.mode === "voronoi" && listItems) {
         const box: [maplibregl.PointLike, maplibregl.PointLike] = [[e.point.x - CLICK_PAD, e.point.y - CLICK_PAD], [e.point.x + CLICK_PAD, e.point.y + CLICK_PAD]];
         const found = m.queryRenderedFeatures(box, { layers: [DIFF_PICK] }).sort((x, y) => Number(x.properties.type === "voronoi") - Number(y.properties.type === "voronoi"));
         onitempick(found[0]?.properties.item ?? null);
@@ -151,7 +151,7 @@
 
   $effect(() => {
     const pair = compare.mode === "voronoi" ? compare.diffPair : null;
-    if (map && loaded) applyDifferences(map, pair, compare.view === "fade", compare.draws, compare.pair.a > compare.pair.b, compare.item?.ids ?? null, diffKind);
+    if (map && loaded) applyDifferences(map, pair, compare.view === "fade", compare.draws, compare.pair.a > compare.pair.b, compare.item?.ids ?? null, listItems);
   });
 
   $effect(() => {

@@ -6,7 +6,7 @@
   import GlobeMap from "$lib/components/GlobeMap.svelte";
   import HitsPanel from "$lib/components/HitsPanel.svelte";
   import PasswordGate from "$lib/components/PasswordGate.svelte";
-  import { itemTitle, listOf, mergeItems, prepareItems, unionBox, type AttributeRow, type GeometryList, type ItemRow, type Part } from "$lib/attributes";
+  import { itemTitle, mergeItems, prepareItems, unionBox, type AttributeRow, type GeometryList, type ItemRow, type Part } from "$lib/attributes";
   import { layerFor } from "$lib/layers";
 
   type Tab = "map" | "split" | "table";
@@ -24,8 +24,9 @@
   let items = $state.raw<ItemRow[]>([]);
   const merged = $derived(mergeItems(items, compare.pair.a, compare.pair.b));
   // The map draws only the differences the Geometry pane lists, and both kinds otherwise.
-  let list = $state<GeometryList>("islands");
-  const diffKind = $derived(tab !== "split" ? null : list === "islands" ? "island" : "land");
+  let list = $state<GeometryList>("land");
+  const diffKind = $derived(tab !== "split" ? null : list);
+  const listItems = $derived(diffKind ? merged.filter((r) => r.list === diffKind).flatMap((r) => r.items ?? []) : null);
   let failed = $state(false);
 
   $effect(() => {
@@ -119,7 +120,7 @@
     const kind = list;
     untrack(() => {
       const row = compare.item && merged.find((it) => it.item === compare.item!.ids[0]);
-      if (row && listOf(row.type) !== kind) compare.item = null;
+      if (row && row.list !== kind) compare.item = null;
     });
   });
 
@@ -137,7 +138,7 @@
 
   function pickItem(id: string | null) {
     const row = id ? merged.find((it) => it.items?.includes(id)) : null;
-    if (!row || (diffKind && listOf(row.type) !== list)) {
+    if (!row || (diffKind && row.list !== list)) {
       compare.item = null;
       return;
     }
@@ -172,7 +173,7 @@
     </header>
     <div class="views" style:--pane="{PANE_REM}rem" style:--shift={tab === "map" ? "100%" : tab === "split" ? `calc(100% - ${PANE_REM}rem)` : "0%"}>
       <div class="view map">
-        <GlobeMap {tilesBase} {compare} active={tab !== "table"} hits={tab === "map"} {inset} {diffKind} onpick={pick} onitempick={pickItem} />
+        <GlobeMap {tilesBase} {compare} active={tab !== "table"} hits={tab === "map"} {inset} {listItems} onpick={pick} onitempick={pickItem} />
         <HitsPanel {compare} {inset} />
         <ComparePanel {compare} />
       </div>

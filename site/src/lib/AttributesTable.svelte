@@ -9,7 +9,6 @@
     attributeGroups,
     groupsInScope,
     itemTitle,
-    listOf,
     marked,
     matches,
     sourcesFor,
@@ -30,7 +29,7 @@
     item,
     pair,
     split = false,
-    list = $bindable("islands"),
+    list = $bindable("land"),
     onfocus,
     onitem,
   }: {
@@ -52,19 +51,19 @@
     { id: "differs", label: "Differs", swatch: "var(--cd-orange--300)" },
   ];
 
-  const LISTS: { id: GeometryList; label: string }[] = [
-    { id: "islands", label: "Islands" },
-    { id: "land", label: "Land" },
+  const LISTS: { id: GeometryList; label: string; note: string }[] = [
+    { id: "land", label: "Land", note: "The two sources put this land in different territories." },
+    { id: "islands", label: "Islands", note: "Both sources draw these islands but put them in different territories." },
+    { id: "unmapped", label: "Unmapped", note: "At least one source doesn't draw these islands, so they go to the nearest territory." },
   ];
 
   let filter = $state<Filter>({ ...DEFAULT_FILTER });
   // Split lists what the map can show; the full table lists attributes unrelated to geometry.
   const view = $derived(split ? list : "attributes");
-  const geometry = $derived(view === "islands" || view === "land");
+  const geometry = $derived(view !== "attributes");
 
   // With the map pair in charge, the table shows and compares only A and B, against A.
   const ab = $derived([pair.a, pair.b]);
-  const diffPair = $derived([...ab].sort().join("|"));
   const ALL = $derived(geometry ? ENTITY.sources : Object.keys(SOURCES));
   // Geometry lists only what differs between A and B.
   const scope = $derived(split ? { ...filter, diff: "differs" as DiffType, sources: ab, ref: pair.a } : filter);
@@ -90,11 +89,9 @@
   // Items with patches in the map's pair, plus those with no OSM land to patch.
   const itemScope = $derived({ ...scope, group: ENTITY.key });
   function itemShown(it: ItemRow) {
-    if (listOf(it.type) !== list) return false;
-    // A no_land entity exists in one source only, so it shows when A or B holds it rather than when both differ.
-    if (it.type === "no_land") return ab.some((s) => value(it, ENTITY.key, s)) && matches(it, [ENTITY], { ...itemScope, diff: "all" });
-    if (!(it.pairs ?? []).includes(diffPair)) return false;
-    return matches(it, [ENTITY], itemScope);
+    if (it.list !== list) return false;
+    // A no_land entity exists in one source only, so it shows whether or not A and B differ.
+    return matches(it, [ENTITY], it.type === "no_land" ? { ...itemScope, diff: "all" } : itemScope);
   }
   const shownItems = $derived(items.filter((it) => it.item === item?.ids[0] || itemShown(it)));
 
@@ -122,7 +119,8 @@
   const focusedItem = $derived(item?.ids[0]);
   $effect(() => {
     if (!focusedItem) return;
-    list = listOf(untrack(() => items.find((it) => it.item === focusedItem))?.type);
+    const row = untrack(() => items.find((it) => it.item === focusedItem));
+    if (row?.list) list = row.list;
     scrollTo(`[data-item="${focusedItem}"]`);
   });
 
@@ -167,7 +165,7 @@
   {#if !ENTITY.sources.includes(source)}<td class="na"></td>{:else}
   {@const [code, name] = [String(it[`code_${source}`] ?? ""), it[`name_${source}`]]}
   {#if prev && name && prev[`code_${source}`] === it[`code_${source}`] && prev[`name_${source}`] === name && !(c.ref && it.type === "no_land")}<td></td>{:else}
-  <td class:empty={!name} class:dim={c.dim} class:ref={c.ref} class:absent={it.missing?.includes(source)} title={it.missing?.includes(source) ? "No entity of its own here" : undefined}
+  <td class:empty={!name} class:dim={c.dim} class:ref={c.ref} class:absent={it.missing?.includes(source)} title={it.missing?.includes(source) ? "No territory of its own here" : undefined}
     >{#if code && code !== groupCode(it)}<span class="iso" style:color={SLOT_COLORS[slotOf(source)]}>{code}</span>{/if}{name ?? ""}{#if c.ref && it.type === "no_land"}<div class="meta">No OSM land</div>{/if}</td
   >{/if}{/if}
 {/snippet}
@@ -183,6 +181,7 @@
       <section>
         <Segmented label="List" options={LISTS} current={list} pick={(id) => (list = id as GeometryList)} />
       </section>
+      <p class="meta note">{LISTS.find((l) => l.id === list)?.note}</p>
     {/if}
     <section class="search"><input type="search" placeholder="Search code or name" bind:value={filter.query} /></section>
     <section class="show">
@@ -342,7 +341,7 @@
     contain: inline-size;
   }
   .split .sidebar {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.75rem;
   }
@@ -415,6 +414,11 @@
     color: var(--brand-grey--text);
     font-size: 0.7rem;
     font-weight: 400;
+  }
+  .note {
+    flex-basis: 100%;
+    order: 1;
+    margin: -0.25rem 0 0;
   }
   th.ref {
     text-decoration: underline;

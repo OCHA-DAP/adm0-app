@@ -65,11 +65,11 @@ export const DEFAULT_FILTER: Filter = {
 export type ItemType = "island" | "land" | "no_land";
 
 // The Geometry pane's lists: differences split by kind.
-export type GeometryList = "islands" | "land";
-export const listOf = (type: ItemType | undefined): GeometryList => (type === "island" ? "islands" : "land");
+export type GeometryList = "islands" | "unmapped" | "land";
 
 // A geometry difference from items.json; title is its smallest entity's name, and pairs are the
-// map's source pairs it has patches in. items lists the differences merged into this row.
+// map's source pairs it has patches in, and mapped those where both sources hold a polygon at
+// its islands. items lists the differences merged into this row, list the one list it shows in.
 export interface ItemRow {
   item: string;
   items?: string[];
@@ -81,11 +81,13 @@ export interface ItemRow {
   km2: number | null;
   bbox: number[] | null;
   pairs: string[] | null;
+  mapped: string[] | null;
+  list?: GeometryList;
   [column: string]: unknown;
 }
 
 // Item tables compare each source's entity as "CODE name".
-export const ENTITY: AttributeGroup = { key: "entity", label: "Entity", sources: MAP_SOURCES };
+export const ENTITY: AttributeGroup = { key: "entity", label: "Territory", sources: MAP_SOURCES };
 
 export function prepareItems(items: ItemRow[]): ItemRow[] {
   for (const row of items) {
@@ -108,21 +110,38 @@ export function unionBox(boxes: number[][]): number[] {
   return plain[2] - plain[0] <= Math.max(180, east[2] - east[0]) ? plain : east;
 }
 
-// Differences of one type that a and b assign to the same two entities read as one, so they merge
-// into one row, led by the first (largest) of them.
+// All of a and b's differences between the same two entities, either way round, share one cause, so
+// they merge into one row in one list: land over mapped islands over unmapped islands.
 export function mergeItems(items: ItemRow[], a: string, b: string): ItemRow[] {
+  const pair = [a, b].sort().join("|");
   const rows = new Map<string, ItemRow>();
-  for (const it of items) {
-    const key = [it.type, it[`code_${a}`], it[`name_${a}`], it[`code_${b}`], it[`name_${b}`]].join("|");
+  const entity = (it: ItemRow, s: string) => [it[`code_${s}`], it[`name_${s}`]].join("|");
+  const seen = new Map<string, Set<unknown>>();
+  // A no_land entity exists in one source only, so it counts when A or B holds it.
+  const relevant = items.filter((it) => (it.type === "no_land" ? [a, b].some((s) => it[`entity_${s}`]) : it.pairs?.includes(pair)));
+  for (const it of relevant) {
+    const key = [entity(it, a), entity(it, b)].sort().join("||");
+    const list: GeometryList = it.type !== "island" ? "land" : it.mapped?.includes(pair) ? "islands" : "unmapped";
     const row = rows.get(key);
     if (!row) {
-      rows.set(key, { ...it, items: [it.item] });
+      rows.set(key, { ...it, items: [it.item], list });
       continue;
     }
     row.items!.push(it.item);
     const boxes = [row.bbox, it.bbox].filter((x): x is number[] => !!x);
     row.bbox = boxes.length ? unionBox(boxes) : null;
     row.pairs = [...new Set([...(row.pairs ?? []), ...(it.pairs ?? [])])];
+    row.km2 = (row.km2 ?? 0) + (it.km2 ?? 0);
+    row.islands = (row.islands ?? 0) + (it.islands ?? 0) || null;
+    for (const s of [a, b]) {
+      for (const g of ["code", "name", "entity"]) {
+        const col = `${g}_${s}`;
+        const values = seen.get(key + col) ?? seen.set(key + col, new Set([row[col]])).get(key + col)!;
+        values.add(it[col]);
+        row[col] = [...values].filter(Boolean).join(", ");
+      }
+    }
+    if (list === "land" || (list === "islands" && row.list === "unmapped")) row.list = list;
   }
   return [...rows.values()];
 }

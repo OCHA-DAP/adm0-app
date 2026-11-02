@@ -200,19 +200,59 @@ def _sided() -> str:
     )
 
 
+# Metres from an island to its source's nearest polygon, capped; 0 where they touch.
+GAP_CAP = 1000
+# An island is mapped in a pair where both sources hold a polygon within this distance.
+MAPPED_M = 100
+
+
+def _gaps(conn: DuckDBPyConnection) -> None:
+    """Each source's distance from every differing island to its own polygons."""
+    conn.execute("""--sql
+        CREATE OR REPLACE TABLE gap_islands AS
+        SELECT DISTINCT d.fid, l.geom, ST_XMin(l.env) - 0.03 AS x0,
+            ST_YMin(l.env) - 0.03 AS y0, ST_XMax(l.env) + 0.03 AS x1,
+            ST_YMax(l.env) + 0.03 AS y1
+        FROM island_pairs d JOIN matches m USING (a, b, a_entity, b_entity)
+        JOIN land l USING (fid) WHERE NOT m.mutual;
+        CREATE OR REPLACE TABLE island_gaps (source VARCHAR, fid BIGINT, gap DOUBLE)
+    """)
+    for source, polygons in POLYGONS.items():
+        path = prepare_dir / f"{polygons}.parquet"
+        src = f"SELECT geometry AS geom FROM read_parquet('{path}')"
+        _step(conn, f"{source} polygons", _chunks("polys", "1 AS one", src))
+        _step(
+            conn,
+            f"{source} gaps",
+            f"""INSERT INTO island_gaps
+            SELECT '{source}', g.fid, least(coalesce(min(CASE
+                WHEN ST_Intersects(g.geom, p.geom) THEN 0
+                ELSE ST_Distance_Sphere(ST_StartPoint(ST_ShortestLine(g.geom, p.geom)),
+                    ST_EndPoint(ST_ShortestLine(g.geom, p.geom))) END), {GAP_CAP}),
+                {GAP_CAP})
+            FROM gap_islands g LEFT JOIN polys p
+                ON ST_Intersects(p.env, ST_MakeEnvelope(g.x0, g.y0, g.x1, g.y1))
+            GROUP BY g.fid""",
+        )
+
+
 def _patches(conn: DuckDBPyConnection) -> None:
-    """Land and island patches where a source pair's entities aren't mutual matches."""
+    """Land patches and itemed island patches where a pair's entities aren't mutual."""
     conn.execute(f"""--sql
         CREATE OR REPLACE TABLE patches AS
         SELECT pair, 'land' AS type, side, item, a_entity, b_entity, a_code, a_name,
-                b_code, b_name, km2, geom::GEOMETRY AS geometry, NULL::BIGINT AS fid
+                b_code, b_name, km2, geom::GEOMETRY AS geometry, NULL::BIGINT AS fid,
+                NULL::DOUBLE AS gap
         FROM land_review
         UNION ALL
         SELECT d.a || '|' || d.b, 'island', {SIDE}, r.item, d.a_entity, d.b_entity,
-               ae.code, ae.name, be.code, be.name, d.km2, l.geom::GEOMETRY, fid
+               ae.code, ae.name, be.code, be.name, d.km2, l.geom::GEOMETRY, fid,
+               greatest(ga.gap, gb.gap)
         FROM island_pairs d JOIN matches m USING (a, b, a_entity, b_entity)
-        JOIN land l USING (fid) LEFT JOIN item_islands r USING (fid)
+        JOIN land l USING (fid) JOIN item_islands r USING (fid)
         {_named("a")} {_named("b")} {_sided()}
+        LEFT JOIN island_gaps ga ON ga.source = d.a AND ga.fid = d.fid
+        LEFT JOIN island_gaps gb ON gb.source = d.b AND gb.fid = d.fid
         WHERE NOT m.mutual
     """)
 
@@ -355,13 +395,14 @@ def _write(conn: DuckDBPyConnection) -> None:
         register_dir / "islands.parquet",
         geo=False,
     )
+    _gaps(conn)
     _patches(conn)
     _dots(conn)
     _areas(conn)
     write_parquet(
         conn,
-        """SELECT * EXCLUDE (a_entity, b_entity, fid) FROM patches
-        UNION ALL SELECT * FROM areas""",
+        """SELECT * EXCLUDE (a_entity, b_entity, fid, gap) FROM patches
+        UNION ALL BY NAME SELECT * FROM areas""",
         prepare_dir / "differences.parquet",
     )
     _items(conn)
@@ -392,13 +433,24 @@ def _items(conn: DuckDBPyConnection) -> None:
     cols = ", ".join(
         f"{s}_code AS code_{s}, {s}_name AS name_{s}" for s in sorted(VORONOI)
     )
+    lost = conn.execute("""--sql
+        SELECT count(*) FROM (
+            SELECT item FROM patches WHERE NOT (type = 'land' AND side = 'both')
+            UNION ALL SELECT item FROM areas)
+        WHERE item IS NULL OR item NOT IN (SELECT item FROM items)""").fetchone()[0]
+    if lost:
+        msg = f"{lost} differences belong to no item"
+        raise ValueError(msg)
     out = tiles_dir / "items.json"
     conn.execute(f"""--sql
         COPY (SELECT item, t.title, type, same_code, missing, s.islands, s.km2,
                 [s.xmin, s.ymin, s.xmax, s.ymax] AS bbox,
                 (SELECT list(DISTINCT pair ORDER BY pair) FROM patches p
                  WHERE p.item = i.item
-                    AND NOT (p.type = 'land' AND p.side = 'both')) AS pairs, {cols}
+                    AND NOT (p.type = 'land' AND p.side = 'both')) AS pairs,
+                (SELECT list(DISTINCT pair ORDER BY pair) FROM patches p
+                 WHERE p.item = i.item AND p.gap <= {MAPPED_M}) AS mapped,
+                {cols}
             FROM items i LEFT JOIN stats s USING (item)
             LEFT JOIN titles t USING (item)
             ORDER BY type, s.km2 DESC) TO '{out}' (FORMAT JSON, ARRAY true)
