@@ -169,10 +169,16 @@ def _overlay(conn: DuckDBPyConnection) -> None:
             UNION ALL SELECT a, b, a_entity, b_entity, km2 FROM island_pairs)
         GROUP BY ALL;
         CREATE OR REPLACE TABLE matches AS
-        SELECT w.*,
-            km2 = max(km2) OVER (PARTITION BY a, b, a_entity)
-            AND km2 = max(km2) OVER (PARTITION BY a, b, b_entity) AS mutual
-        FROM weights w;
+        WITH codes AS (
+            SELECT source, entity, code FROM entities WHERE coalesce(code, '') <> ''
+            QUALIFY count(*) OVER (PARTITION BY source, code) = 1)
+        -- A code held by one entity in each source pairs them, whatever the overlap.
+        SELECT w.*, coalesce(ca.code = cb.code, false)
+            OR (km2 = max(km2) OVER (PARTITION BY a, b, a_entity)
+                AND km2 = max(km2) OVER (PARTITION BY a, b, b_entity)) AS mutual
+        FROM weights w
+        LEFT JOIN codes ca ON ca.source = w.a AND ca.entity = w.a_entity
+        LEFT JOIN codes cb ON cb.source = w.b AND cb.entity = w.b_entity;
     """)
 
 
