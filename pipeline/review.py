@@ -210,7 +210,7 @@ def _borders(conn: DuckDBPyConnection) -> None:
     """Map land patches to items or borders; borders group shifts by country pair."""
     conn.execute("""--sql
         CREATE OR REPLACE TABLE cluster_names AS
-        SELECT cluster, first(e.code || ' ' || e.name ORDER BY source) AS label
+        SELECT cluster, first(concat_ws(' ', e.code, e.name) ORDER BY source) AS label
         FROM clusters JOIN entities e USING (source, entity) GROUP BY cluster;
         CREATE OR REPLACE TABLE land_items AS
         SELECT DISTINCT source, entity, item FROM item_entities

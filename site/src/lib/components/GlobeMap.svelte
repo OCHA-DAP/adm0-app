@@ -183,36 +183,25 @@
   });
 
   // Each pick frames once, after the layout settles so a pane that just opened has its final size.
-  $effect(() => {
-    const focus = compare.focus;
-    if (!map || !loaded || !active || !focus?.bbox || focus === framed) return;
-    framed = focus;
-    if (!focus.fly) return;
+  function frame(target: Focus | ItemFocus | null) {
+    if (!map || !loaded || !active || !target?.bbox || target === framed) return;
+    framed = target;
+    if (!target.fly) return;
     stopSpin();
-    const [m, bbox] = [map, focus.bbox as [number, number, number, number]];
+    const [m, bbox] = [map, target.bbox as [number, number, number, number]];
     requestAnimationFrame(() => {
       m.resize();
       m.fitBounds(bbox, { padding: FOCUS_PAD, maxZoom: FOCUS_MAX_ZOOM });
     });
-  });
+  }
+  $effect(() => frame(compare.focus));
 
   $effect(() => {
     const voronoi = compare.mode === "voronoi";
     if (map && loaded) applyVoronoiFocus(map, compare.draws, voronoi ? compare.item : null, voronoi ? compare.focus : null);
   });
 
-  $effect(() => {
-    const item = compare.item;
-    if (!map || !loaded || !active || !item?.bbox || item === framed) return;
-    framed = item;
-    if (!item.fly) return;
-    stopSpin();
-    const [m, bbox] = [map, item.bbox as [number, number, number, number]];
-    requestAnimationFrame(() => {
-      m.resize();
-      m.fitBounds(bbox, { padding: FOCUS_PAD, maxZoom: FOCUS_MAX_ZOOM });
-    });
-  });
+  $effect(() => frame(compare.item));
 
   $effect(() => {
     if (map && loaded) applyBasemap(map, compare.basemap === "satellite");

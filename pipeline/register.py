@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 from .config import (
     BASELINE,
     SOURCE_COLUMNS,
-    fieldmaps_dir,
     open_db,
     prepare_dir,
     register_dir,
@@ -23,7 +22,7 @@ logger = getLogger(__name__)
 SOURCES = {
     BASELINE: prepare_dir / "gaul_l0.parquet",
     "ungeodata": prepare_dir / "ungeodata_polygons.parquet",
-    "fieldmaps": fieldmaps_dir / "polygons.parquet",
+    "fieldmaps": prepare_dir / "fieldmaps_polygons.parquet",
 }
 
 

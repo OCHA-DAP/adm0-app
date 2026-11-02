@@ -87,7 +87,9 @@
     const restored = compare.focus;
     if (!restored || restored.bbox || !rows.length) return;
     const row = rows.find((r) => r.iso3 === restored.iso3);
-    if (row) compare.focusOn(restored.iso3, shownBox(row), [], false);
+    const bbox = row && shownBox(row);
+    // A code with no geometry stays unframed; refocusing it with a null bbox would retrigger this effect.
+    if (bbox) compare.focusOn(restored.iso3, bbox, [], false);
   });
 
   function focus(row: AttributeRow, parts: Part[] = [], fly = true) {

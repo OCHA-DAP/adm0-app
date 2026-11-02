@@ -71,13 +71,12 @@ function differenceLayers(): LayerSpecification[] {
 // Land border shifts (land patches on side "both") never draw.
 const NOT_BORDER: ExpressionSpecification = ["!", ["all", ["==", ["get", "type"], "land"], ["==", ["get", "side"], "both"]]];
 
-// Shows the pair's patches, or hides them all when pair is null. Tiles name sides by
-// sorted source id, so swapped means slot A holds tile side "b". Focused items keep the
-// colours and grey every other item's patches.
+// Focused items keep their colours and every other item's patches turn this grey.
 const OTHER_ITEM_COLOR = "#9E9E9E";
 // Focused land draws only through its entities' tint, so it never looks like a region of its own.
 const FOCUSED_LAND_HIDDEN = (items: string[]): ExpressionSpecification => ["!", ["all", ["==", ["get", "type"], "land"], ["in", ["get", "item"], ["literal", items]]]];
-// kind limits the patches to islands or land; Voronoi areas stay pickable either way.
+// Shows the pair's patches (none when pair is null), limited to kind; Voronoi areas stay pickable either way.
+// Tiles name sides by sorted source id, so swapped means slot A holds tile side "b".
 export function applyDifferences(map: Map, pair: string | null, fade: boolean, draws: Draw[], swapped: boolean, items: string[] | null, kind: "island" | "land" | null) {
   const split = fade && draws.length === 2;
   const byPair: ExpressionSpecification = ["==", ["get", "pair"], pair];

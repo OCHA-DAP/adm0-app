@@ -96,7 +96,9 @@
   const itemScope = $derived({ ...scope, group: ENTITY.key });
   function itemShown(it: ItemRow) {
     if (listOf(it.type) !== list) return false;
-    if (it.type !== "no_land" && !(it.pairs ?? []).includes(diffPair)) return false;
+    // A no_land entity exists in one source only, so it shows when A or B holds it rather than when both differ.
+    if (it.type === "no_land") return ab.some((s) => value(it as AttributeRow, ENTITY.key, s)) && matches(it, [ENTITY], { ...itemScope, diff: "all" });
+    if (!(it.pairs ?? []).includes(diffPair)) return false;
     return matches(it, [ENTITY], itemScope);
   }
   const shownItems = $derived(items.filter((it) => it.item === item?.ids[0] || itemShown(it)));
