@@ -38,7 +38,7 @@ def _clusters(conn: DuckDBPyConnection) -> None:
     mutual = conn.execute("SELECT a, a_entity, b, b_entity FROM matches WHERE mutual")
     for a, ae, b, be in mutual.fetchall():
         parent[find((a, ae))] = find((b, be))
-    # Entities without land never overlap, so a shared code or name joins them instead.
+    # Landless entities never overlap, so a shared code or name joins them instead.
     first: dict[str, tuple] = {}
     for s, e, code, name in conn.execute("""--sql
         SELECT source, entity, code, lower(name) FROM entities
@@ -46,8 +46,8 @@ def _clusters(conn: DuckDBPyConnection) -> None:
             AND (source, entity) NOT IN (SELECT source, entity FROM placed)
     """).fetchall():
         for key in (f"code:{code}" if code else None, f"name:{name}" if name else None):
-            if key:
-                parent[find((s, e))] = find(first.setdefault(key, (s, e)))
+            if key and first.setdefault(key, (s, e))[0] != s:
+                parent[find((s, e))] = find(first[key])
     ids: dict[tuple, int] = {}
     rows = [(*k, ids.setdefault(find(k), len(ids) + 1)) for k in sorted(parent)]
     conn.execute(
