@@ -51,9 +51,6 @@ const PATCH: ExpressionSpecification = ["!=", ["get", "type"], "voronoi"];
 export const DIFF_PICK = `${DIFFERENCES}-pick`;
 // One point per island difference, on top of source lines; its edge thins out by z12 so it melts into its island.
 const DIFF_DOTS = `${DIFFERENCES}_dots`;
-// One point per small part of a focused code's features, in its source's color, until the part is wider than the dot.
-export const FEATURE_DOTS = "feature_dots";
-const FEATURE_DOTS_LAYER: LayerSpecification = { id: FEATURE_DOTS, source: FEATURE_DOTS, "source-layer": FEATURE_DOTS, layout: { visibility: "none" }, type: "circle", paint: { "circle-radius": 4, "circle-stroke-color": "#FFFFFF", "circle-stroke-width": 1 } };
 const DOTS_LAYER: LayerSpecification = { id: DIFF_DOTS, source: DIFF_DOTS, "source-layer": DIFF_DOTS, layout: { visibility: "none" }, type: "circle", paint: { "circle-color": ISLAND_COLOR, "circle-radius": 4, "circle-stroke-color": "#FFFFFF", "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 8, 1, 12, 0] } };
 
 function differenceLayers(): LayerSpecification[] {
@@ -220,16 +217,6 @@ function outlined(layer: SourceLayer, focus: Focus): string[] | null {
   return names.length ? names : null;
 }
 
-export function applyFeatureDots(map: Map, draws: Draw[], focus: Focus | null) {
-  const polygons = draws.map((d) => layerFor(LAYER_BY_ID.get(d.id)!.source, "polygon").id);
-  map.setLayoutProperty(FEATURE_DOTS, "visibility", focus ? "visible" : "none");
-  if (focus) {
-    const names = focus.parts.map((p) => p.name);
-    map.setFilter(FEATURE_DOTS, ["all", ["in", ["get", "layer"], ["literal", polygons]], ["==", ["get", "code"], focus.iso3], ["<", ["zoom"], ["get", "z"]], ...(names.length ? [["in", ["get", "name"], ["literal", names]] as ExpressionSpecification] : [])]);
-    map.setPaintProperty(FEATURE_DOTS, "circle-color", ["match", ["get", "layer"], ...polygons.flatMap((id, i) => [id, draws[i].color]), DIFF_COLOR] as unknown as ExpressionSpecification);
-  }
-}
-
 export function applyFocus(map: Map, draws: Draw[], focus: Focus | null, fade: boolean, satellite: boolean) {
   for (const layer of LAYERS) {
     if (!layer.code) continue;
@@ -289,7 +276,7 @@ export function buildStyle(tilesBase: string, draws: Draw[]): StyleSpecification
       ...(positron.sources as StyleSpecification["sources"]),
       satellite: SATELLITE,
       ...Object.fromEntries(
-        [...LAYERS.map((l) => l.id), DIFFERENCES, DIFF_DOTS, FEATURE_DOTS].map((id) => [id, { type: "vector" as const, url: `pmtiles://${tilesBase}/${id}.pmtiles` }]),
+        [...LAYERS.map((l) => l.id), DIFFERENCES, DIFF_DOTS].map((id) => [id, { type: "vector" as const, url: `pmtiles://${tilesBase}/${id}.pmtiles` }]),
       ),
     },
     layers: [
@@ -303,7 +290,6 @@ export function buildStyle(tilesBase: string, draws: Draw[]): StyleSpecification
       ...focus.filter((l) => l.type === "line"),
       ...LAYERS.flatMap(entityLayersFor).filter((l) => l.type === "line"),
       DOTS_LAYER,
-      FEATURE_DOTS_LAYER,
     ],
   };
 }

@@ -8,12 +8,10 @@
     SOURCES,
     attributeGroups,
     groupsInScope,
-    featureRows,
     itemTitle,
     listOf,
     marked,
     matches,
-    sameParts,
     sourcesFor,
     value,
     type AttributeGroup,
@@ -22,7 +20,6 @@
     type Filter,
     type GeometryList,
     type ItemRow,
-    type Part,
   } from "$lib/attributes";
 
   let {
@@ -45,7 +42,7 @@
     pair: { a: string; b: string };
     split?: boolean;
     list?: GeometryList;
-    onfocus: (row: AttributeRow, parts?: Part[]) => void;
+    onfocus: (row: AttributeRow) => void;
     onitem: (row: ItemRow, label: string) => void;
   } = $props();
 
@@ -58,7 +55,6 @@
   const LISTS: { id: GeometryList; label: string }[] = [
     { id: "islands", label: "Islands" },
     { id: "land", label: "Land" },
-    { id: "features", label: "Features" },
   ];
 
   let filter = $state<Filter>({ ...DEFAULT_FILTER });
@@ -87,9 +83,8 @@
   let body = $state<HTMLElement>();
 
   const allGroups = $derived(attributeGroups(rows[0]));
-  const attrGroups = $derived(allGroups.filter((g) => (g.key === "count") === (view === "features")));
-  const rowScope = $derived(view === "features" ? { ...scope, group: "count" } : scope);
-  const groups = $derived(groupsInScope(attrGroups, rowScope));
+  const attrGroups = $derived(allGroups.filter((g) => g.key !== "count"));
+    const groups = $derived(groupsInScope(attrGroups, scope));
   const labelled = $derived(view === "attributes" && !filter.group);
 
   // Items with patches in the map's pair, plus those with no OSM land to patch.
@@ -97,13 +92,13 @@
   function itemShown(it: ItemRow) {
     if (listOf(it.type) !== list) return false;
     // A no_land entity exists in one source only, so it shows when A or B holds it rather than when both differ.
-    if (it.type === "no_land") return ab.some((s) => value(it as AttributeRow, ENTITY.key, s)) && matches(it, [ENTITY], { ...itemScope, diff: "all" });
+    if (it.type === "no_land") return ab.some((s) => value(it, ENTITY.key, s)) && matches(it, [ENTITY], { ...itemScope, diff: "all" });
     if (!(it.pairs ?? []).includes(diffPair)) return false;
     return matches(it, [ENTITY], itemScope);
   }
   const shownItems = $derived(items.filter((it) => it.item === item?.ids[0] || itemShown(it)));
 
-  const shown = $derived(rows.filter((row) => row.iso3 === focus?.iso3 || matches(row, attrGroups, rowScope)));
+  const shown = $derived(rows.filter((row) => row.iso3 === focus?.iso3 || matches(row, attrGroups, scope)));
 
   // Scrolls once per code or item, only when the row sits outside the area below the sticky header.
   // scrollIntoView would also scroll the hidden pane's ancestors and slide the table over the map-only view.
@@ -148,7 +143,7 @@
     geometry ? `${shownItems.length} differences` : `${shown.length} of ${rows.length} codes`,
   );
   const slotOf = (source: string) => (source === ab[0] ? "a" : "b");
-  // Differences grouped like Features: under A's code, or B's when A has none, codes in order.
+  // Differences grouped under A's code, or B's when A has none, codes in order.
   const groupCode = (it: ItemRow) => ab.map((s) => String(it[`code_${s}`] ?? "")).find(Boolean) ?? "";
   const itemGroups = $derived.by(() => {
     const groups = new Map<string, ItemRow[]>();
@@ -166,7 +161,7 @@
   {/if}
 {/snippet}
 
-<!-- A name repeated from the row above in the same code is left blank, like the Features list. -->
+<!-- A name repeated from the row above in the same code is left blank. -->
 {#snippet entityCell(it: ItemRow, source: string, prev: ItemRow | undefined)}
   {@const c = cellClass(it, ENTITY, source)}
   {#if !ENTITY.sources.includes(source)}<td class="na"></td>{:else}
@@ -178,7 +173,7 @@
 {/snippet}
 
 {#snippet sourceHead(source: string)}
-  {@const slot = !split ? null : source === ab[0] ? "a" : "b"}
+  {@const slot = split ? slotOf(source) : null}
   <th class:ref={source === scope.ref}>{#if slot}<span class="badge" style:--color={SLOT_COLORS[slot]}>{slot.toUpperCase()}</span>{/if}{SOURCES[source]}</th>
 {/snippet}
 
@@ -238,29 +233,12 @@
                 </tr>
               {/each}
             {/each}
-          {:else if view === "features"}
-            {#each shown as row (row.iso3)}
-              {@const frows = featureRows(row, visible)}
-              {@const codeFocused = row.iso3 === focus?.iso3}
-              {#each frows as cells, i (i)}
-                {@const parts = cells.filter((p) => !!p)}
-                <!-- Picking the focused row again goes back to the whole code. -->
-                {@const picked = codeFocused && !!focus?.parts.length && sameParts(focus.parts, parts)}
-                <tr class="clickable" class:start={i === 0} class:focused={picked} data-iso3={i === 0 ? row.iso3 : undefined} data-group={row.iso3} tabindex="0" role="button"
-                  onclick={() => onfocus(row, picked ? [] : parts)} onkeydown={(e) => e.key === "Enter" && onfocus(row, picked ? [] : parts)}>
-                  {#if i === 0}<th class="code group" class:focused={codeFocused} rowspan={frows.length}>{row.iso3}</th>{/if}
-                  {#each cells as part, si (visible[si])}
-                    <td class:unnamed={part && !part.label}>{part ? (part.label ?? "(no name)") : ""}</td>
-                  {/each}
-                </tr>
-              {/each}
-            {/each}
           {:else}
             {#each shown as row (row.iso3)}
               {@const focused = row.iso3 === focus?.iso3}
               {#each groups as group, gi (group.key)}
                 <tr class:start={gi === 0} class:focused data-iso3={gi === 0 ? row.iso3 : undefined} data-group={row.iso3}>
-                  {#if gi === 0}<th class="code" rowspan={groups.length}><button type="button" class="code-link" title="Show on map" onclick={() => { if (!split) list = "features"; onfocus(row); }}>{row.iso3}</button></th>{/if}
+                  {#if gi === 0}<th class="code" rowspan={groups.length}><button type="button" class="code-link" title="Show on map" onclick={() => onfocus(row)}>{row.iso3}</button></th>{/if}
                   {#if labelled}<td class="attr">{group.label}</td>{/if}
                   {#each visible as source (source)}{@render fixedCell(row, group, source)}{/each}
                 </tr>
@@ -454,10 +432,6 @@
   }
   th.group.focused {
     background-color: var(--cd-blue--lightest);
-  }
-  td.unnamed {
-    color: var(--brand-grey--text);
-    font-style: italic;
   }
   .iso {
     margin-right: 0.35em;

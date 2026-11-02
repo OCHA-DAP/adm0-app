@@ -17,12 +17,14 @@ from .config import (
     tmp_dir,
     write_parquet,
 )
-from .dots import REACH
 
 if TYPE_CHECKING:
     from duckdb import DuckDBPyConnection
 
 logger = getLogger(__name__)
+
+# An island gets no dot within this many of its widths of a larger island in its item.
+REACH = 5
 
 VERTICES = 256
 KM2 = "ST_Area_Spheroid({}) / 1e6"
@@ -209,26 +211,41 @@ def _patches(conn: DuckDBPyConnection) -> None:
     """)
 
 
-def _dots(conn: DuckDBPyConnection) -> None:
-    """Dot each island, skipping any within REACH widths of a larger one in its item."""
+def _drop_crowded(conn: DuckDBPyConnection, table: str, group: str, size: str) -> None:
+    """Delete each part of `table` within REACH widths of a larger part of its group."""
+    # Groups sit side by side on x offsets, so the R-tree join never pairs two groups.
     conn.execute(f"""--sql
+        CREATE OR REPLACE TEMP TABLE boxes AS
+        SELECT id, {size} AS size, (x0 + x1) / 2 AS cx, (y0 + y1) / 2 AS cy,
+            greatest(x1 - x0, y1 - y0) AS w, {REACH} * w AS reach,
+            x0 - reach AS bx0, y0 - reach AS by0, x1 + reach AS bx1, y1 + reach AS by1,
+            dense_rank() OVER (ORDER BY {group}) * (360 + 2 * max(reach) OVER ()) AS off
+        FROM {table};
+        DELETE FROM {table} WHERE id IN (
+            WITH pairs AS MATERIALIZED (
+                SELECT s.id AS sid, s.size AS ss, b.id AS bid, b.size AS bs
+                FROM boxes s JOIN boxes b ON ST_Intersects(
+                    ST_MakeEnvelope(b.off + b.bx0, b.by0, b.off + b.bx1, b.by1),
+                    ST_Point(s.off + s.cx, s.cy)))
+            SELECT sid FROM pairs WHERE bs > ss OR (bs = ss AND bid < sid));
+        DROP TABLE boxes
+    """)
+
+
+def _dots(conn: DuckDBPyConnection) -> None:
+    """Dot each island that is not crowded by a larger one in its item."""
+    conn.execute("""--sql
         CREATE TEMP TABLE dot_islands AS
         SELECT row_number() OVER () AS id, pair, item, km2, geometry,
             ST_XMin(geometry) AS x0, ST_XMax(geometry) AS x1,
-            ST_YMin(geometry) AS y0, ST_YMax(geometry) AS y1,
-            (x0 + x1) / 2 AS cx, (y0 + y1) / 2 AS cy,
-            {REACH} * greatest(x1 - x0, y1 - y0) AS reach
+            ST_YMin(geometry) AS y0, ST_YMax(geometry) AS y1
         FROM patches WHERE type = 'island'
     """)
+    _drop_crowded(conn, "dot_islands", "pair, item", "km2")
     write_parquet(
         conn,
         """SELECT pair, item, ST_MaximumInscribedCircle(geometry).center AS geometry
-        FROM dot_islands s WHERE id NOT IN (
-            SELECT s.id FROM dot_islands s JOIN dot_islands b
-                ON s.pair = b.pair AND s.item = b.item
-                AND (b.km2 > s.km2 OR (b.km2 = s.km2 AND b.id < s.id))
-                AND s.cx BETWEEN b.x0 - b.reach AND b.x1 + b.reach
-                AND s.cy BETWEEN b.y0 - b.reach AND b.y1 + b.reach)""",
+        FROM dot_islands""",
         prepare_dir / "differences_dots.parquet",
     )
 

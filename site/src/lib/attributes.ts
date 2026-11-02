@@ -48,7 +48,7 @@ export interface AttributeRow {
   [column: string]: unknown;
 }
 
-export function value(row: AttributeRow, group: string, source: string): string {
+export function value(row: AttributeRow | ItemRow, group: string, source: string): string {
   return String(row[`${group}_${source}`] ?? "").trim();
 }
 
@@ -64,8 +64,8 @@ export const DEFAULT_FILTER: Filter = {
 
 export type ItemType = "island" | "land" | "no_land";
 
-// The Geometry pane's lists: differences split by kind, and the sources' features.
-export type GeometryList = "islands" | "land" | "features";
+// The Geometry pane's lists: differences split by kind.
+export type GeometryList = "islands" | "land";
 export const listOf = (type: ItemType | undefined): GeometryList => (type === "island" ? "islands" : "land");
 
 // A geometry difference from items.json; title is its smallest entity's name, and pairs are the
@@ -99,15 +99,6 @@ export function itemTitle(row: ItemRow): string {
   const code = MAP_SOURCES.map((s) => row[`code_${s}`]).find(Boolean);
   return row.title?.trim() || String(code ?? row.item);
 }
-
-// A code's features side by side, row i holding each source's i-th feature; the Features list's rows.
-export function featureRows(row: AttributeRow, sources: string[]): (Part | undefined)[][] {
-  const bySource = sources.map((s) => (row.parts ?? []).filter((p) => p.s === s));
-  const n = Math.max(1, ...bySource.map((ps) => ps.length));
-  return Array.from({ length: n }, (_, i) => bySource.map((ps) => ps[i]));
-}
-
-export const sameParts = (x: Part[], y: Part[]) => x.length === y.length && x.every((p) => y.some((q) => q.id === p.id));
 
 // One box around all boxes; across the antimeridian, western boxes move east by 360 when that is narrower.
 export function unionBox(boxes: number[][]): number[] {

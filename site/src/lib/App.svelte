@@ -6,8 +6,8 @@
   import GlobeMap from "$lib/components/GlobeMap.svelte";
   import HitsPanel from "$lib/components/HitsPanel.svelte";
   import PasswordGate from "$lib/components/PasswordGate.svelte";
-  import { featureRows, itemTitle, listOf, mergeItems, prepareItems, unionBox, type AttributeRow, type GeometryList, type ItemRow, type Part, sameParts } from "$lib/attributes";
-  import { LAYER_BY_ID, layerFor } from "$lib/layers";
+  import { itemTitle, listOf, mergeItems, prepareItems, unionBox, type AttributeRow, type GeometryList, type ItemRow, type Part } from "$lib/attributes";
+  import { layerFor } from "$lib/layers";
 
   type Tab = "map" | "split" | "table";
   const TABS: { id: Tab; label: string }[] = [
@@ -25,7 +25,7 @@
   const merged = $derived(mergeItems(items, compare.pair.a, compare.pair.b));
   // The map draws only the differences the Geometry pane lists, and both kinds otherwise.
   let list = $state<GeometryList>("islands");
-  const diffKind = $derived(tab !== "split" || list === "features" ? null : list === "islands" ? "island" : "land");
+  const diffKind = $derived(tab !== "split" ? null : list === "islands" ? "island" : "land");
   let failed = $state(false);
 
   $effect(() => {
@@ -119,14 +119,14 @@
     const kind = list;
     untrack(() => {
       const row = compare.item && merged.find((it) => it.item === compare.item!.ids[0]);
-      if (row && kind !== "features" && listOf(row.type) !== kind) compare.item = null;
+      if (row && listOf(row.type) !== kind) compare.item = null;
     });
   });
 
-  function focusFromTable(row: AttributeRow, parts: Part[] = []) {
+  function focusFromTable(row: AttributeRow) {
     if (compare.mode === "voronoi") borrowView("fade");
     else restoreView();
-    focus(row, parts);
+    focus(row);
   }
 
   function focusItem(row: ItemRow, label: string) {
@@ -145,21 +145,9 @@
     compare.focusItem(row, itemTitle(row), false);
   }
 
-  // On the Features list a map click toggles the row holding the clicked feature, and the sea clears it.
-  function pickFeature(row: AttributeRow | undefined, layer: string, name: string) {
-    // Lines and Voronoi share their polygons' names, so the click's source finds the part.
-    const source = LAYER_BY_ID.get(layer)?.source;
-    const part = row?.parts?.find((p) => LAYER_BY_ID.get(p.layer)?.source === source && p.name === name);
-    const parts = (row && part ? featureRows(row, [compare.pair.a, compare.pair.b]).find((r) => r.includes(part)) : null)?.filter((p) => !!p) ?? [];
-    const f = compare.focus;
-    if (!row || (f?.iso3 === row.iso3 && sameParts(f.parts, parts))) compare.focus = null;
-    else focus(row, parts, false);
-  }
-
   // A map click narrows to the clicked feature only when its source splits the code.
   function pick(iso3: string, layer: string, name: string) {
     const row = rows.find((r) => r.iso3 === iso3);
-    if (tab === "split" && list === "features") return pickFeature(row, layer, name);
     if (!row) return;
     const own = (row.parts ?? []).filter((p) => p.layer === layer);
     const part = own.length > 1 ? (own.find((p) => p.name === name) ?? null) : null;
