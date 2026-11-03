@@ -1,0 +1,22 @@
+{
+  "spec_version": "1.0.0",
+  "current_version": "1.0.0",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "created": "2026-11-03T12:19:36.255827Z",
+      "breaking": false,
+      "assets": {
+        "attributes.parquet": {
+          "sha256": "8554350d9f54f7ee095f22f2b0c092885901fc5701b4b466a82b510634e35aa2",
+          "size_bytes": 60594,
+          "href": "tables/attributes/attributes.parquet",
+          "mtime": 1793708254.8332105
+        }
+      },
+      "changes": [
+        "attributes.parquet"
+      ]
+    }
+  ]
+}

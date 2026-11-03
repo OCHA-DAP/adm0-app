@@ -7,7 +7,7 @@
   import HitsPanel from "$lib/components/HitsPanel.svelte";
   import PasswordGate from "$lib/components/PasswordGate.svelte";
   import { itemTitle, mergeItems, prepareItems, unionBox, type AttributeRow, type GeometryList, type ItemRow, type Part } from "$lib/attributes";
-  import { layerFor } from "$lib/layers";
+  import { catalogPath, layerFor } from "$lib/layers";
 
   type Tab = "map" | "split" | "table";
   const TABS: { id: Tab; label: string }[] = [
@@ -31,11 +31,11 @@
 
   $effect(() => {
     if (!tilesBase) return;
-    const load = (name: string) => fetch(`${tilesBase}/${name}`).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
-    load("attributes.json")
+    const load = (name: string) => fetch(`${tilesBase}/${catalogPath(name, "json")}`).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
+    load("attributes")
       .then((data: AttributeRow[]) => (rows = data))
       .catch(() => (failed = true));
-    load("items.json")
+    load("items")
       .then((data: ItemRow[]) => (items = prepareItems(data)))
       .catch(() => (items = []));
   });

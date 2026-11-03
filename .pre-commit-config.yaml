@@ -9,3 +9,11 @@ repos:
     hooks:
       - id: ruff-check
       - id: ruff-format
+  - repo: local
+    hooks:
+      - id: no-remote-path
+        name: block the catalog's remote path
+        language: system
+        entry: >-
+          bash -c 'r=$(sed -n "s/^PORTOLAN_REMOTE=[\"]*s3:\/\/\([^\"]*\)[\"]*$/\1/p" .env 2>/dev/null);
+          r=${r%/}; [ -z "$r" ] || ! grep -lF "$r" "$@"' --

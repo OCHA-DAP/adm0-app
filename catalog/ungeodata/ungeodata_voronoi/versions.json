@@ -1,0 +1,40 @@
+{
+  "spec_version": "1.0.0",
+  "current_version": "1.0.0",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "created": "2026-11-03T12:17:55.939683Z",
+      "breaking": false,
+      "assets": {
+        "ungeodata_voronoi.parquet": {
+          "sha256": "d0cf4f6a186c23f1779478d599fbcdc52dd3cbab35bef0c2b578d909b29ce6fb",
+          "size_bytes": 17424682,
+          "href": "ungeodata/ungeodata_voronoi/ungeodata_voronoi.parquet",
+          "source_mtime": 1793705859.0347967,
+          "mtime": 1793705859.0347967,
+          "feature_count": 260,
+          "schema_fingerprint": "943392f632d6652f"
+        },
+        "ungeodata_voronoi.pmtiles": {
+          "sha256": "5209e151059bcb67699f542e81052820b9ac36e59d5c054a6637ab979295fd6c",
+          "size_bytes": 101607230,
+          "href": "ungeodata/ungeodata_voronoi/ungeodata_voronoi.pmtiles",
+          "source_path": "ungeodata_voronoi.pmtiles",
+          "mtime": 1793706006.550456
+        },
+        "ungeodata_voronoi.thumb.jpg": {
+          "sha256": "9b833428d90ac268e7538d9286ffefd1e62da694f742dea30074acdc24ea44bb",
+          "size_bytes": 24950,
+          "href": "ungeodata/ungeodata_voronoi/ungeodata_voronoi.thumb.jpg",
+          "mtime": 1793708275.9379954
+        }
+      },
+      "changes": [
+        "ungeodata_voronoi.parquet",
+        "ungeodata_voronoi.pmtiles",
+        "ungeodata_voronoi.thumb.jpg"
+      ]
+    }
+  ]
+}

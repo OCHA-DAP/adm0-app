@@ -1,0 +1,40 @@
+{
+  "spec_version": "1.0.0",
+  "current_version": "1.0.0",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "created": "2026-11-03T12:19:27.450529Z",
+      "breaking": false,
+      "assets": {
+        "lsib_lines.parquet": {
+          "sha256": "87d1f80d549cca0098249ca773ef276a5a704a509e2318542c40d996bb2ed749",
+          "size_bytes": 43724797,
+          "href": "wp/lsib_lines/lsib_lines.parquet",
+          "source_mtime": 1793705804.1649966,
+          "mtime": 1793705804.1649966,
+          "feature_count": 395,
+          "schema_fingerprint": "8048725ef1af20d7"
+        },
+        "lsib_lines.pmtiles": {
+          "sha256": "1eb1ed01135929d079fb3228e79d83ac3188310137e495b5dd97ca84febd8642",
+          "size_bytes": 42391642,
+          "href": "wp/lsib_lines/lsib_lines.pmtiles",
+          "source_path": "lsib_lines.pmtiles",
+          "mtime": 1793706006.549894
+        },
+        "lsib_lines.thumb.jpg": {
+          "sha256": "44934375621e56d720b8fd44bea9a56dcf85153049f05be9ba249088085d0b8f",
+          "size_bytes": 13275,
+          "href": "wp/lsib_lines/lsib_lines.thumb.jpg",
+          "mtime": 1793708367.4488354
+        }
+      },
+      "changes": [
+        "lsib_lines.parquet",
+        "lsib_lines.pmtiles",
+        "lsib_lines.thumb.jpg"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "type": "Catalog",
+  "id": "ungeodata",
+  "stac_version": "1.1.0",
+  "title": "Ungeodata",
+  "description": "Catalog: ungeodata",
+  "links": [
+    {
+      "rel": "root",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "parent",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "child",
+      "href": "./ungeodata_polygons/collection.json",
+      "type": "application/json",
+      "title": "Ungeodata Polygons"
+    },
+    {
+      "rel": "child",
+      "href": "./ungeodata_lines/collection.json",
+      "type": "application/json",
+      "title": "Ungeodata Lines"
+    },
+    {
+      "rel": "child",
+      "href": "./ungeodata_voronoi/collection.json",
+      "type": "application/json",
+      "title": "Ungeodata Voronoi"
+    },
+    {
+      "rel": "agents",
+      "href": "./AGENTS.md",
+      "type": "text/markdown",
+      "title": "Agent/LLM usage guide"
+    },
+    {
+      "rel": "describedby",
+      "href": "./README.md",
+      "type": "text/markdown",
+      "title": "Human-readable documentation"
+    }
+  ],
+  "stac_extensions": [
+    "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json"
+  ]
+}

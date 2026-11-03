@@ -6,7 +6,7 @@ from logging import INFO, basicConfig
 from os import getenv
 
 STEPS = ("download", "prepare", "extend", "attributes", "tiles")
-OPTIONAL_STEPS = ("fieldmaps", "register", "differences")
+OPTIONAL_STEPS = ("fieldmaps", "register", "differences", "catalog")
 
 basicConfig(
     level=INFO,

@@ -1,0 +1,40 @@
+{
+  "spec_version": "1.0.0",
+  "current_version": "1.0.0",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "created": "2026-11-03T12:17:46.306433Z",
+      "breaking": false,
+      "assets": {
+        "gaul_l0.parquet": {
+          "sha256": "1cea9fb71c5154761c3024e9c00102c16665f6f8ede74eeca8359273fc87c6df",
+          "size_bytes": 269615981,
+          "href": "gaul/gaul_l0/gaul_l0.parquet",
+          "source_mtime": 1793705794.63668,
+          "mtime": 1793705794.63668,
+          "feature_count": 272,
+          "schema_fingerprint": "45414119ac82037a"
+        },
+        "gaul_l0.pmtiles": {
+          "sha256": "f2fb4cf193197739be4c91c08d3706d5086fa3b2f2d1d92b661a6c27aa3c81e7",
+          "size_bytes": 175922267,
+          "href": "gaul/gaul_l0/gaul_l0.pmtiles",
+          "source_path": "gaul_l0.pmtiles",
+          "mtime": 1793706006.549272
+        },
+        "gaul_l0.thumb.jpg": {
+          "sha256": "3bc7ed0333a55f6e8bae2109e79e8a66b9875cdb5fd0c736fbbd6cd764ba59f3",
+          "size_bytes": 32061,
+          "href": "gaul/gaul_l0/gaul_l0.thumb.jpg",
+          "mtime": 1793708266.2173898
+        }
+      },
+      "changes": [
+        "gaul_l0.parquet",
+        "gaul_l0.pmtiles",
+        "gaul_l0.thumb.jpg"
+      ]
+    }
+  ]
+}

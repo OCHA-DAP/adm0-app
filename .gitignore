@@ -8,3 +8,11 @@ dist/
 .astro/
 inputs/ungeodata/
 .playwright-cli/
+catalog/**/*.parquet
+catalog/**/*.pmtiles
+catalog/**/*.thumb.*
+catalog/tables/*/*.json
+!catalog/tables/*/collection.json
+!catalog/tables/*/versions.json
+catalog/**/.portolan/.versions.lock
+catalog/**/.state/

@@ -1,0 +1,175 @@
+{
+  "type": "Collection",
+  "id": "gaul/gaul_l0",
+  "stac_version": "1.1.0",
+  "description": "Gaul L0",
+  "links": [
+    {
+      "rel": "root",
+      "href": "../../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "parent",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "license",
+      "href": "https://opendatacommons.org/licenses/odbl/1-0/",
+      "title": "License"
+    },
+    {
+      "rel": "agents",
+      "href": "./AGENTS.md",
+      "type": "text/markdown",
+      "title": "Agent/LLM usage guide"
+    },
+    {
+      "rel": "describedby",
+      "href": "./README.md",
+      "type": "text/markdown",
+      "title": "Human-readable documentation"
+    },
+    {
+      "rel": "pmtiles",
+      "href": "./gaul_l0.pmtiles",
+      "type": "application/vnd.pmtiles",
+      "pmtiles:layers": [
+        "gaul_l0"
+      ]
+    }
+  ],
+  "stac_extensions": [
+    "https://stac-extensions.github.io/table/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+    "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
+    "https://stac-extensions.github.io/web-map-links/v1.3.0/schema.json"
+  ],
+  "updated": "2026-11-03T12:17:36Z",
+  "geoparquet:geometry_type": [
+    "MultiPolygon"
+  ],
+  "geoparquet:feature_count": 272,
+  "pmtiles:min_zoom": 0,
+  "pmtiles:max_zoom": 12,
+  "pmtiles:tile_type": "mvt",
+  "pmtiles:center": [
+    0.0,
+    -0.7118551,
+    6
+  ],
+  "pmtiles:layers": [
+    "gaul_l0"
+  ],
+  "table:row_count": 272,
+  "table:primary_geometry": "geometry",
+  "table:columns": [
+    {
+      "name": "gaul_id",
+      "type": "string"
+    },
+    {
+      "name": "GAUL0_CODE",
+      "type": "int64"
+    },
+    {
+      "name": "ISO3_CODE",
+      "type": "string"
+    },
+    {
+      "name": "MAP_CODE",
+      "type": "string"
+    },
+    {
+      "name": "GAUL0_NAME",
+      "type": "string"
+    },
+    {
+      "name": "CONTINENT",
+      "type": "string"
+    },
+    {
+      "name": "geometry",
+      "type": "binary"
+    }
+  ],
+  "title": "Gaul L0",
+  "extent": {
+    "spatial": {
+      "bbox": [
+        [
+          -180.0,
+          -85.0511287,
+          180.0,
+          83.6274185
+        ]
+      ]
+    },
+    "temporal": {
+      "interval": [
+        [
+          null,
+          null
+        ]
+      ]
+    }
+  },
+  "license": "ODbL-1.0",
+  "providers": [
+    {
+      "name": "FAO (GAUL 2025)",
+      "roles": [
+        "producer",
+        "licensor"
+      ]
+    },
+    {
+      "name": "OCHA Centre for Humanitarian Data",
+      "roles": [
+        "host"
+      ],
+      "url": "https://github.com/OCHA-DAP/adm0-site/issues"
+    }
+  ],
+  "assets": {
+    "gaul_l0": {
+      "href": "./gaul_l0.parquet",
+      "type": "application/vnd.apache.parquet",
+      "file:size": 269615981,
+      "file:checksum": "12201cea9fb71c5154761c3024e9c00102c16665f6f8ede74eeca8359273fc87c6df",
+      "roles": [
+        "data"
+      ]
+    },
+    "gaul_l0-tiles": {
+      "href": "./gaul_l0.pmtiles",
+      "type": "application/vnd.pmtiles",
+      "file:size": 175922267,
+      "file:checksum": "1220f2fb4cf193197739be4c91c08d3706d5086fa3b2f2d1d92b661a6c27aa3c81e7",
+      "roles": [
+        "visual"
+      ]
+    },
+    "styles/default": {
+      "href": "./styles/default.json",
+      "type": "application/vnd.mapbox.style+json",
+      "roles": [
+        "style",
+        "default"
+      ],
+      "title": "Default",
+      "file:size": 454,
+      "file:checksum": "1220687c0f93c5f2c58534e1846b5d9d12f8b106f38a96608cff2ba03acde798990e"
+    },
+    "thumbnail": {
+      "href": "./gaul_l0.thumb.jpg",
+      "type": "image/jpeg",
+      "roles": [
+        "thumbnail"
+      ],
+      "file:size": 32061,
+      "file:checksum": "12203bc7ed0333a55f6e8bae2109e79e8a66b9875cdb5fd0c736fbbd6cd764ba59f3"
+    }
+  }
+}

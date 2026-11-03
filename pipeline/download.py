@@ -65,7 +65,6 @@ _retry = retry(
 
 def _client() -> Client:
     return Client(
-        http2=True,
         timeout=Timeout(60, connect=30),
         headers={"User-Agent": "Mozilla/5.0 (adm0-site)"},
         follow_redirects=True,
