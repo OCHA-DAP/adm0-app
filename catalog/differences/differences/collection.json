@@ -160,22 +160,22 @@
     "styles/default": {
       "href": "./styles/default.json",
       "type": "application/vnd.mapbox.style+json",
+      "title": "Default",
+      "file:size": 466,
+      "file:checksum": "122045afde6ee716b9ae89bea2b660a5835efb60abd85c7a343e39a5edf7509cc7b4",
       "roles": [
         "style",
         "default"
-      ],
-      "title": "Default",
-      "file:size": 466,
-      "file:checksum": "122045afde6ee716b9ae89bea2b660a5835efb60abd85c7a343e39a5edf7509cc7b4"
+      ]
     },
     "thumbnail": {
       "href": "./differences.thumb.jpg",
       "type": "image/jpeg",
+      "file:size": 6665,
+      "file:checksum": "1220f269c64fcdf3d93b3203b8a870cec6eae566eb80f61dc7eae1ce2e675fbe9b74",
       "roles": [
         "thumbnail"
-      ],
-      "file:size": 6665,
-      "file:checksum": "1220f269c64fcdf3d93b3203b8a870cec6eae566eb80f61dc7eae1ce2e675fbe9b74"
+      ]
     }
   }
 }

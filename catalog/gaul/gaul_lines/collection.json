@@ -46,7 +46,7 @@
     "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
     "https://stac-extensions.github.io/web-map-links/v1.3.0/schema.json"
   ],
-  "updated": "2026-11-03T12:17:47Z",
+  "updated": "2026-11-03T14:37:37Z",
   "geoparquet:geometry_type": [
     "LineString",
     "MultiLineString"
@@ -155,22 +155,22 @@
     "styles/default": {
       "href": "./styles/default.json",
       "type": "application/vnd.mapbox.style+json",
+      "title": "Default",
+      "file:size": 447,
+      "file:checksum": "1220d4c0eb5315d97cfc0ad4f47ca681f9f25df34fa9a7d7e395ae6ed9fceabf8758",
       "roles": [
         "style",
         "default"
-      ],
-      "title": "Default",
-      "file:size": 447,
-      "file:checksum": "1220d4c0eb5315d97cfc0ad4f47ca681f9f25df34fa9a7d7e395ae6ed9fceabf8758"
+      ]
     },
     "thumbnail": {
       "href": "./gaul_lines.thumb.jpg",
       "type": "image/jpeg",
+      "file:size": 13141,
+      "file:checksum": "122038e617d2c7a955501ac3ffef3b97e60026e2e81067cf43ae19b844361cf7bf77",
       "roles": [
         "thumbnail"
-      ],
-      "file:size": 13141,
-      "file:checksum": "122038e617d2c7a955501ac3ffef3b97e60026e2e81067cf43ae19b844361cf7bf77"
+      ]
     }
   }
 }

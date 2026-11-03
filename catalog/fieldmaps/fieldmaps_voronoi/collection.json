@@ -46,7 +46,7 @@
     "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
     "https://stac-extensions.github.io/web-map-links/v1.3.0/schema.json"
   ],
-  "updated": "2026-11-03T12:18:44Z",
+  "updated": "2026-11-03T14:37:45Z",
   "geoparquet:geometry_type": [
     "Polygon",
     "MultiPolygon"
@@ -219,22 +219,22 @@
     "styles/default": {
       "href": "./styles/default.json",
       "type": "application/vnd.mapbox.style+json",
+      "title": "Default",
+      "file:size": 484,
+      "file:checksum": "1220cd4937b3608660558f8b4afd989d9545298e1d35d5f32ec0b247ef92ec725660",
       "roles": [
         "style",
         "default"
-      ],
-      "title": "Default",
-      "file:size": 484,
-      "file:checksum": "1220cd4937b3608660558f8b4afd989d9545298e1d35d5f32ec0b247ef92ec725660"
+      ]
     },
     "thumbnail": {
       "href": "./fieldmaps_voronoi.thumb.jpg",
       "type": "image/jpeg",
+      "file:size": 25620,
+      "file:checksum": "1220c7eaf4b52663f72022bbbb29a754d8d6b935887981595e59ad89d390ad1ec09c",
       "roles": [
         "thumbnail"
-      ],
-      "file:size": 25620,
-      "file:checksum": "1220c7eaf4b52663f72022bbbb29a754d8d6b935887981595e59ad89d390ad1ec09c"
+      ]
     }
   }
 }

@@ -132,22 +132,22 @@
     "styles/default": {
       "href": "./styles/default.json",
       "type": "application/vnd.mapbox.style+json",
+      "title": "Default",
+      "file:size": 476,
+      "file:checksum": "1220e903559eb0d136d96e179d6fa455efa8205efe9f28051fa139f3f0b6df32a117",
       "roles": [
         "style",
         "default"
-      ],
-      "title": "Default",
-      "file:size": 476,
-      "file:checksum": "1220e903559eb0d136d96e179d6fa455efa8205efe9f28051fa139f3f0b6df32a117"
+      ]
     },
     "thumbnail": {
       "href": "./differences_dots.thumb.jpg",
       "type": "image/jpeg",
+      "file:size": 8270,
+      "file:checksum": "1220d6c2520bf6e6b7617fcf1fa1af363009b01c0bab78568480aa026764fc1cb672",
       "roles": [
         "thumbnail"
-      ],
-      "file:size": 8270,
-      "file:checksum": "1220d6c2520bf6e6b7617fcf1fa1af363009b01c0bab78568480aa026764fc1cb672"
+      ]
     }
   }
 }

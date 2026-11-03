@@ -46,7 +46,7 @@
     "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
     "https://stac-extensions.github.io/web-map-links/v1.3.0/schema.json"
   ],
-  "updated": "2026-11-03T12:17:48Z",
+  "updated": "2026-11-03T14:37:38Z",
   "geoparquet:geometry_type": [
     "Polygon",
     "MultiPolygon"
@@ -155,22 +155,22 @@
     "styles/default": {
       "href": "./styles/default.json",
       "type": "application/vnd.mapbox.style+json",
+      "title": "Default",
+      "file:size": 469,
+      "file:checksum": "1220e35538f3d57285ba43fa9c03ad9b3a00b4ff4a69e7233c8d534d8724129a338e",
       "roles": [
         "style",
         "default"
-      ],
-      "title": "Default",
-      "file:size": 469,
-      "file:checksum": "1220e35538f3d57285ba43fa9c03ad9b3a00b4ff4a69e7233c8d534d8724129a338e"
+      ]
     },
     "thumbnail": {
       "href": "./gaul_voronoi.thumb.jpg",
       "type": "image/jpeg",
+      "file:size": 25093,
+      "file:checksum": "122073cd48d744452a13421553a1af5d4f3d260504e53eeefec4f446bfa11cf65620",
       "roles": [
         "thumbnail"
-      ],
-      "file:size": 25093,
-      "file:checksum": "122073cd48d744452a13421553a1af5d4f3d260504e53eeefec4f446bfa11cf65620"
+      ]
     }
   }
 }

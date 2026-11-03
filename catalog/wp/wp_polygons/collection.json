@@ -46,7 +46,7 @@
     "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
     "https://stac-extensions.github.io/web-map-links/v1.3.0/schema.json"
   ],
-  "updated": "2026-11-03T12:18:48Z",
+  "updated": "2026-11-03T14:37:47Z",
   "geoparquet:geometry_type": [
     "MultiPolygon"
   ],
@@ -214,22 +214,22 @@
     "styles/default": {
       "href": "./styles/default.json",
       "type": "application/vnd.mapbox.style+json",
+      "title": "Default",
+      "file:size": 466,
+      "file:checksum": "12202b8f90ff9bdd220ee58ce2dad9c8ec0297b551e05540bd390cb884ac95e721da",
       "roles": [
         "style",
         "default"
-      ],
-      "title": "Default",
-      "file:size": 466,
-      "file:checksum": "12202b8f90ff9bdd220ee58ce2dad9c8ec0297b551e05540bd390cb884ac95e721da"
+      ]
     },
     "thumbnail": {
       "href": "./wp_polygons.thumb.jpg",
       "type": "image/jpeg",
+      "file:size": 33375,
+      "file:checksum": "1220786fdf4ee4e8d7490f170f74a1e20e48e9e36c984a7d9166bb8846fcf8420221",
       "roles": [
         "thumbnail"
-      ],
-      "file:size": 33375,
-      "file:checksum": "1220786fdf4ee4e8d7490f170f74a1e20e48e9e36c984a7d9166bb8846fcf8420221"
+      ]
     }
   }
 }

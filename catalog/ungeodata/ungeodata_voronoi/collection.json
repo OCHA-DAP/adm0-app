@@ -46,7 +46,7 @@
     "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
     "https://stac-extensions.github.io/web-map-links/v1.3.0/schema.json"
   ],
-  "updated": "2026-11-03T12:17:55Z",
+  "updated": "2026-11-03T14:37:41Z",
   "geoparquet:geometry_type": [
     "Polygon",
     "MultiPolygon"
@@ -175,22 +175,22 @@
     "styles/default": {
       "href": "./styles/default.json",
       "type": "application/vnd.mapbox.style+json",
+      "title": "Default",
+      "file:size": 484,
+      "file:checksum": "1220b00a18df40878a5c1def2bf1a9680fc4dea93d43237441b30e23bbb29713f522",
       "roles": [
         "style",
         "default"
-      ],
-      "title": "Default",
-      "file:size": 484,
-      "file:checksum": "1220b00a18df40878a5c1def2bf1a9680fc4dea93d43237441b30e23bbb29713f522"
+      ]
     },
     "thumbnail": {
       "href": "./ungeodata_voronoi.thumb.jpg",
       "type": "image/jpeg",
+      "file:size": 24950,
+      "file:checksum": "12209b833428d90ac268e7538d9286ffefd1e62da694f742dea30074acdc24ea44bb",
       "roles": [
         "thumbnail"
-      ],
-      "file:size": 24950,
-      "file:checksum": "12209b833428d90ac268e7538d9286ffefd1e62da694f742dea30074acdc24ea44bb"
+      ]
     }
   }
 }
