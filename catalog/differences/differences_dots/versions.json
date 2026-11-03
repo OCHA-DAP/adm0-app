@@ -1,0 +1,40 @@
+{
+  "spec_version": "1.0.0",
+  "current_version": "1.0.0",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "created": "2026-11-03T12:19:35.360580Z",
+      "breaking": false,
+      "assets": {
+        "differences_dots.parquet": {
+          "sha256": "4cb8992a8c0a8793666fd0fcf614d2303c0a3ac36af043371269e7ef1e7fecea",
+          "size_bytes": 12034,
+          "href": "differences/differences_dots/differences_dots.parquet",
+          "source_mtime": 1793705596.124454,
+          "mtime": 1793705596.124454,
+          "feature_count": 1549,
+          "schema_fingerprint": "03c35d2b11ec75b9"
+        },
+        "differences_dots.pmtiles": {
+          "sha256": "d3229930b4f9f0891dbc258167c281c2971464eb98f1526c8f66f6f12ba2da26",
+          "size_bytes": 465058,
+          "href": "differences/differences_dots/differences_dots.pmtiles",
+          "source_path": "differences_dots.pmtiles",
+          "mtime": 1793706006.54804
+        },
+        "differences_dots.thumb.jpg": {
+          "sha256": "d6c2520bf6e6b7617fcf1fa1af363009b01c0bab78568480aa026764fc1cb672",
+          "size_bytes": 8270,
+          "href": "differences/differences_dots/differences_dots.thumb.jpg",
+          "mtime": 1793708375.3590088
+        }
+      },
+      "changes": [
+        "differences_dots.parquet",
+        "differences_dots.pmtiles",
+        "differences_dots.thumb.jpg"
+      ]
+    }
+  ]
+}

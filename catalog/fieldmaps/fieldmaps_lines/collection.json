@@ -1,0 +1,211 @@
+{
+  "type": "Collection",
+  "id": "fieldmaps/fieldmaps_lines",
+  "stac_version": "1.1.0",
+  "description": "Fieldmaps Lines",
+  "links": [
+    {
+      "rel": "root",
+      "href": "../../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "parent",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "license",
+      "href": "https://opendatacommons.org/licenses/odbl/1-0/",
+      "title": "License"
+    },
+    {
+      "rel": "agents",
+      "href": "./AGENTS.md",
+      "type": "text/markdown",
+      "title": "Agent/LLM usage guide"
+    },
+    {
+      "rel": "describedby",
+      "href": "./README.md",
+      "type": "text/markdown",
+      "title": "Human-readable documentation"
+    },
+    {
+      "rel": "pmtiles",
+      "href": "./fieldmaps_lines.pmtiles",
+      "type": "application/vnd.pmtiles",
+      "pmtiles:layers": [
+        "fieldmaps_lines"
+      ]
+    }
+  ],
+  "stac_extensions": [
+    "https://stac-extensions.github.io/table/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+    "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
+    "https://stac-extensions.github.io/web-map-links/v1.3.0/schema.json"
+  ],
+  "updated": "2026-11-03T14:37:44Z",
+  "geoparquet:geometry_type": [
+    "MultiLineString"
+  ],
+  "geoparquet:feature_count": 396,
+  "pmtiles:min_zoom": 0,
+  "pmtiles:max_zoom": 12,
+  "pmtiles:tile_type": "mvt",
+  "pmtiles:center": [
+    0.0101463,
+    7.5991906,
+    6
+  ],
+  "pmtiles:layers": [
+    "fieldmaps_lines"
+  ],
+  "table:row_count": 396,
+  "table:primary_geometry": "geometry",
+  "table:columns": [
+    {
+      "name": "adm_id",
+      "type": "int64"
+    },
+    {
+      "name": "cc1",
+      "type": "string"
+    },
+    {
+      "name": "country1",
+      "type": "string"
+    },
+    {
+      "name": "cc2",
+      "type": "string"
+    },
+    {
+      "name": "country2",
+      "type": "string"
+    },
+    {
+      "name": "rank",
+      "type": "int64"
+    },
+    {
+      "name": "label",
+      "type": "string"
+    },
+    {
+      "name": "status",
+      "type": "string"
+    },
+    {
+      "name": "notes",
+      "type": "string"
+    },
+    {
+      "name": "line_type",
+      "type": "string"
+    },
+    {
+      "name": "wld_date",
+      "type": "date32[day]"
+    },
+    {
+      "name": "wld_update",
+      "type": "date32[day]"
+    },
+    {
+      "name": "wld_land",
+      "type": "string"
+    },
+    {
+      "name": "wld_view",
+      "type": "string"
+    },
+    {
+      "name": "geometry",
+      "type": "binary"
+    },
+    {
+      "name": "line_type_1",
+      "type": "string"
+    }
+  ],
+  "title": "Fieldmaps Lines",
+  "extent": {
+    "spatial": {
+      "bbox": [
+        [
+          -141.0018584,
+          -54.8939119,
+          141.022151,
+          70.0922932
+        ]
+      ]
+    },
+    "temporal": {
+      "interval": [
+        [
+          null,
+          null
+        ]
+      ]
+    }
+  },
+  "license": "ODbL-1.0",
+  "providers": [
+    {
+      "name": "FieldMaps (OpenStreetMap)",
+      "roles": [
+        "producer",
+        "licensor"
+      ]
+    },
+    {
+      "name": "OCHA Centre for Humanitarian Data",
+      "roles": [
+        "host"
+      ],
+      "url": "https://github.com/OCHA-DAP/adm0-site/issues"
+    }
+  ],
+  "assets": {
+    "fieldmaps_lines": {
+      "href": "./fieldmaps_lines.parquet",
+      "type": "application/vnd.apache.parquet",
+      "file:size": 37680553,
+      "file:checksum": "122057d58b5387250915e108eaf4724b6b2cbb3b12d0bd2c466f54219f0f11334878",
+      "roles": [
+        "data"
+      ]
+    },
+    "fieldmaps_lines-tiles": {
+      "href": "./fieldmaps_lines.pmtiles",
+      "type": "application/vnd.pmtiles",
+      "file:size": 33508644,
+      "file:checksum": "12202ac736a26089ae598616e0a4bf31036ad2c1dfad51ff2bd246a10407fdb5f1f4",
+      "roles": [
+        "visual"
+      ]
+    },
+    "styles/default": {
+      "href": "./styles/default.json",
+      "type": "application/vnd.mapbox.style+json",
+      "title": "Default",
+      "file:size": 462,
+      "file:checksum": "122085de7e665764bbab475c847451e7e7b97deeb4989f33d0c0a357f05992769f9c",
+      "roles": [
+        "style",
+        "default"
+      ]
+    },
+    "thumbnail": {
+      "href": "./fieldmaps_lines.thumb.jpg",
+      "type": "image/jpeg",
+      "file:size": 13149,
+      "file:checksum": "1220744c63bf0e6e2f668bd1e0ce69d75b31de0370933bea18648b92e61218d4ca74",
+      "roles": [
+        "thumbnail"
+      ]
+    }
+  }
+}

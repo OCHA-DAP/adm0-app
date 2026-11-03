@@ -24,6 +24,11 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: site/package-lock.json
+      - name: Check the tiles path is not in the repo
+        env:
+          TILES_URL: ${{ secrets.TILES_URL }}
+        run: |
+          if git grep -qF "${TILES_URL#https://data.source.coop/}"; then echo "Tiles path found in repo"; exit 1; fi
       - run: npm ci
       - run: node scripts/seal-url.mjs
         env:

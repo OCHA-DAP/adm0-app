@@ -1,7 +1,7 @@
 import type { ExpressionSpecification, FilterSpecification, LayerSpecification, Map, StyleSpecification } from "maplibre-gl";
 import type { Focus, ItemFocus } from "$lib/compare.svelte";
 import positron from "$lib/utils/basemap/positron.json";
-import { LAYERS, LAYER_BY_ID, layerFor, type SourceLayer } from "$lib/layers";
+import { LAYERS, LAYER_BY_ID, catalogPath, layerFor, type SourceLayer } from "$lib/layers";
 import { SATELLITE } from "$lib/map/satellite";
 
 export type Slot = "a" | "b";
@@ -276,7 +276,7 @@ export function buildStyle(tilesBase: string, draws: Draw[]): StyleSpecification
       ...(positron.sources as StyleSpecification["sources"]),
       satellite: SATELLITE,
       ...Object.fromEntries(
-        [...LAYERS.map((l) => l.id), DIFFERENCES, DIFF_DOTS].map((id) => [id, { type: "vector" as const, url: `pmtiles://${tilesBase}/${id}.pmtiles` }]),
+        [...LAYERS.map((l) => l.id), DIFFERENCES, DIFF_DOTS].map((id) => [id, { type: "vector" as const, url: `pmtiles://${tilesBase}/${catalogPath(id)}` }]),
       ),
     },
     layers: [

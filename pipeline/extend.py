@@ -1,6 +1,9 @@
 """Extend each source's polygons into Voronoi cells with topo-tools edge-extend."""
 
+import sys
+from argparse import ArgumentParser
 from logging import getLogger
+from pathlib import Path
 from subprocess import run
 
 from .config import layers, open_db, prepare_dir, tmp_dir, write_parquet
@@ -8,6 +11,7 @@ from .config import layers, open_db, prepare_dir, tmp_dir, write_parquet
 logger = getLogger(__name__)
 
 extend_dir = tmp_dir / "extend"
+TOPO_TOOLS = Path(sys.executable).parent / "topo-tools"
 
 
 def extend(layer: dict) -> None:
@@ -17,30 +21,28 @@ def extend(layer: dict) -> None:
         for lyr in layers()
         if lyr["source"] == layer["source"] and lyr["kind"] == "polygon"
     )
-    src = prepare_dir / f"{polygon}.parquet"
-    bounded = extend_dir / f"{polygon}_bounded.parquet"
     extend_dir.mkdir(parents=True, exist_ok=True)
-    # Vertices a hair past +-180 fall outside edge-extend's clipped Voronoi cells.
+    raw = extend_dir / f"{layer['id']}.parquet"
+    logger.info("%s: extending %s", layer["id"], polygon)
+    run(
+        [TOPO_TOOLS, "edge-extend", prepare_dir / f"{polygon}.parquet", raw],
+        check=True,
+    )
     write_parquet(
         open_db(),
-        f"""SELECT * REPLACE (CASE
-                WHEN ST_XMin(geometry) < -180 OR ST_XMax(geometry) > 180
-                  OR ST_YMin(geometry) < -90 OR ST_YMax(geometry) > 90
-                THEN ST_Multi(ST_CollectionExtract(ST_Intersection(
-                    geometry, ST_MakeEnvelope(-180, -90, 180, 90)), 3))
-                ELSE geometry
-            END AS geometry)
-        FROM read_parquet('{src}')""",
-        bounded,
+        f"SELECT * FROM read_parquet('{raw}')",
+        prepare_dir / f"{layer['id']}.parquet",
     )
-    out = prepare_dir / f"{layer['id']}.parquet"
-    logger.info("%s: extending %s", layer["id"], bounded.name)
-    run(["topo-tools", "edge-extend", str(bounded), str(out)], check=True)
-    bounded.unlink()
+    raw.unlink()
 
 
 def main() -> None:
-    """Write one Voronoi layer per source."""
+    """Write one Voronoi layer per source, or only the sources named in ``--source``."""
+    parser = ArgumentParser()
+    parser.add_argument("--source", nargs="+")
+    args, _ = parser.parse_known_args()
     for layer in layers():
-        if layer["kind"] == "voronoi":
+        if layer["kind"] == "voronoi" and (
+            not args.source or layer["source"] in args.source
+        ):
             extend(layer)

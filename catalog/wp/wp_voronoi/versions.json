@@ -1,0 +1,40 @@
+{
+  "spec_version": "1.0.0",
+  "current_version": "1.0.0",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "created": "2026-11-03T12:19:31.577336Z",
+      "breaking": false,
+      "assets": {
+        "wp_voronoi.parquet": {
+          "sha256": "6234c1b92a1f34282ef9f7c68d561482b883478ba88c2dada0ce84fb984fcd6f",
+          "size_bytes": 74152953,
+          "href": "wp/wp_voronoi/wp_voronoi.parquet",
+          "source_mtime": 1793705999.278446,
+          "mtime": 1793705999.278446,
+          "feature_count": 323,
+          "schema_fingerprint": "f7964d9d461a5eb0"
+        },
+        "wp_voronoi.pmtiles": {
+          "sha256": "41918e17b84dccf2a764879cf86b58d2d318ed51c844cb473126d901b0c0b800",
+          "size_bytes": 166841125,
+          "href": "wp/wp_voronoi/wp_voronoi.pmtiles",
+          "source_path": "wp_voronoi.pmtiles",
+          "mtime": 1793706006.551366
+        },
+        "wp_voronoi.thumb.jpg": {
+          "sha256": "a5d3efb5b8d4d6833db04a4b2f2c7205f47f43b7b8eab5e057d5f3883d4754d4",
+          "size_bytes": 25362,
+          "href": "wp/wp_voronoi/wp_voronoi.thumb.jpg",
+          "mtime": 1793708371.572389
+        }
+      },
+      "changes": [
+        "wp_voronoi.parquet",
+        "wp_voronoi.pmtiles",
+        "wp_voronoi.thumb.jpg"
+      ]
+    }
+  ]
+}

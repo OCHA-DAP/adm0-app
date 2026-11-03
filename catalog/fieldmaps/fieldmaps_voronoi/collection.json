@@ -1,0 +1,240 @@
+{
+  "type": "Collection",
+  "id": "fieldmaps/fieldmaps_voronoi",
+  "stac_version": "1.1.0",
+  "description": "Fieldmaps Voronoi",
+  "links": [
+    {
+      "rel": "root",
+      "href": "../../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "parent",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "license",
+      "href": "https://opendatacommons.org/licenses/odbl/1-0/",
+      "title": "License"
+    },
+    {
+      "rel": "agents",
+      "href": "./AGENTS.md",
+      "type": "text/markdown",
+      "title": "Agent/LLM usage guide"
+    },
+    {
+      "rel": "describedby",
+      "href": "./README.md",
+      "type": "text/markdown",
+      "title": "Human-readable documentation"
+    },
+    {
+      "rel": "pmtiles",
+      "href": "./fieldmaps_voronoi.pmtiles",
+      "type": "application/vnd.pmtiles",
+      "pmtiles:layers": [
+        "fieldmaps_voronoi"
+      ]
+    }
+  ],
+  "stac_extensions": [
+    "https://stac-extensions.github.io/table/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+    "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
+    "https://stac-extensions.github.io/web-map-links/v1.3.0/schema.json"
+  ],
+  "updated": "2026-11-03T14:37:45Z",
+  "geoparquet:geometry_type": [
+    "Polygon",
+    "MultiPolygon"
+  ],
+  "geoparquet:feature_count": 315,
+  "pmtiles:min_zoom": 0,
+  "pmtiles:max_zoom": 12,
+  "pmtiles:tile_type": "mvt",
+  "pmtiles:center": [
+    0.0,
+    0.0,
+    6
+  ],
+  "pmtiles:layers": [
+    "fieldmaps_voronoi"
+  ],
+  "table:row_count": 315,
+  "table:primary_geometry": "geometry",
+  "table:columns": [
+    {
+      "name": "geometry",
+      "type": "binary"
+    },
+    {
+      "name": "adm0_id",
+      "type": "string"
+    },
+    {
+      "name": "adm0_src",
+      "type": "string"
+    },
+    {
+      "name": "adm0_name",
+      "type": "string"
+    },
+    {
+      "name": "adm0_name1",
+      "type": "string"
+    },
+    {
+      "name": "adm0_name2",
+      "type": "double"
+    },
+    {
+      "name": "iso_cd",
+      "type": "int64"
+    },
+    {
+      "name": "iso_2",
+      "type": "string"
+    },
+    {
+      "name": "iso_3",
+      "type": "string"
+    },
+    {
+      "name": "iso_3_grp",
+      "type": "string"
+    },
+    {
+      "name": "region3_cd",
+      "type": "int64"
+    },
+    {
+      "name": "region3_nm",
+      "type": "string"
+    },
+    {
+      "name": "region2_cd",
+      "type": "int64"
+    },
+    {
+      "name": "region2_nm",
+      "type": "string"
+    },
+    {
+      "name": "region1_cd",
+      "type": "int64"
+    },
+    {
+      "name": "region1_nm",
+      "type": "string"
+    },
+    {
+      "name": "status_cd",
+      "type": "int64"
+    },
+    {
+      "name": "status_nm",
+      "type": "string"
+    },
+    {
+      "name": "wld_date",
+      "type": "date32[day]"
+    },
+    {
+      "name": "wld_update",
+      "type": "date32[day]"
+    },
+    {
+      "name": "wld_land",
+      "type": "string"
+    },
+    {
+      "name": "wld_view",
+      "type": "string"
+    },
+    {
+      "name": "wld_notes",
+      "type": "string"
+    }
+  ],
+  "title": "Fieldmaps Voronoi",
+  "extent": {
+    "spatial": {
+      "bbox": [
+        [
+          -180.0,
+          -85.0511287,
+          180.0,
+          85.0511287
+        ]
+      ]
+    },
+    "temporal": {
+      "interval": [
+        [
+          null,
+          null
+        ]
+      ]
+    }
+  },
+  "license": "ODbL-1.0",
+  "providers": [
+    {
+      "name": "FieldMaps (OpenStreetMap)",
+      "roles": [
+        "producer",
+        "licensor"
+      ]
+    },
+    {
+      "name": "OCHA Centre for Humanitarian Data",
+      "roles": [
+        "host"
+      ],
+      "url": "https://github.com/OCHA-DAP/adm0-site/issues"
+    }
+  ],
+  "assets": {
+    "fieldmaps_voronoi": {
+      "href": "./fieldmaps_voronoi.parquet",
+      "type": "application/vnd.apache.parquet",
+      "file:size": 63747758,
+      "file:checksum": "12201baa2fc91d1034a15458894ab2c2b69aed615f14a2444d7fb9ab850dc75b8499",
+      "roles": [
+        "data"
+      ]
+    },
+    "fieldmaps_voronoi-tiles": {
+      "href": "./fieldmaps_voronoi.pmtiles",
+      "type": "application/vnd.pmtiles",
+      "file:size": 155073512,
+      "file:checksum": "1220b3edf309e4a5bdd073c8026c83ddfddd7848ed4f1e0fcea4c0d5a68e1d8b3965",
+      "roles": [
+        "visual"
+      ]
+    },
+    "styles/default": {
+      "href": "./styles/default.json",
+      "type": "application/vnd.mapbox.style+json",
+      "title": "Default",
+      "file:size": 484,
+      "file:checksum": "1220cd4937b3608660558f8b4afd989d9545298e1d35d5f32ec0b247ef92ec725660",
+      "roles": [
+        "style",
+        "default"
+      ]
+    },
+    "thumbnail": {
+      "href": "./fieldmaps_voronoi.thumb.jpg",
+      "type": "image/jpeg",
+      "file:size": 25620,
+      "file:checksum": "1220c7eaf4b52663f72022bbbb29a754d8d6b935887981595e59ad89d390ad1ec09c",
+      "roles": [
+        "thumbnail"
+      ]
+    }
+  }
+}

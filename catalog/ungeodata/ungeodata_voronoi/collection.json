@@ -1,0 +1,196 @@
+{
+  "type": "Collection",
+  "id": "ungeodata/ungeodata_voronoi",
+  "stac_version": "1.1.0",
+  "description": "Ungeodata Voronoi",
+  "links": [
+    {
+      "rel": "root",
+      "href": "../../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "parent",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "license",
+      "href": "https://opendatacommons.org/licenses/odbl/1-0/",
+      "title": "License"
+    },
+    {
+      "rel": "agents",
+      "href": "./AGENTS.md",
+      "type": "text/markdown",
+      "title": "Agent/LLM usage guide"
+    },
+    {
+      "rel": "describedby",
+      "href": "./README.md",
+      "type": "text/markdown",
+      "title": "Human-readable documentation"
+    },
+    {
+      "rel": "pmtiles",
+      "href": "./ungeodata_voronoi.pmtiles",
+      "type": "application/vnd.pmtiles",
+      "pmtiles:layers": [
+        "ungeodata_voronoi"
+      ]
+    }
+  ],
+  "stac_extensions": [
+    "https://stac-extensions.github.io/table/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+    "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
+    "https://stac-extensions.github.io/web-map-links/v1.3.0/schema.json"
+  ],
+  "updated": "2026-11-03T14:37:41Z",
+  "geoparquet:geometry_type": [
+    "Polygon",
+    "MultiPolygon"
+  ],
+  "geoparquet:feature_count": 260,
+  "pmtiles:min_zoom": 0,
+  "pmtiles:max_zoom": 12,
+  "pmtiles:tile_type": "mvt",
+  "pmtiles:center": [
+    0.0,
+    0.0,
+    6
+  ],
+  "pmtiles:layers": [
+    "ungeodata_voronoi"
+  ],
+  "table:row_count": 260,
+  "table:primary_geometry": "geometry",
+  "table:columns": [
+    {
+      "name": "geometry",
+      "type": "binary"
+    },
+    {
+      "name": "objectid",
+      "type": "int64"
+    },
+    {
+      "name": "iso3cd",
+      "type": "string"
+    },
+    {
+      "name": "romnam",
+      "type": "string"
+    },
+    {
+      "name": "maplab",
+      "type": "string"
+    },
+    {
+      "name": "contcd",
+      "type": "string"
+    },
+    {
+      "name": "stscod",
+      "type": "int16"
+    },
+    {
+      "name": "typ005",
+      "type": "int16"
+    },
+    {
+      "name": "typ025",
+      "type": "int16"
+    },
+    {
+      "name": "del025",
+      "type": "int16"
+    },
+    {
+      "name": "isoclr",
+      "type": "string"
+    },
+    {
+      "name": "status_label",
+      "type": "string"
+    }
+  ],
+  "title": "Ungeodata Voronoi",
+  "extent": {
+    "spatial": {
+      "bbox": [
+        [
+          -180.0,
+          -85.0511287,
+          180.0,
+          85.0511287
+        ]
+      ]
+    },
+    "temporal": {
+      "interval": [
+        [
+          null,
+          null
+        ]
+      ]
+    }
+  },
+  "license": "ODbL-1.0",
+  "providers": [
+    {
+      "name": "United Nations Geospatial",
+      "roles": [
+        "producer",
+        "licensor"
+      ]
+    },
+    {
+      "name": "OCHA Centre for Humanitarian Data",
+      "roles": [
+        "host"
+      ],
+      "url": "https://github.com/OCHA-DAP/adm0-site/issues"
+    }
+  ],
+  "assets": {
+    "ungeodata_voronoi": {
+      "href": "./ungeodata_voronoi.parquet",
+      "type": "application/vnd.apache.parquet",
+      "file:size": 17424682,
+      "file:checksum": "1220d0cf4f6a186c23f1779478d599fbcdc52dd3cbab35bef0c2b578d909b29ce6fb",
+      "roles": [
+        "data"
+      ]
+    },
+    "ungeodata_voronoi-tiles": {
+      "href": "./ungeodata_voronoi.pmtiles",
+      "type": "application/vnd.pmtiles",
+      "file:size": 101607230,
+      "file:checksum": "12205209e151059bcb67699f542e81052820b9ac36e59d5c054a6637ab979295fd6c",
+      "roles": [
+        "visual"
+      ]
+    },
+    "styles/default": {
+      "href": "./styles/default.json",
+      "type": "application/vnd.mapbox.style+json",
+      "title": "Default",
+      "file:size": 484,
+      "file:checksum": "1220b00a18df40878a5c1def2bf1a9680fc4dea93d43237441b30e23bbb29713f522",
+      "roles": [
+        "style",
+        "default"
+      ]
+    },
+    "thumbnail": {
+      "href": "./ungeodata_voronoi.thumb.jpg",
+      "type": "image/jpeg",
+      "file:size": 24950,
+      "file:checksum": "12209b833428d90ac268e7538d9286ffefd1e62da694f742dea30074acdc24ea44bb",
+      "roles": [
+        "thumbnail"
+      ]
+    }
+  }
+}
