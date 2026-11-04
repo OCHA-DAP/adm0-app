@@ -1,7 +1,7 @@
 # adm0-site
 ## Data catalog
 
-The site's tiles and tables are published as a Portolan catalog in `catalog/` (metadata committed, data files gitignored). After the `tiles` step, build and push it with:
+The site's tiles and tables are published as a Portolan catalog in `catalog/`, which the `catalog` step generates (only its `.portolan/` settings are committed). After the `tiles` step, build and push it with:
 
 ```sh
 uv run python -m pipeline --step catalog --push

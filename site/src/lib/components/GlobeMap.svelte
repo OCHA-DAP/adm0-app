@@ -90,11 +90,11 @@
     m.once("load", () => (loaded = true));
     m.on("click", (e) => {
       // On a Geometry list, a Voronoi click picks the difference there, a patch before its area.
-      if (!hits && compare.mode === "voronoi" && listItems) {
+      const picksItem = !hits && compare.mode === "voronoi" && !!listItems;
+      if (picksItem) {
         const box: [maplibregl.PointLike, maplibregl.PointLike] = [[e.point.x - CLICK_PAD, e.point.y - CLICK_PAD], [e.point.x + CLICK_PAD, e.point.y + CLICK_PAD]];
         const found = m.queryRenderedFeatures(box, { layers: [DIFF_PICK] }).sort((x, y) => Number(x.properties.type === "voronoi") - Number(y.properties.type === "voronoi"));
         onitempick(found[0]?.properties.item ?? null);
-        return;
       }
       // Rendered order puts later sources first; A's feature should win.
       const ids = pickLayerIds(compare.draws);
@@ -102,8 +102,7 @@
       const hit = picked[0];
       const layer = hit && LAYER_BY_ID.get(hit.sourceLayer ?? "");
       // Voronoi clicks on the Map tab only report what each source assigns there, so the patches stay unobscured.
-      if (layer?.code && (!hits || compare.mode !== "voronoi")) onpick(String(hit.properties[layer.code] ?? "").toUpperCase(), layer.id, String(hit.properties[layer.name!] ?? ""));
-      if (!hits) return;
+      if (layer?.code && !picksItem && (!hits || compare.mode !== "voronoi")) onpick(String(hit.properties[layer.code] ?? "").toUpperCase(), layer.id, String(hit.properties[layer.name!] ?? ""));
       const seen = new Set<string>();
       compare.hits = query(m, e.point, picked).filter((h) => {
         const key = `${h.slot}:${h.label}:${JSON.stringify(h.properties)}`;
