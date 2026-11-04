@@ -14,9 +14,9 @@ export interface Draw {
 
 const POSITRON_IDS = (positron.layers as LayerSpecification[]).map((l) => l.id);
 
-const FILL_OPACITY = 0.08;
-const LINE_WIDTH = 2;
-const FOCUS_WIDTH = 4;
+const FILL_OPACITY = 0.15;
+const LINE_WIDTH = 3;
+const FOCUS_WIDTH = 5;
 const DIM = { map: { color: "#FFFFFF", opacity: 0.7 }, satellite: { color: "#000000", opacity: 0.55 } };
 
 // Line types from the UN Guidelines for the Publication of Maps, in the line_type tile property; dashes are in line widths.
@@ -25,8 +25,8 @@ const LINE_TYPES = {
   special: { dash: [4, 1.5, 1, 1.5], width: LINE_WIDTH },
   armistice: { dash: [3, 1.5], width: LINE_WIDTH },
   separation: { dash: [1, 1.5], width: LINE_WIDTH },
-  autonomous: { dash: [3, 1.5], width: 1.5 },
-  sovereign: { dash: [1, 0], width: 1 },
+  autonomous: { dash: [3, 1.5], width: 2.25 },
+  sovereign: { dash: [1, 0], width: 1.5 },
 };
 
 function byType(value: (t: (typeof LINE_TYPES)[keyof typeof LINE_TYPES]) => unknown) {

@@ -22,10 +22,10 @@
       "total_size_bytes": 445570309
     },
     "differences/differences_dots": {
-      "updated": "2026-11-04T09:12:07.753592+00:00",
-      "current_version": "1.0.2",
+      "updated": "2026-11-04T18:46:10.088207+00:00",
+      "current_version": "1.0.3",
       "asset_count": 3,
-      "total_size_bytes": 778483
+      "total_size_bytes": 279481
     },
     "gaul/gaul_voronoi": {
       "updated": "2026-11-03T12:17:49.847876+00:00",
@@ -88,10 +88,10 @@
       "total_size_bytes": 241019440
     },
     "differences/differences": {
-      "updated": "2026-11-04T09:12:06.742559+00:00",
-      "current_version": "1.0.2",
+      "updated": "2026-11-04T18:46:09.178623+00:00",
+      "current_version": "1.0.3",
       "asset_count": 3,
-      "total_size_bytes": 618207689
+      "total_size_bytes": 543798441
     },
     "wb/wb_polygons": {
       "updated": "2026-11-04T07:14:18.169067+00:00",
@@ -112,5 +112,5 @@
       "total_size_bytes": 130462935
     }
   },
-  "updated": "2026-11-04T14:11:50.581593+00:00"
+  "updated": "2026-11-04T18:46:10.088207+00:00"
 }

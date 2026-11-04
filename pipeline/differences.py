@@ -203,7 +203,7 @@ def _sided() -> str:
 
 # Metres from an island to its source's nearest polygon, capped; 0 where they touch.
 GAP_CAP = 1000
-# An island is mapped in a pair where both sources hold a polygon within this distance.
+# Island patches stay in pairs where both sources hold a polygon this near.
 MAPPED_M = 100
 
 
@@ -238,7 +238,7 @@ def _gaps(conn: DuckDBPyConnection) -> None:
 
 
 def _patches(conn: DuckDBPyConnection) -> None:
-    """Land patches and itemed island patches where a pair's entities aren't mutual."""
+    """Land and mapped island patches where a pair's entities aren't mutual."""
     conn.execute(f"""--sql
         CREATE OR REPLACE TABLE patches AS
         SELECT pair, 'land' AS type, side, item, a_entity, b_entity, a_code, a_name,
@@ -254,7 +254,7 @@ def _patches(conn: DuckDBPyConnection) -> None:
         {_named("a")} {_named("b")} {_sided()}
         LEFT JOIN island_gaps ga ON ga.source = d.a AND ga.fid = d.fid
         LEFT JOIN island_gaps gb ON gb.source = d.b AND gb.fid = d.fid
-        WHERE NOT m.mutual
+        WHERE NOT m.mutual AND greatest(ga.gap, gb.gap) <= {MAPPED_M}
     """)
 
 
@@ -442,6 +442,16 @@ def _items(conn: DuckDBPyConnection) -> None:
     if lost:
         msg = f"{lost} differences belong to no item"
         raise ValueError(msg)
+    # Island items count only the islands their patches keep.
+    conn.execute("""--sql
+        CREATE OR REPLACE TABLE item_stats AS
+        SELECT item, count(*) AS islands, sum(i.km2) AS km2,
+            min(ST_XMin(l.env)) AS xmin, min(ST_YMin(l.env)) AS ymin,
+            max(ST_XMax(l.env)) AS xmax, max(ST_YMax(l.env)) AS ymax
+        FROM (SELECT DISTINCT item, fid FROM patches WHERE type = 'island')
+        JOIN islands i USING (fid) JOIN land l USING (fid) GROUP BY item
+        UNION ALL SELECT * FROM stats WHERE islands = 0
+    """)
     out = tiles_dir / "items.json"
     conn.execute(f"""--sql
         COPY (SELECT item, t.title, type, same_code, missing, s.islands, s.km2,
@@ -449,11 +459,10 @@ def _items(conn: DuckDBPyConnection) -> None:
                 (SELECT list(DISTINCT pair ORDER BY pair) FROM patches p
                  WHERE p.item = i.item
                     AND NOT (p.type = 'land' AND p.side = 'both')) AS pairs,
-                (SELECT list(DISTINCT pair ORDER BY pair) FROM patches p
-                 WHERE p.item = i.item AND p.gap <= {MAPPED_M}) AS mapped,
                 {cols}
-            FROM items i LEFT JOIN stats s USING (item)
+            FROM items i LEFT JOIN item_stats s USING (item)
             LEFT JOIN titles t USING (item)
+            WHERE type <> 'island' OR item IN (SELECT item FROM patches)
             ORDER BY type, s.km2 DESC) TO '{out}' (FORMAT JSON, ARRAY true)
     """)
 

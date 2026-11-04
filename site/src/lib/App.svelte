@@ -49,13 +49,7 @@
     history.replaceState(null, "", url);
   });
 
-  function show(next: Tab) {
-    tab = next;
-    // Click results belong to the Map tab; Geometry clicks pick codes and differences.
-    if (next !== "map") compare.hits = [];
-  }
-
-  // The table pane's width in Geometry, which the map pads its camera by.
+  // The table pane's width beside the map, which the map pads its camera by.
   const PANE_REM = 36;
   const inset = $derived(tab === "map" ? 0 : PANE_REM * parseFloat(getComputedStyle(document.documentElement).fontSize));
 
@@ -95,7 +89,6 @@
 
   function focus(row: AttributeRow, parts: Part[] = [], fly = true) {
     compare.focusOn(row.iso3, shownBox(row), parts, fly);
-    if (tab === "table") show("split");
   }
 
   // A picked part shows its source alone, and a difference or a code in Voronoi shows in Fade;
@@ -133,7 +126,6 @@
   function focusItem(row: ItemRow, label: string) {
     borrowView("fade");
     compare.focusItem(row, label);
-    if (tab === "table") show("split");
   }
 
   function pickItem(id: string | null) {
@@ -167,19 +159,19 @@
       <nav aria-label="Views">
         <span class="pill" style:transform="translateX({pill.left}px)" style:width="{pill.width}px"></span>
         {#each TABS as t, i (t.id)}
-          <button bind:this={tabButtons[i]} aria-current={tab === t.id ? "page" : undefined} onclick={() => show(t.id)}>{t.label}</button>
+          <button bind:this={tabButtons[i]} aria-current={tab === t.id ? "page" : undefined} onclick={() => (tab = t.id)}>{t.label}</button>
         {/each}
       </nav>
     </header>
-    <div class="views" style:--pane="{PANE_REM}rem" style:--shift={tab === "map" ? "100%" : tab === "split" ? `calc(100% - ${PANE_REM}rem)` : "0%"}>
+    <div class="views" style:--pane="{PANE_REM}rem" style:--shift={tab === "map" ? "100%" : `calc(100% - ${PANE_REM}rem)`}>
       <div class="view map">
-        <GlobeMap {tilesBase} {compare} active={tab !== "table"} hits={tab === "map"} {inset} {listItems} onpick={pick} onitempick={pickItem} />
+        <GlobeMap {tilesBase} {compare} active hits={tab === "map"} {inset} {listItems} onpick={pick} onitempick={pickItem} />
         <HitsPanel {compare} {inset} />
         <ComparePanel {compare} />
       </div>
       <div class="view table" class:open={tab !== "map"}>
-        <div class="slide" class:full={tab === "table"}>
-          <AttributesTable {rows} items={merged} {failed} focus={compare.focus} item={compare.item} pair={compare.pair} split={tab === "split"} bind:list onfocus={focusFromTable} onitem={focusItem} />
+        <div class="slide">
+          <AttributesTable {rows} items={merged} {failed} focus={compare.focus} item={compare.item} pair={compare.pair} pane={tab === "split" ? "geometry" : "attributes"} bind:list onfocus={focusFromTable} onitem={focusItem} />
         </div>
       </div>
     </div>
@@ -278,9 +270,6 @@
   .slide {
     display: flex;
     width: var(--pane);
-  }
-  .slide.full {
-    width: 100%;
   }
   @media (prefers-reduced-motion: reduce) {
     .pill,

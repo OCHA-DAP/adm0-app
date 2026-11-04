@@ -1,6 +1,6 @@
 {
   "spec_version": "1.0.0",
-  "current_version": "1.0.2",
+  "current_version": "1.0.3",
   "versions": [
     {
       "version": "1.0.0",
@@ -89,6 +89,39 @@
           "href": "differences/differences_dots/differences_dots.pmtiles",
           "source_path": "differences_dots.pmtiles",
           "mtime": 1793783523.5495136
+        },
+        "differences_dots.thumb.jpg": {
+          "sha256": "d6c2520bf6e6b7617fcf1fa1af363009b01c0bab78568480aa026764fc1cb672",
+          "size_bytes": 8270,
+          "href": "differences/differences_dots/differences_dots.thumb.jpg",
+          "mtime": 1793708375.3590088
+        }
+      },
+      "changes": [
+        "differences_dots.parquet",
+        "differences_dots.pmtiles"
+      ]
+    },
+    {
+      "version": "1.0.3",
+      "created": "2026-11-04T18:46:10.087500Z",
+      "breaking": false,
+      "assets": {
+        "differences_dots.parquet": {
+          "sha256": "ba505a5b685b6263edf9257de0d51721f4ef399b5952aea8a4660bddd7d15d31",
+          "size_bytes": 7517,
+          "href": "differences/differences_dots/differences_dots.parquet",
+          "source_mtime": 1793817655.7448394,
+          "mtime": 1793817655.7448394,
+          "feature_count": 696,
+          "schema_fingerprint": "b215c6e6fae6cb4e"
+        },
+        "differences_dots.pmtiles": {
+          "sha256": "5d370e5535201252389d66a87ab6464e8d9013852883256d3c1000558af996e3",
+          "size_bytes": 263694,
+          "href": "differences/differences_dots/differences_dots.pmtiles",
+          "source_path": "differences_dots.pmtiles",
+          "mtime": 1793817785.721357
         },
         "differences_dots.thumb.jpg": {
           "sha256": "d6c2520bf6e6b7617fcf1fa1af363009b01c0bab78568480aa026764fc1cb672",

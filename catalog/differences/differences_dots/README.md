@@ -4,7 +4,7 @@ Differences Dots
 
 ## Spatial Coverage
 
-- **Bounding Box**: [-179.9104106, -77.9313052, 174.632639, 71.0713917]
+- **Bounding Box**: [-178.2915738, -54.9496837, 172.0866003, 71.0713917]
 
 ## Temporal Coverage
 
@@ -23,8 +23,8 @@ Differences Dots
 
 | File | Size | Checksum |
 |------|------|----------|
-| ./differences_dots.parquet | 16.4 KB | 12202a220be5... |
-| ./differences_dots.pmtiles | 735.8 KB | 1220d6f4538d... |
+| ./differences_dots.parquet | 7.3 KB | 1220ba505a5b... |
+| ./differences_dots.pmtiles | 257.5 KB | 12205d370e55... |
 | ./styles/default.json | 476 B | 1220e903559e... |
 | ./differences_dots.thumb.jpg | 8.1 KB | 1220d6c2520b... |
 

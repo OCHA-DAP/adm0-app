@@ -1,6 +1,6 @@
 {
   "spec_version": "1.0.0",
-  "current_version": "1.0.2",
+  "current_version": "1.0.3",
   "versions": [
     {
       "version": "1.0.0",
@@ -89,6 +89,39 @@
           "href": "differences/differences/differences.pmtiles",
           "source_path": "differences.pmtiles",
           "mtime": 1793783523.2119741
+        },
+        "differences.thumb.jpg": {
+          "sha256": "f269c64fcdf3d93b3203b8a870cec6eae566eb80f61dc7eae1ce2e675fbe9b74",
+          "size_bytes": 6665,
+          "href": "differences/differences/differences.thumb.jpg",
+          "mtime": 1793708374.1522279
+        }
+      },
+      "changes": [
+        "differences.parquet",
+        "differences.pmtiles"
+      ]
+    },
+    {
+      "version": "1.0.3",
+      "created": "2026-11-04T18:46:09.177428Z",
+      "breaking": false,
+      "assets": {
+        "differences.parquet": {
+          "sha256": "673fd6807eb101e78a44afaa19799ff32aa0972580cba2f0c5c8cd4b523b773e",
+          "size_bytes": 224144099,
+          "href": "differences/differences/differences.parquet",
+          "source_mtime": 1793817705.7340016,
+          "mtime": 1793817705.7340016,
+          "feature_count": 3837821,
+          "schema_fingerprint": "d05592148116751c"
+        },
+        "differences.pmtiles": {
+          "sha256": "2621ccecf8ff30b3cd7fd61b6ce687120c3d644be170fd618929884af6357974",
+          "size_bytes": 319647677,
+          "href": "differences/differences/differences.pmtiles",
+          "source_path": "differences.pmtiles",
+          "mtime": 1793817785.6513677
         },
         "differences.thumb.jpg": {
           "sha256": "f269c64fcdf3d93b3203b8a870cec6eae566eb80f61dc7eae1ce2e675fbe9b74",

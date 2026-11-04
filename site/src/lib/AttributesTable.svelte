@@ -28,7 +28,7 @@
     focus,
     item,
     pair,
-    split = false,
+    pane,
     list = $bindable("land"),
     onfocus,
     onitem,
@@ -39,52 +39,36 @@
     focus: Focus | null;
     item: ItemFocus | null;
     pair: { a: string; b: string };
-    split?: boolean;
+    pane: "geometry" | "attributes";
     list?: GeometryList;
     onfocus: (row: AttributeRow) => void;
     onitem: (row: ItemRow, label: string) => void;
   } = $props();
 
-  // The swatches double as the legend for the cell colors.
-  const SHOW: { id: DiffType; label: string; swatch?: string }[] = [
-    { id: "all", label: "All" },
-    { id: "differs", label: "Differs", swatch: "var(--cd-orange--300)" },
-  ];
+  // One reference source shows beside A and B, never compared: M49 where it has the attribute, else UNTERM.
+  const REFS = ["m49", "unterm"];
 
   const LISTS: { id: GeometryList; label: string; note: string }[] = [
     { id: "land", label: "Land", note: "The two sources put this land in different territories." },
     { id: "islands", label: "Islands", note: "Both sources draw these islands but put them in different territories." },
-    { id: "unmapped", label: "Unmapped", note: "At least one source doesn't draw these islands, so they go to the nearest territory." },
   ];
 
   let filter = $state<Filter>({ ...DEFAULT_FILTER });
-  // Split lists what the map can show; the full table lists attributes unrelated to geometry.
-  const view = $derived(split ? list : "attributes");
+  const view = $derived(pane === "geometry" ? list : "attributes");
   const geometry = $derived(view !== "attributes");
 
-  // With the map pair in charge, the table shows and compares only A and B, against A.
+  // The map pair is in charge: the table lists only what differs between A and B, against A.
   const ab = $derived([pair.a, pair.b]);
-  const ALL = $derived(geometry ? ENTITY.sources : Object.keys(SOURCES));
-  // Geometry lists only what differs between A and B.
-  const scope = $derived(split ? { ...filter, diff: "differs" as DiffType, sources: ab, ref: pair.a } : filter);
-  const on = $derived(filter.sources.length ? ALL.filter((s) => filter.sources.includes(s)) : ALL);
-  const columns = $derived.by(() => {
-    const cols = split ? ab : on;
-    return scope.ref && cols.includes(scope.ref) ? [scope.ref, ...cols.filter((s) => s !== scope.ref)] : cols;
-  });
-
-  // At least two sources stay on; all on is stored as empty.
-  function toggle(source: string) {
-    const next = on.includes(source) ? on.filter((s) => s !== source) : ALL.filter((s) => s === source || on.includes(s));
-    if (next.length < 2) return;
-    filter.sources = next.length === Object.keys(SOURCES).length ? [] : next;
-  }
   let body = $state<HTMLElement>();
 
+  // Only attributes both A and B have; the picked one falls back to the first when the pair lacks it.
   const allGroups = $derived(attributeGroups(rows[0]));
-  const attrGroups = $derived(allGroups.filter((g) => g.key !== "count"));
-    const groups = $derived(groupsInScope(attrGroups, scope));
-  const labelled = $derived(view === "attributes" && !filter.group);
+  const attrGroups = $derived(allGroups.filter((g) => g.key !== "count" && ab.every((s) => g.sources.includes(s))));
+  const group = $derived(attrGroups.some((g) => g.key === filter.group) ? filter.group : (attrGroups[0]?.key ?? DEFAULT_FILTER.group));
+  const scope = $derived({ ...filter, group, diff: "differs" as DiffType, sources: ab, ref: pair.a });
+  const groups = $derived(groupsInScope(attrGroups, scope));
+  const reference = $derived(REFS.filter((s) => groups.some((g) => g.sources.includes(s))).slice(0, 1));
+  const columns = $derived(geometry ? ab : [...ab, ...reference]);
 
   // Items with patches in the map's pair, plus those with no OSM land to patch.
   const itemScope = $derived({ ...scope, group: ENTITY.key });
@@ -125,10 +109,6 @@
   });
 
   const visible = $derived(geometry ? columns : columns.filter((s) => groups.some((g) => g.sources.includes(s))));
-  const dirty = $derived(JSON.stringify(filter) !== JSON.stringify(DEFAULT_FILTER));
-  function reset() {
-    filter = { ...DEFAULT_FILTER };
-  }
 
   function cellClass(row: AttributeRow | ItemRow, group: AttributeGroup, source: string) {
     const v = value(row as AttributeRow, group.key, source);
@@ -171,43 +151,25 @@
 {/snippet}
 
 {#snippet sourceHead(source: string)}
-  {@const slot = split ? slotOf(source) : null}
+  {@const slot = ab.includes(source) ? slotOf(source) : null}
   <th class:ref={source === scope.ref}>{#if slot}<span class="badge" style:--color={SLOT_COLORS[slot]}>{slot.toUpperCase()}</span>{/if}{SOURCES[source]}</th>
 {/snippet}
 
-<div class="table-view" class:split>
+<div class="table-view split">
   <aside class="sidebar">
-    {#if split}
+    {#if geometry}
       <section>
         <Segmented label="List" options={LISTS} current={list} pick={(id) => (list = id as GeometryList)} />
       </section>
       <p class="meta note">{LISTS.find((l) => l.id === list)?.note}</p>
     {/if}
     <section class="search"><input type="search" placeholder="Search code or name" bind:value={filter.query} /></section>
-    <section class="show">
-      {#if !split}
-        <h2>Show</h2>
-        <Segmented label="Show" options={SHOW} current={filter.diff} pick={(id) => (filter.diff = id as DiffType)} />
-      {/if}
-      <span class="count">{count}</span>
-    </section>
-    {#if view === "attributes"}
+    {#if !geometry}
       <section>
-        <h2>Attribute</h2>
-        <Segmented label="Attribute" options={[{ id: "", label: "All" }, ...attrGroups.map((g) => ({ id: g.key, label: g.label }))]} current={filter.group} pick={(id) => (filter.group = id)} />
+        <Segmented label="Attribute" options={attrGroups.map((g) => ({ id: g.key, label: g.label }))} current={group} pick={(id) => (filter.group = id)} />
       </section>
     {/if}
-    {#if !split}
-      <section>
-        <h2>Sources</h2>
-        <div class="toggles" role="group" aria-label="Sources">
-          {#each ALL as s (s)}
-            <button type="button" aria-pressed={on.includes(s)} class:on={on.includes(s)} disabled={on.includes(s) && on.length === 2} onclick={() => toggle(s)}>{on.includes(s) ? "✓ " : ""}{SOURCES[s]}</button>
-          {/each}
-        </div>
-      </section>
-    {/if}
-    {#if dirty}<button type="button" class="btn" onclick={reset}>Reset</button>{/if}
+    <section class="show"><span class="count">{count}</span></section>
   </aside>
   {#if failed}
     <p>Could not load attributes.json.</p>
@@ -217,7 +179,6 @@
         <thead>
           <tr>
             <th class="code">ISO3</th>
-            {#if labelled && !geometry}<th class="attr">Attribute</th>{/if}
             {#each visible as source (source)}{@render sourceHead(source)}{/each}
           </tr>
         </thead>
@@ -238,7 +199,6 @@
               {#each groups as group, gi (group.key)}
                 <tr class:start={gi === 0} class:focused data-iso3={gi === 0 ? row.iso3 : undefined} data-group={row.iso3}>
                   {#if gi === 0}<th class="code" rowspan={groups.length}><button type="button" class="code-link" title="Show on map" onclick={() => onfocus(row)}>{row.iso3}</button></th>{/if}
-                  {#if labelled}<td class="attr">{group.label}</td>{/if}
                   {#each visible as source (source)}{@render fixedCell(row, group, source)}{/each}
                 </tr>
               {/each}
@@ -268,32 +228,6 @@
   .count {
     color: var(--brand-grey--text);
   }
-  /* Multi-select toggles are outlined pills so they read differently from the segmented single choices. */
-  .toggles {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-  }
-  .toggles button {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.25rem 0.6rem;
-    border: 1px solid var(--cd-grey--500);
-    border-radius: 999px;
-    background: var(--cd-white);
-    color: var(--cd-grey--800);
-    font-size: 0.75rem;
-    cursor: pointer;
-  }
-  .toggles button:hover:not(.on) {
-    background: var(--cd-grey--300);
-  }
-  .toggles button.on {
-    border-color: var(--brand-primary--text);
-    background: var(--cd-blue--lightest);
-    color: var(--brand-primary--text);
-  }
   thead th.code {
     z-index: 3;
   }
@@ -318,13 +252,8 @@
   .code-link:hover {
     text-decoration-color: currentColor;
   }
-  tr.focused > th,
-  tr.focused > .attr {
+  tr.focused > th {
     background-color: var(--cd-blue--lightest);
-  }
-  .attr {
-    min-width: 6rem;
-    color: var(--brand-grey--text);
   }
   .na {
     background: repeating-linear-gradient(45deg, transparent 0 4px, var(--cd-grey--300) 4px 6px);
@@ -361,12 +290,6 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 0.4rem;
-  }
-  .sidebar h2 {
-    margin: 0;
-  }
-  .sidebar .btn {
-    align-self: center;
   }
   .scroll {
     flex: 1;

@@ -4,7 +4,7 @@ import type { Draw, Slot } from "$lib/map/style";
 
 // Voronoi also draws the pair's differing OSM land and islands over the sources' cells.
 export type Kind = SourceLayer["kind"];
-export type View = "overlay" | "fade" | Slot;
+export type View = "fade" | Slot;
 export type Basemap = "map" | "satellite";
 
 export interface Hit {
@@ -38,7 +38,6 @@ export const MODES: { id: Kind; label: string }[] = [
   { id: "voronoi", label: "Voronoi" },
 ];
 export const VIEWS: { id: View; label: string }[] = [
-  { id: "overlay", label: "Overlay" },
   { id: "fade", label: "Fade" },
   { id: "a", label: "A" },
   { id: "b", label: "B" },

@@ -49,19 +49,19 @@
   "geoparquet:geometry_type": [
     "Polygon"
   ],
-  "geoparquet:feature_count": 3981947,
+  "geoparquet:feature_count": 3837821,
   "pmtiles:min_zoom": 0,
   "pmtiles:max_zoom": 12,
   "pmtiles:tile_type": "mvt",
   "pmtiles:center": [
     0.0,
-    -2.0391737,
+    11.4640577,
     6
   ],
   "pmtiles:layers": [
     "differences"
   ],
-  "table:row_count": 3981947,
+  "table:row_count": 3837821,
   "table:primary_geometry": "geometry",
   "table:columns": [
     {
@@ -111,7 +111,7 @@
       "bbox": [
         [
           -180.0,
-          -85.0511287,
+          -58.0446657,
           180.0,
           80.9727812
         ]
@@ -142,8 +142,8 @@
     "differences": {
       "href": "./differences.parquet",
       "type": "application/vnd.apache.parquet",
-      "file:size": 232676185,
-      "file:checksum": "122099782e644a5e60b9c875fa95ed7056a92c1733726cd38e5526f52debe0da7563",
+      "file:size": 224144099,
+      "file:checksum": "1220673fd6807eb101e78a44afaa19799ff32aa0972580cba2f0c5c8cd4b523b773e",
       "roles": [
         "data"
       ]
@@ -151,8 +151,8 @@
     "differences-tiles": {
       "href": "./differences.pmtiles",
       "type": "application/vnd.pmtiles",
-      "file:size": 385524839,
-      "file:checksum": "122005f75da5f5bb8dc6059b6376a7f2ee1a6e6777d0a2eb763671ee5e3d44acc123",
+      "file:size": 319647677,
+      "file:checksum": "12202621ccecf8ff30b3cd7fd61b6ce687120c3d644be170fd618929884af6357974",
       "roles": [
         "visual"
       ]

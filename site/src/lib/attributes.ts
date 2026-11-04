@@ -65,11 +65,10 @@ export const DEFAULT_FILTER: Filter = {
 export type ItemType = "island" | "land" | "no_land";
 
 // The Geometry pane's lists: differences split by kind.
-export type GeometryList = "islands" | "unmapped" | "land";
+export type GeometryList = "islands" | "land";
 
 // A geometry difference from items.json; title is its smallest entity's name, and pairs are the
-// map's source pairs it has patches in, and mapped those where both sources hold a polygon at
-// its islands. items lists the differences merged into this row, list the one list it shows in.
+// map's source pairs it has patches in. items lists the differences merged into this row.
 export interface ItemRow {
   item: string;
   items?: string[];
@@ -81,7 +80,6 @@ export interface ItemRow {
   km2: number | null;
   bbox: number[] | null;
   pairs: string[] | null;
-  mapped: string[] | null;
   list?: GeometryList;
   entities?: Record<string, [unknown, unknown][]>;
   [column: string]: unknown;
@@ -112,7 +110,7 @@ export function unionBox(boxes: number[][]): number[] {
 }
 
 // All of a and b's differences between the same two entities, either way round, share one cause, so
-// they merge into one row in one list: land over mapped islands over unmapped islands.
+// they merge into one row in one list, land over islands.
 export function mergeItems(items: ItemRow[], a: string, b: string): ItemRow[] {
   const pair = [a, b].sort().join("|");
   const rows = new Map<string, ItemRow>();
@@ -122,7 +120,7 @@ export function mergeItems(items: ItemRow[], a: string, b: string): ItemRow[] {
   const relevant = items.filter((it) => (it.type === "no_land" ? [a, b].some((s) => it[`entity_${s}`]) : it.pairs?.includes(pair)));
   for (const it of relevant) {
     const key = [entity(it, a), entity(it, b)].sort().join("||");
-    const list: GeometryList = it.type !== "island" ? "land" : it.mapped?.includes(pair) ? "islands" : "unmapped";
+    const list: GeometryList = it.type === "island" ? "islands" : "land";
     const row = rows.get(key);
     if (!row) {
       rows.set(key, { ...it, items: [it.item], list, entities: own(it) });
@@ -139,7 +137,7 @@ export function mergeItems(items: ItemRow[], a: string, b: string): ItemRow[] {
       if (!ents.some(([c, n]) => c === it[`code_${s}`] && n === it[`name_${s}`])) ents.push([it[`code_${s}`], it[`name_${s}`]]);
     }
     if (list === "land" && row.list !== "land") row.type = it.type;
-    if (list === "land" || (list === "islands" && row.list === "unmapped")) row.list = list;
+    if (list === "land") row.list = list;
   }
   // Two-way rows show each source's territories together.
   for (const row of rows.values()) {
