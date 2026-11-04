@@ -1,0 +1,40 @@
+{
+  "spec_version": "1.0.0",
+  "current_version": "1.0.0",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "created": "2026-11-04T07:14:21.027339Z",
+      "breaking": false,
+      "assets": {
+        "wb_voronoi.parquet": {
+          "sha256": "1283d48b8b10b325f5b58bf80847f43255103537c547e2781f8bf907ac8d9366",
+          "size_bytes": 7223419,
+          "href": "wb/wb_voronoi/wb_voronoi.parquet",
+          "source_mtime": 1793775182.2006998,
+          "mtime": 1793775182.2006998,
+          "feature_count": 275,
+          "schema_fingerprint": "782a658cfc1fba71"
+        },
+        "wb_voronoi.pmtiles": {
+          "sha256": "5bbc7678e147abcc06bc3a557b78c131cbcfedc88afae1771e7cc4b417478069",
+          "size_bytes": 123213279,
+          "href": "wb/wb_voronoi/wb_voronoi.pmtiles",
+          "source_path": "wb_voronoi.pmtiles",
+          "mtime": 1793776429.0049837
+        },
+        "wb_voronoi.thumb.jpg": {
+          "sha256": "5ea235895396c46349e20346eae470bc8fcc30848be65b64ebe55c90d8e2b19d",
+          "size_bytes": 26237,
+          "href": "wb/wb_voronoi/wb_voronoi.thumb.jpg",
+          "mtime": 1793776461.025286
+        }
+      },
+      "changes": [
+        "wb_voronoi.parquet",
+        "wb_voronoi.pmtiles",
+        "wb_voronoi.thumb.jpg"
+      ]
+    }
+  ]
+}

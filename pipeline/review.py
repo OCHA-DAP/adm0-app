@@ -41,7 +41,7 @@ def _clusters(conn: DuckDBPyConnection) -> None:
     # Landless entities never overlap, so a shared code or name joins them instead.
     first: dict[str, tuple] = {}
     for s, e, code, name in conn.execute("""--sql
-        SELECT source, entity, code, lower(name) FROM entities
+        SELECT source, entity, upper(code), lower(name) FROM entities
         WHERE (source, entity) NOT IN (SELECT source, entity FROM pieces)
             AND (source, entity) NOT IN (SELECT source, entity FROM placed)
     """).fetchall():
@@ -165,7 +165,8 @@ def build(conn: DuckDBPyConnection) -> None:
     members, entities = _island_items(conn, label)
     entities += _entity_items(conn, label)
     conn.execute("CREATE OR REPLACE TABLE item_islands (fid BIGINT, item VARCHAR)")
-    conn.executemany("INSERT INTO item_islands VALUES (?, ?)", members)
+    if members:
+        conn.executemany("INSERT INTO item_islands VALUES (?, ?)", members)
     conn.execute(
         "CREATE OR REPLACE TABLE item_entities (item VARCHAR, type VARCHAR, "
         "source VARCHAR, entity VARCHAR, own BOOLEAN)"

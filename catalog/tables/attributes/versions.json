@@ -1,6 +1,6 @@
 {
   "spec_version": "1.0.0",
-  "current_version": "1.0.0",
+  "current_version": "1.2.0",
   "versions": [
     {
       "version": "1.0.0",
@@ -12,6 +12,38 @@
           "size_bytes": 60594,
           "href": "tables/attributes/attributes.parquet",
           "mtime": 1793708254.8332105
+        }
+      },
+      "changes": [
+        "attributes.parquet"
+      ]
+    },
+    {
+      "version": "1.1.0",
+      "created": "2026-11-04T07:14:21.923115Z",
+      "breaking": false,
+      "assets": {
+        "attributes.parquet": {
+          "sha256": "89c2ccede755407a583603c7c99dfc5c82b8a42342f3292ef26cdd128b50f90f",
+          "size_bytes": 68097,
+          "href": "tables/attributes/attributes.parquet",
+          "mtime": 1793776453.9489048
+        }
+      },
+      "changes": [
+        "attributes.parquet"
+      ]
+    },
+    {
+      "version": "1.2.0",
+      "created": "2026-11-04T14:11:50.580590Z",
+      "breaking": false,
+      "assets": {
+        "attributes.parquet": {
+          "sha256": "97d7d5be4ae8383a772d6b7fdab9e561de8168ca68b1603c7712a64250a2c528",
+          "size_bytes": 68132,
+          "href": "tables/attributes/attributes.parquet",
+          "mtime": 1793801508.8788958
         }
       },
       "changes": [

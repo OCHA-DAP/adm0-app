@@ -4,7 +4,7 @@ Differences
 
 ## Spatial Coverage
 
-- **Bounding Box**: [-180.0, -61.8479015, 180.0, 80.9727812]
+- **Bounding Box**: [-180.0, -85.0511287, 180.0, 80.9727812]
 
 ## Temporal Coverage
 
@@ -30,8 +30,8 @@ Differences
 
 | File | Size | Checksum |
 |------|------|----------|
-| ./differences.parquet | 163.3 MB | 1220bc9a7ce0... |
-| ./differences.pmtiles | 179.9 MB | 1220739d2c57... |
+| ./differences.parquet | 221.9 MB | 122099782e64... |
+| ./differences.pmtiles | 367.7 MB | 122005f75da5... |
 | ./styles/default.json | 466 B | 122045afde6e... |
 | ./differences.thumb.jpg | 6.5 KB | 1220f269c64f... |
 

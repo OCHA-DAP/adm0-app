@@ -1,0 +1,200 @@
+{
+  "type": "Collection",
+  "id": "wb/wb_polygons",
+  "stac_version": "1.1.0",
+  "description": "Wb Polygons",
+  "links": [
+    {
+      "rel": "root",
+      "href": "../../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "parent",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "license",
+      "href": "https://opendatacommons.org/licenses/odbl/1-0/",
+      "title": "License"
+    },
+    {
+      "rel": "agents",
+      "href": "./AGENTS.md",
+      "type": "text/markdown",
+      "title": "Agent/LLM usage guide"
+    },
+    {
+      "rel": "describedby",
+      "href": "./README.md",
+      "type": "text/markdown",
+      "title": "Human-readable documentation"
+    },
+    {
+      "rel": "pmtiles",
+      "href": "./wb_polygons.pmtiles",
+      "type": "application/vnd.pmtiles",
+      "pmtiles:layers": [
+        "wb_polygons"
+      ]
+    }
+  ],
+  "stac_extensions": [
+    "https://stac-extensions.github.io/table/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+    "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
+    "https://stac-extensions.github.io/web-map-links/v1.3.0/schema.json"
+  ],
+  "updated": "2026-11-04T07:14:16Z",
+  "geoparquet:geometry_type": [
+    "Polygon",
+    "MultiPolygon"
+  ],
+  "geoparquet:feature_count": 275,
+  "pmtiles:min_zoom": 0,
+  "pmtiles:max_zoom": 12,
+  "pmtiles:tile_type": "mvt",
+  "pmtiles:center": [
+    0.0,
+    12.1221064,
+    6
+  ],
+  "pmtiles:layers": [
+    "wb_polygons"
+  ],
+  "table:row_count": 275,
+  "table:primary_geometry": "geometry",
+  "table:columns": [
+    {
+      "name": "wb_id",
+      "type": "string"
+    },
+    {
+      "name": "ISO_A3",
+      "type": "string"
+    },
+    {
+      "name": "ISO_A2",
+      "type": "string"
+    },
+    {
+      "name": "WB_A3",
+      "type": "string"
+    },
+    {
+      "name": "WB_STATUS",
+      "type": "string"
+    },
+    {
+      "name": "SOV_ISO_A3",
+      "type": "string"
+    },
+    {
+      "name": "SOV_NAME",
+      "type": "string"
+    },
+    {
+      "name": "NAM_0",
+      "type": "string"
+    },
+    {
+      "name": "CONTINENT",
+      "type": "string"
+    },
+    {
+      "name": "WB_REGION",
+      "type": "string"
+    },
+    {
+      "name": "WB_INCOME",
+      "type": "string"
+    },
+    {
+      "name": "ADM0CD_c",
+      "type": "string"
+    },
+    {
+      "name": "geometry",
+      "type": "binary"
+    }
+  ],
+  "title": "Wb Polygons",
+  "extent": {
+    "spatial": {
+      "bbox": [
+        [
+          -180.0,
+          -59.4208664,
+          180.0,
+          83.6650793
+        ]
+      ]
+    },
+    "temporal": {
+      "interval": [
+        [
+          null,
+          null
+        ]
+      ]
+    }
+  },
+  "license": "ODbL-1.0",
+  "providers": [
+    {
+      "name": "World Bank",
+      "roles": [
+        "producer",
+        "licensor"
+      ]
+    },
+    {
+      "name": "OCHA Centre for Humanitarian Data",
+      "roles": [
+        "host"
+      ],
+      "url": "https://github.com/OCHA-DAP/adm0-site/issues"
+    }
+  ],
+  "assets": {
+    "wb_polygons": {
+      "href": "./wb_polygons.parquet",
+      "type": "application/vnd.apache.parquet",
+      "file:size": 47835898,
+      "file:checksum": "122099c8344a01c6cd5159ef8cd74e87d1638868f62c33d98c28aa28f0028b7dea09",
+      "roles": [
+        "data"
+      ]
+    },
+    "wb_polygons-tiles": {
+      "href": "./wb_polygons.pmtiles",
+      "type": "application/vnd.pmtiles",
+      "file:size": 198221620,
+      "file:checksum": "1220d8f4f4bd5f211094318ca1204826d41417dfef8a75aa9aba5563761cc9df47c6",
+      "roles": [
+        "visual"
+      ]
+    },
+    "styles/default": {
+      "href": "./styles/default.json",
+      "type": "application/vnd.mapbox.style+json",
+      "roles": [
+        "style",
+        "default"
+      ],
+      "title": "Default",
+      "file:size": 466,
+      "file:checksum": "122090e252d5c20b6d5d9250244335fb22eec738e6530613ef178908d12b0eafad31"
+    },
+    "thumbnail": {
+      "href": "./wb_polygons.thumb.jpg",
+      "type": "image/jpeg",
+      "roles": [
+        "thumbnail"
+      ],
+      "file:size": 25936,
+      "file:checksum": "1220165773a555c365610dc57ec446bb74d2c3ccc6887480fe16d7651e42f1c52e8b"
+    }
+  }
+}

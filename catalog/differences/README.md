@@ -12,7 +12,7 @@ Catalog: differences
 
 **Spatial Extent**
 
-- West: -180.0000, South: -61.8479, East: 180.0000, North: 80.9728
+- West: -180.0000, South: -85.0511, East: 180.0000, North: 80.9728
 
 ---
 

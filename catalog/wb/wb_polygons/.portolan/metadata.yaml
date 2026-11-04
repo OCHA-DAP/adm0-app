@@ -1,0 +1,18 @@
+{
+  "providers": [
+    {
+      "name": "World Bank",
+      "roles": [
+        "producer",
+        "licensor"
+      ]
+    },
+    {
+      "name": "OCHA Centre for Humanitarian Data",
+      "roles": [
+        "host"
+      ],
+      "url": "https://github.com/OCHA-DAP/adm0-site/issues"
+    }
+  ]
+}

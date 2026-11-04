@@ -1,0 +1,40 @@
+{
+  "spec_version": "1.0.0",
+  "current_version": "1.0.0",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "created": "2026-11-04T07:14:19.429752Z",
+      "breaking": false,
+      "assets": {
+        "wb_lines.parquet": {
+          "sha256": "37c92415767ea47a26f3a3726dd383386702ffd5711e74a5692e627287b4d050",
+          "size_bytes": 4794459,
+          "href": "wb/wb_lines/wb_lines.parquet",
+          "source_mtime": 1793774715.7489555,
+          "mtime": 1793774715.7489555,
+          "feature_count": 377,
+          "schema_fingerprint": "506574eaee67808a"
+        },
+        "wb_lines.pmtiles": {
+          "sha256": "17877e4b9828f66f2ab9719569628200edbe0baa0793f7604f0bd3015eed6826",
+          "size_bytes": 18550282,
+          "href": "wb/wb_lines/wb_lines.pmtiles",
+          "source_path": "wb_lines.pmtiles",
+          "mtime": 1793776325.4186049
+        },
+        "wb_lines.thumb.jpg": {
+          "sha256": "f1727d4ccf73485d4236f2e43cb8b03bae0886d9a77bf5a7c6eba8f224f9fb92",
+          "size_bytes": 13729,
+          "href": "wb/wb_lines/wb_lines.thumb.jpg",
+          "mtime": 1793776459.4280422
+        }
+      },
+      "changes": [
+        "wb_lines.parquet",
+        "wb_lines.pmtiles",
+        "wb_lines.thumb.jpg"
+      ]
+    }
+  ]
+}

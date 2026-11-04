@@ -1,6 +1,6 @@
 {
   "spec_version": "1.0.0",
-  "current_version": "1.0.0",
+  "current_version": "1.0.2",
   "versions": [
     {
       "version": "1.0.0",
@@ -34,6 +34,72 @@
         "differences.parquet",
         "differences.pmtiles",
         "differences.thumb.jpg"
+      ]
+    },
+    {
+      "version": "1.0.1",
+      "created": "2026-11-04T07:47:01.620494Z",
+      "breaking": false,
+      "assets": {
+        "differences.parquet": {
+          "sha256": "925452dbbc57e16383d4ca16d934f8a90c3b5b474d689ca24bcd3855e19b18cb",
+          "size_bytes": 232692252,
+          "href": "differences/differences/differences.parquet",
+          "source_mtime": 1793778254.4952724,
+          "mtime": 1793778254.4952724,
+          "feature_count": 3981963,
+          "schema_fingerprint": "2bfdcf73f6090baf"
+        },
+        "differences.pmtiles": {
+          "sha256": "2e099b069b1e8582af33cad89a25c196bd91f883a397ea070e6ff138832e5645",
+          "size_bytes": 385499405,
+          "href": "differences/differences/differences.pmtiles",
+          "source_path": "differences.pmtiles",
+          "mtime": 1793778419.3647747
+        },
+        "differences.thumb.jpg": {
+          "sha256": "f269c64fcdf3d93b3203b8a870cec6eae566eb80f61dc7eae1ce2e675fbe9b74",
+          "size_bytes": 6665,
+          "href": "differences/differences/differences.thumb.jpg",
+          "mtime": 1793708374.1522279
+        }
+      },
+      "changes": [
+        "differences.parquet",
+        "differences.pmtiles"
+      ]
+    },
+    {
+      "version": "1.0.2",
+      "created": "2026-11-04T09:12:06.741702Z",
+      "breaking": false,
+      "assets": {
+        "differences.parquet": {
+          "sha256": "99782e644a5e60b9c875fa95ed7056a92c1733726cd38e5526f52debe0da7563",
+          "size_bytes": 232676185,
+          "href": "differences/differences/differences.parquet",
+          "source_mtime": 1793783361.679941,
+          "mtime": 1793783361.679941,
+          "feature_count": 3981947,
+          "schema_fingerprint": "2bfdcf73f6090baf"
+        },
+        "differences.pmtiles": {
+          "sha256": "05f75da5f5bb8dc6059b6376a7f2ee1a6e6777d0a2eb763671ee5e3d44acc123",
+          "size_bytes": 385524839,
+          "href": "differences/differences/differences.pmtiles",
+          "source_path": "differences.pmtiles",
+          "mtime": 1793783523.2119741
+        },
+        "differences.thumb.jpg": {
+          "sha256": "f269c64fcdf3d93b3203b8a870cec6eae566eb80f61dc7eae1ce2e675fbe9b74",
+          "size_bytes": 6665,
+          "href": "differences/differences/differences.thumb.jpg",
+          "mtime": 1793708374.1522279
+        }
+      },
+      "changes": [
+        "differences.parquet",
+        "differences.pmtiles"
       ]
     }
   ]

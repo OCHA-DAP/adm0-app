@@ -35,6 +35,7 @@ PRODUCERS = {
     "ungeodata": "United Nations Geospatial",
     "fieldmaps": "FieldMaps (OpenStreetMap)",
     "wp": "U.S. Department of State",
+    "wb": "World Bank",
 }
 
 

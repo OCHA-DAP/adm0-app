@@ -10,5 +10,8 @@
   { "id": "fieldmaps_voronoi", "source": "fieldmaps", "label": "FieldMaps", "kind": "voronoi" },
   { "id": "wp_polygons", "source": "wp", "label": "US State Dept", "kind": "polygon", "code": "GENC_3", "name": "Map_Label", "entity": "WP_Name" },
   { "id": "lsib_lines", "source": "wp", "label": "US State Dept", "kind": "line" },
-  { "id": "wp_voronoi", "source": "wp", "label": "US State Dept", "kind": "voronoi" }
+  { "id": "wp_voronoi", "source": "wp", "label": "US State Dept", "kind": "voronoi" },
+  { "id": "wb_polygons", "source": "wb", "label": "World Bank", "kind": "polygon", "code": "ISO_A3", "name": "NAM_0", "entity": "NAM_0" },
+  { "id": "wb_lines", "source": "wb", "label": "World Bank", "kind": "line" },
+  { "id": "wb_voronoi", "source": "wb", "label": "World Bank", "kind": "voronoi" }
 ]

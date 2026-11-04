@@ -36,9 +36,7 @@ tiles_dir = root / "outputs/tiles"
 input_dir = root / "inputs"
 layers_json = root / "site/src/lib/layers.json"
 
-BASELINE = "gaul"
-
-# Per source: entity id, join code and register entity name (default name), then
+# Per source: entity id, join code and entity name (default name), then
 # attribute columns (output name: SQL).
 SOURCE_COLUMNS = {
     "gaul": {
@@ -72,6 +70,14 @@ SOURCE_COLUMNS = {
         "name": "WP_Name",
         "mapname": "Map_Label",
         "status": "US_Recog",
+    },
+    "wb": {
+        "id": "wb_id",
+        "code": "ISO_A3",
+        "name": "NAM_0",
+        "sovereign": "SOV_ISO_A3",
+        "status": "WB_STATUS",
+        "region": "CONTINENT",
     },
     "unterm": {"code": "iso3", "name": "name_en_short", "status": "un_status"},
     "m49": {"code": "iso3", "name": "name_m49", "region": "region"},

@@ -1,0 +1,200 @@
+{
+  "type": "Collection",
+  "id": "wb/wb_voronoi",
+  "stac_version": "1.1.0",
+  "description": "Wb Voronoi",
+  "links": [
+    {
+      "rel": "root",
+      "href": "../../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "parent",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "license",
+      "href": "https://opendatacommons.org/licenses/odbl/1-0/",
+      "title": "License"
+    },
+    {
+      "rel": "agents",
+      "href": "./AGENTS.md",
+      "type": "text/markdown",
+      "title": "Agent/LLM usage guide"
+    },
+    {
+      "rel": "describedby",
+      "href": "./README.md",
+      "type": "text/markdown",
+      "title": "Human-readable documentation"
+    },
+    {
+      "rel": "pmtiles",
+      "href": "./wb_voronoi.pmtiles",
+      "type": "application/vnd.pmtiles",
+      "pmtiles:layers": [
+        "wb_voronoi"
+      ]
+    }
+  ],
+  "stac_extensions": [
+    "https://stac-extensions.github.io/table/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+    "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
+    "https://stac-extensions.github.io/web-map-links/v1.3.0/schema.json"
+  ],
+  "updated": "2026-11-04T07:14:20Z",
+  "geoparquet:geometry_type": [
+    "Polygon",
+    "MultiPolygon"
+  ],
+  "geoparquet:feature_count": 275,
+  "pmtiles:min_zoom": 0,
+  "pmtiles:max_zoom": 12,
+  "pmtiles:tile_type": "mvt",
+  "pmtiles:center": [
+    0.0,
+    0.0,
+    6
+  ],
+  "pmtiles:layers": [
+    "wb_voronoi"
+  ],
+  "table:row_count": 275,
+  "table:primary_geometry": "geometry",
+  "table:columns": [
+    {
+      "name": "geometry",
+      "type": "binary"
+    },
+    {
+      "name": "wb_id",
+      "type": "string"
+    },
+    {
+      "name": "ISO_A3",
+      "type": "string"
+    },
+    {
+      "name": "ISO_A2",
+      "type": "string"
+    },
+    {
+      "name": "WB_A3",
+      "type": "string"
+    },
+    {
+      "name": "WB_STATUS",
+      "type": "string"
+    },
+    {
+      "name": "SOV_ISO_A3",
+      "type": "string"
+    },
+    {
+      "name": "SOV_NAME",
+      "type": "string"
+    },
+    {
+      "name": "NAM_0",
+      "type": "string"
+    },
+    {
+      "name": "CONTINENT",
+      "type": "string"
+    },
+    {
+      "name": "WB_REGION",
+      "type": "string"
+    },
+    {
+      "name": "WB_INCOME",
+      "type": "string"
+    },
+    {
+      "name": "ADM0CD_c",
+      "type": "string"
+    }
+  ],
+  "title": "Wb Voronoi",
+  "extent": {
+    "spatial": {
+      "bbox": [
+        [
+          -180.0,
+          -85.0511287,
+          180.0,
+          85.0511287
+        ]
+      ]
+    },
+    "temporal": {
+      "interval": [
+        [
+          null,
+          null
+        ]
+      ]
+    }
+  },
+  "license": "ODbL-1.0",
+  "providers": [
+    {
+      "name": "World Bank",
+      "roles": [
+        "producer",
+        "licensor"
+      ]
+    },
+    {
+      "name": "OCHA Centre for Humanitarian Data",
+      "roles": [
+        "host"
+      ],
+      "url": "https://github.com/OCHA-DAP/adm0-site/issues"
+    }
+  ],
+  "assets": {
+    "wb_voronoi": {
+      "href": "./wb_voronoi.parquet",
+      "type": "application/vnd.apache.parquet",
+      "file:size": 7223419,
+      "file:checksum": "12201283d48b8b10b325f5b58bf80847f43255103537c547e2781f8bf907ac8d9366",
+      "roles": [
+        "data"
+      ]
+    },
+    "wb_voronoi-tiles": {
+      "href": "./wb_voronoi.pmtiles",
+      "type": "application/vnd.pmtiles",
+      "file:size": 123213279,
+      "file:checksum": "12205bbc7678e147abcc06bc3a557b78c131cbcfedc88afae1771e7cc4b417478069",
+      "roles": [
+        "visual"
+      ]
+    },
+    "styles/default": {
+      "href": "./styles/default.json",
+      "type": "application/vnd.mapbox.style+json",
+      "roles": [
+        "style",
+        "default"
+      ],
+      "title": "Default",
+      "file:size": 463,
+      "file:checksum": "1220d1eab314642fc27aa48a66738f19d809746c943c3322499c3e00c0f4311a0d58"
+    },
+    "thumbnail": {
+      "href": "./wb_voronoi.thumb.jpg",
+      "type": "image/jpeg",
+      "roles": [
+        "thumbnail"
+      ],
+      "file:size": 26237,
+      "file:checksum": "12205ea235895396c46349e20346eae470bc8fcc30848be65b64ebe55c90d8e2b19d"
+    }
+  }
+}

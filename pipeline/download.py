@@ -45,6 +45,11 @@ UNTERM_URL = "https://conferences.unite.un.org/untermapi/api/term/downloadCountr
 FIELDMAPS_LICENSE = "odbl"
 FIELDMAPS_URL = "https://data.source.coop/fieldmaps/international/{license}/humanitarian/adm0-{geom}/adm0_{geom}.parquet"
 M49_URL = "https://unstats.un.org/unsd/methodology/m49/overview/"
+WB_URL = (
+    "https://datacatalogfiles.worldbank.org/ddh-published/0038272/3/DR0096331/"
+    "World%20Bank%20Official%20Boundaries%20%28Parquet%29/"
+    "World%20Bank%20Official%20Boundaries%20-%20Admin%200_all_layers.parquet"
+)
 
 
 def _transient(e: BaseException) -> bool:
@@ -156,6 +161,10 @@ def _fieldmaps(out: Path) -> str:
     return max(dates)
 
 
+def _wb(out: Path) -> str:
+    return _stream(WB_URL, out / "adm0_all_layers.parquet")
+
+
 def _fetch(source: str, fn: Callable[[Path], str]) -> None:
     out = download_dir / source
     rmtree(out, ignore_errors=True)
@@ -173,6 +182,7 @@ def main() -> None:
         "wp": _wp,
         "ref": _ref,
         "fieldmaps": _fieldmaps,
+        "wb": _wb,
     }
     with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
         futures = [pool.submit(_fetch, s, fn) for s, fn in jobs.items()]

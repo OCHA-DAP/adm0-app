@@ -35,6 +35,11 @@ Attributes
 | name_wp | string |  |
 | mapname_wp | string |  |
 | status_wp | string |  |
+| count_wb | int64 |  |
+| name_wb | string |  |
+| sovereign_wb | string |  |
+| status_wb | string |  |
+| region_wb | string |  |
 | name_unterm | string |  |
 | status_unterm | string |  |
 | name_m49 | string |  |
@@ -46,7 +51,7 @@ Attributes
 
 | File | Size | Checksum |
 |------|------|----------|
-| ./attributes.parquet | 59.2 KB | 12208554350d... |
+| ./attributes.parquet | 66.5 KB | 122097d7d5be... |
 
 ## Quick Start
 
