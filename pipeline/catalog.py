@@ -37,10 +37,9 @@ ODBL = {
     "license": "ODbL-1.0",
     "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
 }
-# U.S. Government works are public domain (17 U.S.C. 105), which has no SPDX id.
-US_PUBLIC_DOMAIN = {
-    "license": "other",
-    "license_url": "https://www.state.gov/copyright-information",
+CC0 = {
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
 }
 UN_TERMS = {
     "license": "other",
@@ -52,7 +51,7 @@ PRODUCERS = {
     "gaul": ("FAO (GAUL 2025)", CC_BY),
     "ungeodata": ("United Nations Geospatial", UN_TERMS),
     "fieldmaps": ("FieldMaps (OpenStreetMap)", ODBL),
-    "wp": ("U.S. Department of State", US_PUBLIC_DOMAIN),
+    "wp": ("U.S. Department of State", CC0),
     "wb": ("World Bank", CC_BY),
 }
 

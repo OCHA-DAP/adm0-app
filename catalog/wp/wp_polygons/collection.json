@@ -36,7 +36,7 @@
     },
     {
       "rel": "license",
-      "href": "https://www.state.gov/copyright-information",
+      "href": "https://creativecommons.org/publicdomain/zero/1.0/",
       "title": "License"
     }
   ],
@@ -46,7 +46,7 @@
     "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
     "https://stac-extensions.github.io/web-map-links/v1.3.0/schema.json"
   ],
-  "updated": "2026-11-04T15:02:08Z",
+  "updated": "2026-11-04T17:12:39Z",
   "geoparquet:geometry_type": [
     "MultiPolygon"
   ],
@@ -175,7 +175,7 @@
       ]
     }
   },
-  "license": "other",
+  "license": "CC0-1.0",
   "providers": [
     {
       "name": "U.S. Department of State",

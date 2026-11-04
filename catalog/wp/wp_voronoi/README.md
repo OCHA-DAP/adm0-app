@@ -63,7 +63,7 @@ print(gdf.head())
 
 ## License
 
-[other](https://www.state.gov/copyright-information)
+[CC0-1.0](https://creativecommons.org/publicdomain/zero/1.0/)
 
 ## Contact
 
