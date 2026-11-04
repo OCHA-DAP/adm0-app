@@ -1,0 +1,40 @@
+{
+  "spec_version": "1.0.0",
+  "current_version": "1.0.0",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "created": "2026-11-04T07:14:18.168297Z",
+      "breaking": false,
+      "assets": {
+        "wb_polygons.parquet": {
+          "sha256": "99c8344a01c6cd5159ef8cd74e87d1638868f62c33d98c28aa28f0028b7dea09",
+          "size_bytes": 47835898,
+          "href": "wb/wb_polygons/wb_polygons.parquet",
+          "source_mtime": 1793774707.4427958,
+          "mtime": 1793774707.4427958,
+          "feature_count": 275,
+          "schema_fingerprint": "80edb6724597dadb"
+        },
+        "wb_polygons.pmtiles": {
+          "sha256": "d8f4f4bd5f211094318ca1204826d41417dfef8a75aa9aba5563761cc9df47c6",
+          "size_bytes": 198221620,
+          "href": "wb/wb_polygons/wb_polygons.pmtiles",
+          "source_path": "wb_polygons.pmtiles",
+          "mtime": 1793776322.9643447
+        },
+        "wb_polygons.thumb.jpg": {
+          "sha256": "165773a555c365610dc57ec446bb74d2c3ccc6887480fe16d7651e42f1c52e8b",
+          "size_bytes": 25936,
+          "href": "wb/wb_polygons/wb_polygons.thumb.jpg",
+          "mtime": 1793776458.149705
+        }
+      },
+      "changes": [
+        "wb_polygons.parquet",
+        "wb_polygons.pmtiles",
+        "wb_polygons.thumb.jpg"
+      ]
+    }
+  ]
+}

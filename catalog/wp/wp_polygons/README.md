@@ -63,7 +63,7 @@ print(gdf.head())
 
 ## License
 
-[ODbL-1.0](https://opendatacommons.org/licenses/odbl/1-0/)
+[CC0-1.0](https://creativecommons.org/publicdomain/zero/1.0/)
 
 ## Contact
 

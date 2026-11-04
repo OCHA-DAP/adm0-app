@@ -83,41 +83,67 @@ def gaul(conn: DuckDBPyConnection) -> None:
     )
 
 
-def gaul_lines(conn: DuckDBPyConnection) -> None:
-    """Derive GAUL L0 boundary lines from edges shared by neighbouring polygons."""
-    path = prepare_dir / "gaul_l0.parquet"
+def _shared_lines(
+    conn: DuckDBPyConnection, source: str, polygons: str, code: str, name: str
+) -> None:
+    """Derive ``source``'s boundary lines from edges its neighbouring polygons share."""
+    path = prepare_dir / f"{polygons}.parquet"
+    sid = f"{source}_id"
     conn.execute(f"""--sql
-        CREATE TEMP TABLE gaul_boundary AS
-        SELECT gaul_id, ISO3_CODE, GAUL0_NAME, ST_Boundary(geometry) AS boundary,
+        CREATE OR REPLACE TEMP TABLE boundary AS
+        SELECT {sid} AS id, {code} AS code, {name} AS name,
+               ST_Boundary(geometry) AS boundary,
                ST_XMin(geometry) AS xmin, ST_YMin(geometry) AS ymin,
                ST_XMax(geometry) AS xmax, ST_YMax(geometry) AS ymax
         FROM read_parquet('{path}')
     """)
     conn.execute("""--sql
-        CREATE TEMP TABLE gaul_pairs AS
-        SELECT a.gaul_id AS id_1, b.gaul_id AS id_2
-        FROM gaul_boundary a JOIN gaul_boundary b ON a.gaul_id < b.gaul_id
+        CREATE OR REPLACE TEMP TABLE pairs AS
+        SELECT a.id AS id_1, b.id AS id_2
+        FROM boundary a JOIN boundary b ON a.id < b.id
          AND a.xmin <= b.xmax AND b.xmin <= a.xmax
          AND a.ymin <= b.ymax AND b.ymin <= a.ymax
     """)
     _copy(
         conn,
-        """--sql
+        f"""--sql
         SELECT * FROM (
-            SELECT a.gaul_id AS gaul_id_1, a.ISO3_CODE AS iso3_1,
-                   a.GAUL0_NAME AS name_1, b.gaul_id AS gaul_id_2,
-                   b.ISO3_CODE AS iso3_2, b.GAUL0_NAME AS name_2,
+            SELECT a.id AS {sid}_1, a.code AS iso3_1, a.name AS name_1,
+                   b.id AS {sid}_2, b.code AS iso3_2, b.name AS name_2,
                    ST_LineMerge(ST_CollectionExtract(
                        ST_Intersection(a.boundary, b.boundary), 2)) AS geometry
-            FROM gaul_pairs p
-            JOIN gaul_boundary a ON a.gaul_id = p.id_1
-            JOIN gaul_boundary b ON b.gaul_id = p.id_2
+            FROM pairs p
+            JOIN boundary a ON a.id = p.id_1
+            JOIN boundary b ON b.id = p.id_2
         )
         WHERE NOT ST_IsEmpty(geometry)
-        ORDER BY gaul_id_1, gaul_id_2
+        ORDER BY {sid}_1, {sid}_2
         """,
-        "gaul_lines",
+        f"{source}_lines",
     )
+
+
+def gaul_lines(conn: DuckDBPyConnection) -> None:
+    """Derive GAUL L0 boundary lines."""
+    _shared_lines(conn, "gaul", "gaul_l0", "ISO3_CODE", "GAUL0_NAME")
+
+
+def wb(conn: DuckDBPyConnection) -> None:
+    """Copy World Bank ADM0 polygons, NDLSA included, and derive their lines."""
+    path = download_dir / "wb/adm0_all_layers.parquet"
+    # NDLSA rows have no ADM0CD_c, and Jammu and Kashmir appears once per sovereign.
+    _copy(
+        conn,
+        f"""--sql
+        SELECT coalesce(ADM0CD_c, NAM_0 || coalesce('-' || SOV_ISO_A3, '')) AS wb_id,
+               * EXCLUDE geometry, geometry
+        FROM (SELECT * REPLACE (regexp_replace(NAM_0, '^\\s+|\\s+$', '', 'g') AS NAM_0)
+              FROM read_parquet('{path}'))
+        ORDER BY wb_id
+        """,
+        "wb_polygons",
+    )
+    _shared_lines(conn, "wb", "wb_polygons", "ISO_A3", "NAM_0")
 
 
 def _gpkg(
@@ -311,5 +337,5 @@ def main() -> None:
     """Prepare every downloaded source."""
     prepare_dir.mkdir(parents=True, exist_ok=True)
     conn = open_db()
-    for fn in (ref, gaul, gaul_lines, lsib, wp, osm, ungeodata, fieldmaps):
+    for fn in (ref, gaul, gaul_lines, lsib, wp, osm, ungeodata, fieldmaps, wb):
         fn(conn)

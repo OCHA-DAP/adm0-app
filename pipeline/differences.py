@@ -170,8 +170,9 @@ def _overlay(conn: DuckDBPyConnection) -> None:
         GROUP BY ALL;
         CREATE OR REPLACE TABLE matches AS
         WITH codes AS (
-            SELECT source, entity, code FROM entities WHERE coalesce(code, '') <> ''
-            QUALIFY count(*) OVER (PARTITION BY source, code) = 1)
+            SELECT source, entity, upper(code) AS code FROM entities
+            WHERE coalesce(code, '') <> ''
+            QUALIFY count(*) OVER (PARTITION BY source, upper(code)) = 1)
         -- A code held by one entity in each source pairs them, whatever the overlap.
         SELECT w.*, coalesce(ca.code = cb.code, false)
             OR (km2 = max(km2) OVER (PARTITION BY a, b, a_entity)

@@ -72,8 +72,8 @@
       "roles": [
         "data"
       ],
-      "file:size": 60594,
-      "file:checksum": "12208554350d9f54f7ee095f22f2b0c092885901fc5701b4b466a82b510634e35aa2"
+      "file:size": 68132,
+      "file:checksum": "122097d7d5be4ae8383a772d6b7fdab9e561de8168ca68b1603c7712a64250a2c528"
     }
   },
   "table:columns": [
@@ -158,6 +158,26 @@
       "type": "string"
     },
     {
+      "name": "count_wb",
+      "type": "int64"
+    },
+    {
+      "name": "name_wb",
+      "type": "string"
+    },
+    {
+      "name": "sovereign_wb",
+      "type": "string"
+    },
+    {
+      "name": "status_wb",
+      "type": "string"
+    },
+    {
+      "name": "region_wb",
+      "type": "string"
+    },
+    {
       "name": "name_unterm",
       "type": "string"
     },
@@ -182,7 +202,7 @@
       "type": "list<element: struct<s: string, id: string, layer: string, name: string, label: string, bbox: list<element: double>>>"
     }
   ],
-  "table:row_count": 331,
+  "table:row_count": 332,
   "stac_extensions": [
     "https://stac-extensions.github.io/table/v1.2.0/schema.json",
     "https://stac-extensions.github.io/file/v2.1.0/schema.json",

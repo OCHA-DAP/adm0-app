@@ -53,7 +53,7 @@ print(gdf.head())
 
 ## License
 
-[ODbL-1.0](https://opendatacommons.org/licenses/odbl/1-0/)
+[other](https://www.un.org/en/about-us/terms-of-use)
 
 ## Contact
 

@@ -11,18 +11,6 @@
       "title": "ADM0 site data"
     },
     {
-      "rel": "agents",
-      "href": "./AGENTS.md",
-      "type": "text/markdown",
-      "title": "Agent/LLM usage guide"
-    },
-    {
-      "rel": "describedby",
-      "href": "./README.md",
-      "type": "text/markdown",
-      "title": "Human-readable documentation"
-    },
-    {
       "rel": "child",
       "href": "./gaul/catalog.json",
       "type": "application/json",
@@ -57,6 +45,24 @@
       "href": "./wp/catalog.json",
       "type": "application/json",
       "title": "Wp"
+    },
+    {
+      "rel": "child",
+      "href": "./wb/catalog.json",
+      "type": "application/json",
+      "title": "Wb"
+    },
+    {
+      "rel": "agents",
+      "href": "./AGENTS.md",
+      "type": "text/markdown",
+      "title": "Agent/LLM usage guide"
+    },
+    {
+      "rel": "describedby",
+      "href": "./README.md",
+      "type": "text/markdown",
+      "title": "Human-readable documentation"
     }
   ],
   "title": "ADM0 site data",
