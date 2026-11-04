@@ -15,11 +15,6 @@
       "type": "application/json"
     },
     {
-      "rel": "license",
-      "href": "https://opendatacommons.org/licenses/odbl/1-0/",
-      "title": "License"
-    },
-    {
       "rel": "agents",
       "href": "./AGENTS.md",
       "type": "text/markdown",
@@ -38,6 +33,11 @@
       "pmtiles:layers": [
         "ungeodata_lines"
       ]
+    },
+    {
+      "rel": "license",
+      "href": "https://www.un.org/en/about-us/terms-of-use",
+      "title": "License"
     }
   ],
   "stac_extensions": [
@@ -46,7 +46,7 @@
     "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
     "https://stac-extensions.github.io/web-map-links/v1.3.0/schema.json"
   ],
-  "updated": "2026-11-03T14:37:40Z",
+  "updated": "2026-11-04T17:09:10Z",
   "geoparquet:geometry_type": [
     "MultiLineString"
   ],
@@ -107,7 +107,7 @@
       ]
     }
   },
-  "license": "ODbL-1.0",
+  "license": "other",
   "providers": [
     {
       "name": "United Nations Geospatial",

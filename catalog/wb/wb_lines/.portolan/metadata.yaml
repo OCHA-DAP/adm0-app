@@ -1,4 +1,6 @@
 {
+  "license": "CC-BY-4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
   "providers": [
     {
       "name": "World Bank",

@@ -54,7 +54,7 @@ print(gdf.head())
 
 ## License
 
-[ODbL-1.0](https://opendatacommons.org/licenses/odbl/1-0/)
+[CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/)
 
 ## Contact
 

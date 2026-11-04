@@ -15,11 +15,6 @@
       "type": "application/json"
     },
     {
-      "rel": "license",
-      "href": "https://opendatacommons.org/licenses/odbl/1-0/",
-      "title": "License"
-    },
-    {
       "rel": "agents",
       "href": "./AGENTS.md",
       "type": "text/markdown",
@@ -38,6 +33,11 @@
       "pmtiles:layers": [
         "wp_voronoi"
       ]
+    },
+    {
+      "rel": "license",
+      "href": "https://www.state.gov/copyright-information",
+      "title": "License"
     }
   ],
   "stac_extensions": [
@@ -46,7 +46,7 @@
     "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
     "https://stac-extensions.github.io/web-map-links/v1.3.0/schema.json"
   ],
-  "updated": "2026-11-03T14:37:49Z",
+  "updated": "2026-11-04T15:01:48Z",
   "geoparquet:geometry_type": [
     "Polygon",
     "MultiPolygon"
@@ -176,7 +176,7 @@
       ]
     }
   },
-  "license": "ODbL-1.0",
+  "license": "other",
   "providers": [
     {
       "name": "U.S. Department of State",

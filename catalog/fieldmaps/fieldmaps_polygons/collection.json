@@ -46,7 +46,7 @@
     "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
     "https://stac-extensions.github.io/web-map-links/v1.3.0/schema.json"
   ],
-  "updated": "2026-11-03T14:37:43Z",
+  "updated": "2026-11-04T15:01:43Z",
   "geoparquet:geometry_type": [
     "MultiPolygon"
   ],

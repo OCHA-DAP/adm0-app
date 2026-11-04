@@ -1,4 +1,6 @@
 {
+  "license": "other",
+  "license_url": "https://www.un.org/en/about-us/terms-of-use",
   "providers": [
     {
       "name": "United Nations Geospatial",

@@ -29,13 +29,31 @@ HOST = {
     "roles": ["host"],
     "url": "https://github.com/OCHA-DAP/adm0-site/issues",
 }
-# Producer per top-level folder; differences/ and tables/ are the site's own.
+CC_BY = {
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+}
+ODBL = {
+    "license": "ODbL-1.0",
+    "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
+}
+# U.S. Government works are public domain (17 U.S.C. 105), which has no SPDX id.
+US_PUBLIC_DOMAIN = {
+    "license": "other",
+    "license_url": "https://www.state.gov/copyright-information",
+}
+UN_TERMS = {
+    "license": "other",
+    "license_url": "https://www.un.org/en/about-us/terms-of-use",
+}
+# Producer and licence per top-level folder; differences/ and tables/ are the site's
+# own and keep the catalog's licence.
 PRODUCERS = {
-    "gaul": "FAO (GAUL 2025)",
-    "ungeodata": "United Nations Geospatial",
-    "fieldmaps": "FieldMaps (OpenStreetMap)",
-    "wp": "U.S. Department of State",
-    "wb": "World Bank",
+    "gaul": ("FAO (GAUL 2025)", CC_BY),
+    "ungeodata": ("United Nations Geospatial", UN_TERMS),
+    "fieldmaps": ("FieldMaps (OpenStreetMap)", ODBL),
+    "wp": ("U.S. Department of State", US_PUBLIC_DOMAIN),
+    "wb": ("World Bank", CC_BY),
 }
 
 
@@ -79,8 +97,8 @@ def _stage(only: list[str] | None) -> list[Path]:
 
 
 def _write_providers(collection: Path) -> None:
-    """Write the collection's providers into its .portolan/metadata.yaml."""
-    producer = PRODUCERS.get(collection.parent.name)
+    """Write the collection's providers and licence into its .portolan/metadata.yaml."""
+    producer, licence = PRODUCERS.get(collection.parent.name, (None, {}))
     providers = (
         [{"name": producer, "roles": ["producer", "licensor"]}, HOST]
         if producer
@@ -88,7 +106,7 @@ def _write_providers(collection: Path) -> None:
     )
     meta = collection / ".portolan" / "metadata.yaml"
     meta.parent.mkdir(exist_ok=True)
-    meta.write_text(json.dumps({"providers": providers}, indent=2) + "\n")
+    meta.write_text(json.dumps({**licence, "providers": providers}, indent=2) + "\n")
 
 
 def _date(collection: Path) -> str:

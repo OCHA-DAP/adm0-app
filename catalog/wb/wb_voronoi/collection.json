@@ -15,11 +15,6 @@
       "type": "application/json"
     },
     {
-      "rel": "license",
-      "href": "https://opendatacommons.org/licenses/odbl/1-0/",
-      "title": "License"
-    },
-    {
       "rel": "agents",
       "href": "./AGENTS.md",
       "type": "text/markdown",
@@ -38,6 +33,11 @@
       "pmtiles:layers": [
         "wb_voronoi"
       ]
+    },
+    {
+      "rel": "license",
+      "href": "https://creativecommons.org/licenses/by/4.0/",
+      "title": "License"
     }
   ],
   "stac_extensions": [
@@ -46,7 +46,7 @@
     "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
     "https://stac-extensions.github.io/web-map-links/v1.3.0/schema.json"
   ],
-  "updated": "2026-11-04T07:14:20Z",
+  "updated": "2026-11-04T15:01:51Z",
   "geoparquet:geometry_type": [
     "Polygon",
     "MultiPolygon"
@@ -140,7 +140,7 @@
       ]
     }
   },
-  "license": "ODbL-1.0",
+  "license": "CC-BY-4.0",
   "providers": [
     {
       "name": "World Bank",
@@ -179,22 +179,22 @@
     "styles/default": {
       "href": "./styles/default.json",
       "type": "application/vnd.mapbox.style+json",
+      "title": "Default",
+      "file:size": 463,
+      "file:checksum": "1220d1eab314642fc27aa48a66738f19d809746c943c3322499c3e00c0f4311a0d58",
       "roles": [
         "style",
         "default"
-      ],
-      "title": "Default",
-      "file:size": 463,
-      "file:checksum": "1220d1eab314642fc27aa48a66738f19d809746c943c3322499c3e00c0f4311a0d58"
+      ]
     },
     "thumbnail": {
       "href": "./wb_voronoi.thumb.jpg",
       "type": "image/jpeg",
+      "file:size": 26237,
+      "file:checksum": "12205ea235895396c46349e20346eae470bc8fcc30848be65b64ebe55c90d8e2b19d",
       "roles": [
         "thumbnail"
-      ],
-      "file:size": 26237,
-      "file:checksum": "12205ea235895396c46349e20346eae470bc8fcc30848be65b64ebe55c90d8e2b19d"
+      ]
     }
   }
 }
