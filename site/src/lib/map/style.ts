@@ -32,8 +32,8 @@ const LINE_TYPES = {
 function byType(value: (t: (typeof LINE_TYPES)[keyof typeof LINE_TYPES]) => unknown) {
   return ["match", ["get", "line_type"], ...Object.entries(LINE_TYPES).flatMap(([k, t]) => [k, value(t)]), value(LINE_TYPES.international)] as unknown as ExpressionSpecification;
 }
-const LINE_DASH = byType((t) => ["literal", t.dash]);
-const LINE_WIDTHS = byType((t) => t.width);
+export const LINE_DASH = byType((t) => ["literal", t.dash]);
+export const LINE_WIDTHS = byType((t) => t.width);
 
 export const DIFFERENCES = "differences";
 export const DIFF_COLOR = "#7B3FA0";
@@ -261,6 +261,14 @@ export function applyOpacity(map: Map, draws: Draw[], opacities: number[], satel
 export function applyBasemap(map: Map, satellite: boolean) {
   for (const id of POSITRON_IDS) map.setLayoutProperty(id, "visibility", satellite ? "none" : "visible");
   map.setLayoutProperty("satellite", "visibility", satellite ? "visible" : "none");
+}
+
+// Apparent globe diameter in px at zoom 0 with the default camera, measured.
+const GLOBE_PX_AT_Z0 = 129;
+const GLOBE_FIT = 0.9;
+
+export function globeFitZoom(el: HTMLElement) {
+  return Math.log2((GLOBE_FIT * Math.min(el.clientWidth, el.clientHeight)) / GLOBE_PX_AT_Z0);
 }
 
 export function buildStyle(tilesBase: string, draws: Draw[]): StyleSpecification {

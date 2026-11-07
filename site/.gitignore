@@ -1,3 +1,4 @@
 src/lib/tiles.sealed.json
 public/tiles
 .astro/
+public/build

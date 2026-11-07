@@ -1,0 +1,8 @@
+---
+import BuildApp from "$lib/build/BuildApp.svelte";
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout>
+  <BuildApp client:only="svelte" />
+</Layout>

@@ -7,7 +7,7 @@
   import type { CompareState, Focus, Hit, ItemFocus } from "$lib/compare.svelte";
   import { LAYER_BY_ID } from "$lib/layers";
   import { SATELLITE_PROTOCOL, satelliteTile } from "$lib/map/satellite";
-  import { DIFFERENCES, DIFF_COLOR, DIFF_FILLS, DIFF_PICK, applyBasemap, applyDifferenceFade, applyDifferences, applyDraws, applyFocus, applyOpacity, applyVoronoiFocus, buildStyle, drawFor, pickLayerIds, queryLayerId } from "$lib/map/style";
+  import { DIFFERENCES, DIFF_COLOR, DIFF_FILLS, DIFF_PICK, applyBasemap, applyDifferenceFade, applyDifferences, applyDraws, applyFocus, applyOpacity, applyVoronoiFocus, buildStyle, drawFor, globeFitZoom, pickLayerIds, queryLayerId } from "$lib/map/style";
 
   let {
     tilesBase,
@@ -31,9 +31,6 @@
   // Matches the table pane's slide so the globe moves with it.
   const SLIDE_MS = 300;
 
-  // Apparent globe diameter in px at zoom 0 with the default camera, measured.
-  const GLOBE_PX_AT_Z0 = 129;
-  const GLOBE_FIT = 0.9;
   const SPIN_DEG_PER_S = 6;
   // The compare panel covers the left edge, so a framed code clears it.
   const FOCUS_PAD = { top: 60, right: 40, bottom: 40, left: 320 };
@@ -78,12 +75,11 @@
     const el = container;
     // MapLibre writes the hash on creation, so a linked position has to be read first.
     const linked = import.meta.env.DEV && location.hash.length > 1;
-    const fitZoom = () => Math.log2((GLOBE_FIT * Math.min(el.clientWidth, el.clientHeight)) / GLOBE_PX_AT_Z0);
     const m = new maplibregl.Map({
       container: el,
       style: buildStyle(tilesBase, untrack(() => compare.draws)),
       center: [20, 10],
-      zoom: fitZoom(),
+      zoom: globeFitZoom(el),
       attributionControl: { compact: true },
       hash: import.meta.env.DEV,
     });
@@ -120,7 +116,7 @@
     };
     // Dev holds still so tests and screenshots are repeatable.
     if (!import.meta.env.DEV) frame = requestAnimationFrame(spin);
-    const refit = new ResizeObserver(() => el.clientWidth && m.setZoom(fitZoom()));
+    const refit = new ResizeObserver(() => el.clientWidth && m.setZoom(globeFitZoom(el)));
     refit.observe(el);
     const stop = new AbortController();
     stop.signal.addEventListener("abort", () => {

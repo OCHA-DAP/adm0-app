@@ -8,3 +8,7 @@ uv run python -m pipeline --step catalog --push
 ```
 
 Pushing needs `PORTOLAN_REMOTE` and the source.coop keys in `.env` (see `.env.example`). `--only <id> ...` stages a subset of layers or tables. `uv run pytest` checks the portolan wrapper against a scratch catalog (about a minute).
+
+## Build layer
+
+`uv run python -m pipeline --step build` builds the build layer in numbered stages under `outputs/build/`. Stage 07 (`--stage 07`) extends it into water and runs only by name. See `docs/reference/build-data.md`.

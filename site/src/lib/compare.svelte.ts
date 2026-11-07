@@ -46,7 +46,7 @@ export const BASEMAPS: { id: Basemap; label: string }[] = [
   { id: "map", label: "Map" },
   { id: "satellite", label: "Satellite" },
 ];
-export const SLOT_COLORS: Record<Slot, string> = { a: "#009EDB", b: "#CF3F0B" };
+export const SLOT_COLORS: Record<Slot, string> = { a: "#CF3F0B", b: "#009EDB" };
 
 const VIEW_PARAM = "ui";
 const FADE_CYCLE_MS = 3000;
