@@ -1,4 +1,10 @@
 # adm0-site
+## Pipeline
+
+`uv run python -m pipeline` runs the default steps, or one with `--step <name>`. `prepare`, `extend`, `differences` and `tiles` skip work whose inputs match `outputs/state.json`. `extend --source <name>` and `tiles --only <id>` always run what they name.
+
+`--step differences` keeps its tables in `tmp/differences.duckdb`, so `--from assign`, `--from overlay` or `--from review` reruns that phase and all after it. Phases read as: `land` (land and lines), `assign` (cells, pieces, polygons), `overlay` (matches, land patches, island gaps), `review` (items, borders, site files). `DIFF_BBOX=xmin,ymin,xmax,ymax` limits a run to one area and writes partial results, which `--step differences` replaces on its next run.
+
 ## Data catalog
 
 The site's tiles and tables are published as a Portolan catalog in `catalog/`, which the `catalog` step generates (only its `.portolan/` settings are committed). After the `tiles` step, build and push it with:

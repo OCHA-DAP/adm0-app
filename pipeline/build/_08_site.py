@@ -18,7 +18,6 @@ LAYERS = {
     "build_gaul": ("06", "gaul"),
     "build_path_errors": ("06", "path_errors"),
     "build_path_disputed": ("06", "path_disputed"),
-    "build_removed": ("04", "removed"),
 }
 
 
@@ -28,10 +27,14 @@ def main() -> None:
     sources = [Path(data(*src)) for src in LAYERS.values()]
     settings = Path(tiles.__file__)
     same_settings = unchanged("08", settings)
+    conn = connect()
     for name, src in zip(LAYERS, sources, strict=True):
         dest = folder / f"{name}.pmtiles"
         if same_settings and dest.exists() and unchanged("08", src):
             logger.info("%s: unchanged", name)
+        elif not conn.execute(f"SELECT count(*) FROM '{src}'").fetchall()[0][0]:
+            dest.unlink(missing_ok=True)
+            logger.info("%s: empty, not tiled", name)
         else:
             tiles.tile(src, dest, name)
     tables = [
@@ -41,4 +44,4 @@ def main() -> None:
     tables += [curated_dir / "stages.json", curated_dir / "path.json"]
     for path in tables:
         copy2(path, folder)
-    finish(connect(), "08", [settings, *sources, *tables])
+    finish(conn, "08", [settings, *sources, *tables])

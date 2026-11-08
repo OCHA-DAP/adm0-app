@@ -1,3 +1,6 @@
 un,fieldmaps,action,reason
 xSR,PHL,remove,FieldMaps has no land here so its Voronoi cell only fills the sea
-xRI,XKI,recode,Same land disaggregated and re-coded
+RUS,XKI,remove,Same land as C14
+IND,PAK,remove,False positive
+LKA,IND,remove,False positive
+PYF,CPT,remove,Same land as C10

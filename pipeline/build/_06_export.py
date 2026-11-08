@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 TOLERANCE = 1e-9
-UN_ROWS, GAUL_ROWS = 260, 272
+UN_ROWS, GAUL_ROWS = 262, 274
 PATH_OUTPUTS = {"errors": "path_errors", "disputed": "path_disputed"}
 
 
@@ -32,7 +32,31 @@ def _dissolve(key: str) -> str:
     return f"""--sql
         SELECT {key}, ST_Multi(ST_CollectionExtract(ST_Union_Agg(geometry), 3))
             AS geometry
-        FROM '{data("05", "units")}' GROUP BY {key}"""
+        FROM '{data("05", "units")}' GROUP BY 1"""
+
+
+def _sources(conn: DuckDBPyConnection) -> None:
+    """Add the entities changes create to both sources, keyed like the dissolves."""
+    rows = [(e["code"], e["name"]) for c in changes() if (e := c.get("entity"))]
+    conn.execute("CREATE TABLE entities (code VARCHAR, name VARCHAR)")
+    conn.executemany("INSERT INTO entities VALUES (?, ?)", rows)
+    units = data("05", "units")
+    conn.execute(f"""--sql
+        CREATE TABLE un_src AS
+        SELECT 'UN ' || objectid AS key, * EXCLUDE geometry
+        FROM '{data("01", "un_polygons")}'
+        UNION ALL BY NAME
+        SELECT 'NEW ' || code AS key, code AS iso3cd, name AS romnam, name AS maplab
+        FROM entities;
+        CREATE TABLE gaul_src AS
+        SELECT 'GAUL ' || gaul_id AS key, * EXCLUDE geometry
+        FROM '{data("01", "gaul_polygons")}'
+        UNION ALL BY NAME
+        SELECT 'NEW ' || code AS key, code AS ISO3_CODE, code AS MAP_CODE,
+               name AS GAUL0_NAME
+        FROM entities
+        WHERE code IN (SELECT entity FROM '{units}' WHERE gaul_id IS NULL);
+    """)
 
 
 def _path_state(types: list[str]) -> str:
@@ -52,7 +76,8 @@ def _path_state(types: list[str]) -> str:
             FROM '{data("05", "units")}'
         ),
         keyed AS (
-            SELECT CASE WHEN applied OR (coalesce(change_ids, '') = '' AND gaul_id IN
+            SELECT CASE WHEN gaul_id IS NULL THEN 'NEW ' || entity
+                        WHEN applied OR (coalesce(change_ids, '') = '' AND gaul_id IN
                              (SELECT gaul_id FROM flagged WHERE applied))
                         THEN 'GAUL ' || gaul_id {relabels}
                         ELSE 'UN ' || un_objectid END AS key,
@@ -64,10 +89,10 @@ def _path_state(types: list[str]) -> str:
                 AS geometry
             FROM keyed GROUP BY key
         )
-        SELECT d.key, g.* EXCLUDE geometry, u.* EXCLUDE geometry, d.geometry
+        SELECT d.key, g.* EXCLUDE key, u.* EXCLUDE key, d.geometry
         FROM dissolved d
-        LEFT JOIN '{data("01", "gaul_polygons")}' g ON d.key = 'GAUL ' || g.gaul_id
-        LEFT JOIN '{data("01", "un_polygons")}' u ON d.key = 'UN ' || u.objectid"""
+        LEFT JOIN gaul_src g ON d.key = g.key
+        LEFT JOIN un_src u ON d.key = u.key"""
 
 
 def _path_outputs(conn: DuckDBPyConnection) -> None:
@@ -92,15 +117,17 @@ def _checks(conn: DuckDBPyConnection, un: str, gaul: str) -> dict:
     difference = one(f"""--sql
         SELECT max(ST_Area(ST_SymDifference(ST_MakeValid(a.geometry),
                                             ST_MakeValid(b.geometry))))
-        FROM '{un}' a JOIN '{src_un}' b USING (objectid)""")
+        FROM ({_dissolve("un_objectid")}) a
+        JOIN '{src_un}' b ON b.objectid = a.un_objectid""")
     described = {s["stage"] for s in stages() if s["summary"] and s["why"]}
     used = {
         c
-        for row in conn.execute(f"FROM '{units}'").fetchall()
-        for c in row[5].split(";")
+        for (ids,) in conn.execute(f"SELECT change_ids FROM '{units}'").fetchall()
+        for c in ids.split(";")
         if c
     }
     known = {c["id"] for c in changes()}
+    adding = ", ".join(f"'{c['id']}'" for c in changes() if "entity" in c) or "''"
     return {
         "un_rows": (n := one(f"SELECT count(*) FROM '{un}'"), n == UN_ROWS),
         "un_max_difference": (difference, difference <= TOLERANCE),
@@ -128,7 +155,9 @@ def _checks(conn: DuckDBPyConnection, un: str, gaul: str) -> dict:
             d <= TOLERANCE * 1000,
         ),
         "parts_without_gaul": (
-            n := one(f"SELECT count(*) FROM '{parts}' WHERE gaul_id IS NULL"),
+            n := one(f"""--sql
+                SELECT count(*) FROM '{parts}'
+                WHERE gaul_id IS NULL AND coalesce(change_id, '') NOT IN ({adding})"""),
             n == 0,
         ),
         "unknown_changes": (
@@ -156,22 +185,19 @@ def main() -> None:
         return
     conn = connect()
     un, gaul = data("06", "un"), data("06", "gaul")
-    write_parquet(
-        conn,
-        f"""--sql
-        SELECT s.* EXCLUDE geometry, d.geometry
-        FROM ({_dissolve("un_objectid")}) d
-        JOIN '{data("01", "un_polygons")}' s ON s.objectid = d.un_objectid""",
-        Path(un),
-    )
-    write_parquet(
-        conn,
-        f"""--sql
-        SELECT s.* EXCLUDE geometry, d.geometry
-        FROM ({_dissolve("gaul_id")}) d
-        JOIN '{data("01", "gaul_polygons")}' s USING (gaul_id)""",
-        Path(gaul),
-    )
+    _sources(conn)
+    for path, src, key in (
+        (un, "un_src", "coalesce('NEW ' || entity, 'UN ' || un_owner)"),
+        (gaul, "gaul_src", "coalesce('GAUL ' || gaul_id, 'NEW ' || entity)"),
+    ):
+        write_parquet(
+            conn,
+            f"""--sql
+            SELECT s.* EXCLUDE key, d.geometry
+            FROM ({_dissolve(f"{key} AS key")}) d
+            JOIN {src} s USING (key)""",
+            Path(path),
+        )
     _path_outputs(conn)
     checks = _checks(conn, un, gaul)
     (stage_dir("06") / "checks.json").write_text(

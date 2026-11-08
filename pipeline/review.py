@@ -5,13 +5,12 @@ from hashlib import md5
 from math import floor
 from typing import TYPE_CHECKING
 
-from .config import SOURCE_COLUMNS, layers, prepare_dir, register_dir, write_parquet
+from .config import layers, register_dir, write_parquet
 
 if TYPE_CHECKING:
     from duckdb import DuckDBPyConnection
 
 SOURCES = sorted({lyr["source"] for lyr in layers() if lyr["kind"] == "voronoi"})
-POLYGONS = {lyr["source"]: lyr["id"] for lyr in layers() if lyr["kind"] == "polygon"}
 # Differing islands with one assignment pattern in neighbouring cells form one item.
 GRID = 2
 
@@ -143,18 +142,6 @@ def _entity_items(conn: DuckDBPyConnection, label: dict) -> list:
     return out
 
 
-def _no_land_extents() -> str:
-    """Bounding boxes of entities without OSM land, from their source polygons."""
-    parts = []
-    for s in SOURCES:
-        c = SOURCE_COLUMNS[s]
-        parts.append(f"""SELECT '{s}' AS source, coalesce(({c["id"]})::VARCHAR, '')
-            AS entity, ST_XMin(geometry) AS xmin, ST_YMin(geometry) AS ymin,
-            ST_XMax(geometry) AS xmax, ST_YMax(geometry) AS ymax
-            FROM read_parquet('{prepare_dir / POLYGONS[s]}.parquet')""")
-    return " UNION ALL ".join(parts)
-
-
 def build(conn: DuckDBPyConnection) -> None:
     """Write items.parquet and borders.parquet, and tables mapping patches to them."""
     _clusters(conn)
@@ -179,9 +166,8 @@ def build(conn: DuckDBPyConnection) -> None:
     )
     conn.execute(f"""--sql
         CREATE OR REPLACE TABLE entity_land AS
-        SELECT source, entity, sum(ST_Area_Spheroid(geom)) / 1e6 AS km2,
-            min(ST_XMin(geom)) AS xmin, min(ST_YMin(geom)) AS ymin,
-            max(ST_XMax(geom)) AS xmax, max(ST_YMax(geom)) AS ymax
+        SELECT source, entity, sum(km2) AS km2, min(x0) AS xmin, min(y0) AS ymin,
+            max(x1) AS xmax, max(y1) AS ymax
         FROM pieces GROUP BY ALL;
         CREATE OR REPLACE TABLE stats AS
         SELECT item, count(*) AS islands, sum(i.km2) AS km2,
@@ -194,8 +180,9 @@ def build(conn: DuckDBPyConnection) -> None:
         FROM item_entities JOIN entity_land k USING (source, entity)
         WHERE own AND type = 'land' GROUP BY item
         UNION ALL
-        SELECT item, 0, 0, min(k.xmin), min(k.ymin), max(k.xmax), max(k.ymax)
-        FROM item_entities JOIN ({_no_land_extents()}) k USING (source, entity)
+        SELECT item, 0, 0, min(ST_XMin(k.env)), min(ST_YMin(k.env)),
+            max(ST_XMax(k.env)), max(ST_YMax(k.env))
+        FROM item_entities JOIN polygon_parts k USING (source, entity)
         WHERE own AND type = 'no_land' GROUP BY item;
         CREATE OR REPLACE TABLE items AS
         SELECT ie.item, any_value(ie.type) AS type,

@@ -2,14 +2,12 @@
 
 import json
 from datetime import UTC, datetime
-from hashlib import sha256
 from importlib.metadata import version
 from logging import getLogger
-from os import cpu_count
 from subprocess import check_output
 from typing import TYPE_CHECKING
 
-from pipeline.config import input_dir, open_db, root
+from pipeline.config import file_hash, input_dir, open_db, root
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -53,7 +51,6 @@ def connect() -> DuckDBPyConnection:
     """Open an in-memory database with spatial loaded and x/y axis order."""
     conn = open_db()
     conn.execute("SET geometry_always_xy = true")
-    conn.execute(f"SET threads = {max(1, (cpu_count() or 2) // 2)}")
     return conn
 
 
@@ -62,17 +59,14 @@ def changes() -> list[dict]:
     return json.loads((curated_dir / "changes.json").read_text())
 
 
+def path() -> list[dict]:
+    """Read the page's steps."""
+    return json.loads((curated_dir / "path.json").read_text())
+
+
 def stages() -> list[dict]:
     """Read the plain-language stage descriptions."""
     return json.loads((curated_dir / "stages.json").read_text())
-
-
-def _hash(path: Path) -> str:
-    digest = sha256()
-    with path.open("rb") as file:
-        while chunk := file.read(1 << 20):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def unchanged(stage: str, path: Path) -> bool:
@@ -84,7 +78,7 @@ def unchanged(stage: str, path: Path) -> bool:
     )
     return intact and record.get("inputs", {}).get(
         str(path.relative_to(root))
-    ) == _hash(path)
+    ) == file_hash(path)
 
 
 def _figures(conn: DuckDBPyConnection, path: Path) -> dict:
@@ -107,13 +101,13 @@ def finish(conn: DuckDBPyConnection, stage: str, inputs: list[Path]) -> None:
     outputs = {}
     for path in sorted(p for p in folder.iterdir() if p.name != "README.md"):
         figures = _figures(conn, path) if path.suffix == ".parquet" else {}
-        outputs[path.name] = {"sha256": _hash(path), **figures}
+        outputs[path.name] = {"sha256": file_hash(path), **figures}
     commit = check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
     manifest.setdefault("stages", {})[stage] = {
         "built_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "git_commit": commit,
         "tools": {name: version(name) for name in ("duckdb", "topo-tools")},
-        "inputs": {str(p.relative_to(root)): _hash(p) for p in inputs},
+        "inputs": {str(p.relative_to(root)): file_hash(p) for p in inputs},
         "outputs": outputs,
     }
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")

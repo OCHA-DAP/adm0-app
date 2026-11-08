@@ -2,13 +2,24 @@
 
 import html
 import re
+from concurrent.futures import ThreadPoolExecutor
 from logging import getLogger
+from pathlib import Path
 from typing import TYPE_CHECKING
 
-from .config import download_dir, input_dir, open_db, prepare_dir, write_parquet
+from .config import (
+    THREADS,
+    download_dir,
+    fresh,
+    input_dir,
+    open_db,
+    prepare_dir,
+    record,
+    write_parquet,
+)
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    from collections.abc import Callable
 
     from duckdb import DuckDBPyConnection
 
@@ -52,7 +63,7 @@ def _strip_stars(s: str) -> str:
 
 
 def gaul(conn: DuckDBPyConnection) -> None:
-    """Dissolve GAUL 2025 L1 to one L0 entity per distinct L0 attribute set."""
+    """Dissolve GAUL 2025 L1 to one L0 entity per attribute set, and derive lines."""
     path = download_dir / "gaul/gaul_2025_l1.shp"
     conn.execute(f"CREATE TABLE gaul_l1 AS SELECT * FROM ST_Read('{path}')")
     attrs = "GAUL0_CODE, ISO3_CODE, MAP_CODE, GAUL0_NAME, CONTINENT"
@@ -81,6 +92,7 @@ def gaul(conn: DuckDBPyConnection) -> None:
         """,
         "gaul_l0",
     )
+    _shared_lines(conn, "gaul", "gaul_l0", "ISO3_CODE", "GAUL0_NAME")
 
 
 def _shared_lines(
@@ -123,11 +135,6 @@ def _shared_lines(
     )
 
 
-def gaul_lines(conn: DuckDBPyConnection) -> None:
-    """Derive GAUL L0 boundary lines."""
-    _shared_lines(conn, "gaul", "gaul_l0", "ISO3_CODE", "GAUL0_NAME")
-
-
 def wb(conn: DuckDBPyConnection) -> None:
     """Copy World Bank ADM0 polygons, NDLSA included, and derive their lines."""
     path = download_dir / "wb/adm0_all_layers.parquet"
@@ -155,7 +162,7 @@ def _gpkg(
             SELECT UNNEST(layers).name AS name FROM ST_Read_Meta('{path}')
         )
         WHERE {where}
-    """).fetchone()[0]
+    """).fetchall()[0][0]
     _copy(
         conn,
         f"""--sql
@@ -333,9 +340,39 @@ def fieldmaps(conn: DuckDBPyConnection) -> None:
         )
 
 
+# Each source's function, its input folder and the layers it writes.
+SOURCES: tuple[tuple[Callable, Path, tuple[str, ...]], ...] = (
+    (ref, download_dir / "ref", ("ref",)),
+    (gaul, download_dir / "gaul", ("gaul_l0", "gaul_lines")),
+    (lsib, download_dir / "lsib", ("lsib_lines",)),
+    (wp, download_dir / "wp", ("wp_polygons",)),
+    (osm, download_dir / "osm", ("osm_land",)),
+    (ungeodata, input_dir / "ungeodata", ("ungeodata_polygons", "ungeodata_lines")),
+    (fieldmaps, download_dir / "fieldmaps", ("fieldmaps_polygons", "fieldmaps_lines")),
+    (wb, download_dir / "wb", ("wb_polygons", "wb_lines")),
+)
+
+
+def _inputs(folder: Path) -> list[Path]:
+    """Return this module and the data files in ``folder``, without its ``.date``."""
+    files = (p for p in folder.rglob("*") if p.is_file() and p.name != ".date")
+    return [Path(__file__), *sorted(files)]
+
+
 def main() -> None:
-    """Prepare every downloaded source."""
+    """Prepare every source whose download or preparing code changed, side by side."""
     prepare_dir.mkdir(parents=True, exist_ok=True)
     conn = open_db()
-    for fn in (ref, gaul, gaul_lines, lsib, wp, osm, ungeodata, fieldmaps, wb):
-        fn(conn)
+    stale = [
+        (fn, _inputs(folder))
+        for fn, folder, names in SOURCES
+        if not fresh(
+            f"prepare/{fn.__name__}",
+            _inputs(folder),
+            [prepare_dir / f"{name}.parquet" for name in names],
+        )
+    ]
+    with ThreadPoolExecutor(THREADS) as pool:
+        list(pool.map(lambda job: job[0](conn.cursor()), stale))
+    for fn, inputs in stale:
+        record(f"prepare/{fn.__name__}", inputs)

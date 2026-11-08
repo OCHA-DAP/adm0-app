@@ -6,15 +6,13 @@ from typing import TYPE_CHECKING
 
 from pipeline.config import write_parquet
 
-from .common import KM2, changes, connect, curated_dir, data, finish, stage_dir
+from .common import KM2, changes, connect, curated_dir, data, finish, path, stage_dir
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from duckdb import DuckDBPyConnection
 
-VIET_NAM, VIET_NAM_XMIN = "VNM", 109.6
-VIET_NAM_MOVED, VIET_NAM_REMOVED = ("C13a", "C13b"), "C13c"
 UN_ATTRS = (
     "iso3cd AS un_iso3, romnam AS un_name, stscod AS un_status, isoclr AS un_sovereign"
 )
@@ -22,6 +20,8 @@ GAUL_ATTRS = "GAUL0_CODE, ISO3_CODE, MAP_CODE, GAUL0_NAME"
 # Smaller patches are digitising noise along shared lines.
 MIN_PATCH_KM2 = 0.01
 DECISIONS = curated_dir / "review_decisions.csv"
+OVERRIDES = curated_dir / "island_overrides.csv"
+LINKS = curated_dir / "gaul_links.csv"
 
 
 def _units(conn: DuckDBPyConnection) -> None:
@@ -31,6 +31,20 @@ def _units(conn: DuckDBPyConnection) -> None:
         "CREATE TABLE keyed (un_objectid BIGINT, gaul_id VARCHAR, change_id VARCHAR)"
     )
     conn.executemany("INSERT INTO keyed VALUES (?, ?, ?)", keys)
+    conn.execute(
+        "CREATE TABLE entities (change_id VARCHAR, code VARCHAR, name VARCHAR)"
+    )
+    conn.executemany(
+        "INSERT INTO entities VALUES (?, ?, ?)",
+        [(c["id"], e["code"], e["name"]) for c in changes() if (e := c.get("entity"))],
+    )
+    # Every step but the disputed one applies to the UN export too.
+    shared = {t for s in path() if s["id"] != "disputed" for t in s["types"]}
+    conn.execute("CREATE TABLE moves (change_id VARCHAR, to_objectid BIGINT)")
+    conn.executemany(
+        "INSERT INTO moves VALUES (?, ?)",
+        [(c["id"], c.get("un_to")) for c in changes() if c["type"] in shared],
+    )
     conn.execute(f"""--sql
         CREATE TABLE un AS
             SELECT objectid, {UN_ATTRS} FROM '{data("01", "un_polygons")}';
@@ -49,14 +63,9 @@ def _units(conn: DuckDBPyConnection) -> None:
         CREATE TABLE tagged AS
             SELECT u.* EXCLUDE (override_changes),
                    list_distinct(list_filter(
-                       list_concat(coalesce(u.override_changes, []), [k.change_id,
-                           CASE WHEN k.change_id IS NULL
-                                 AND n.un_iso3 IS DISTINCT FROM g.ISO3_CODE
-                                THEN 'I-' || n.un_iso3 || '-' || u.gaul_id END]),
+                       list_concat(coalesce(u.override_changes, []), [k.change_id]),
                        lambda x: x IS NOT NULL)) AS change_ids
             FROM units u
-            JOIN un n ON n.objectid = u.un_objectid
-            JOIN gaul g USING (gaul_id)
             LEFT JOIN keyed k USING (un_objectid, gaul_id);
         CREATE TABLE relabels (un_objectid BIGINT, gaul_id VARCHAR, change_id VARCHAR,
                                to_objectid BIGINT);
@@ -67,10 +76,32 @@ def _units(conn: DuckDBPyConnection) -> None:
         if (r := c.get("relabel"))
     ]
     conn.executemany("INSERT INTO relabels VALUES (?, ?, ?, ?)", relabels)
-    conn.execute("""--sql
+    conn.execute(f"""--sql
         UPDATE tagged t SET change_ids = list_append(t.change_ids, r.change_id)
         FROM relabels r
         WHERE t.un_objectid = r.un_objectid AND t.gaul_id = r.gaul_id;
+        CREATE TABLE back AS
+        SELECT gaul_id, any_value(un_objectid) AS un_objectid
+        FROM read_csv('{LINKS}', types={{'gaul_id': 'VARCHAR'}})
+        GROUP BY gaul_id HAVING count(*) = 1;
+        CREATE OR REPLACE TABLE tagged AS
+        SELECT t.* EXCLUDE (geometry),
+               (SELECT any_value(code) FROM entities e
+                WHERE list_contains(t.change_ids, e.change_id)) AS entity,
+               CASE WHEN list_has_any(t.change_ids, (SELECT list(change_id) FROM moves))
+                    THEN coalesce((SELECT any_value(to_objectid) FROM moves m
+                                   WHERE list_contains(t.change_ids, m.change_id)),
+                                  (SELECT any_value(un_objectid) FROM back b
+                                   WHERE b.gaul_id = t.gaul_id),
+                                  t.un_objectid)
+                    ELSE t.un_objectid END AS un_owner,
+               t.geometry
+        FROM tagged t;
+        CREATE TABLE links AS
+        SELECT DISTINCT upper(n.un_iso3) AS un, upper(g.ISO3_CODE) AS gaul
+        FROM tagged t JOIN un n ON n.objectid = t.un_objectid
+        JOIN gaul g USING (gaul_id)
+        WHERE len(t.change_ids) = 0 AND upper(n.un_iso3) <> upper(g.ISO3_CODE);
     """)
 
 
@@ -78,12 +109,15 @@ def _crosswalk(conn: DuckDBPyConnection) -> None:
     """Write the crosswalk beside the units, with every source attribute."""
     query = f"""--sql
         SELECT t.unit_id, t.area_id, t.un_objectid, n.* EXCLUDE objectid,
-               t.gaul_id, g.* EXCLUDE gaul_id, t.parts,
+               t.gaul_id, g.* EXCLUDE gaul_id, t.entity, e.name AS entity_name,
+               t.un_owner,
+               t.parts,
                round({KM2.format("t.geometry")}, 3) AS km2,
                array_to_string(t.change_ids, ';') AS change_ids
         FROM tagged t
         JOIN un n ON n.objectid = t.un_objectid
-        JOIN gaul g USING (gaul_id)
+        LEFT JOIN gaul g USING (gaul_id)
+        LEFT JOIN (SELECT DISTINCT code, name FROM entities) e ON e.code = t.entity
         ORDER BY n.un_iso3, t.un_objectid, t.gaul_id, t.area_id
     """
     write_parquet(conn, query, Path(data("05", "crosswalk")), geo=False)
@@ -101,10 +135,12 @@ def _record(change: dict, conn: DuckDBPyConnection) -> dict:
     """).fetchall()[0]
     columns = ("un_objectid", "un", "un_name", "gaul", "gaul_name", "km2")
     values = conn.execute(f"""--sql
-        SELECT t.un_objectid, n.un_iso3, coalesce(n.un_name, n.un_iso3), g.MAP_CODE,
-               g.GAUL0_NAME, round(sum({KM2.format("t.geometry")}), 3) AS km2
+        SELECT t.un_objectid, n.un_iso3, coalesce(n.un_name, n.un_iso3),
+               coalesce(t.entity, g.MAP_CODE), coalesce(e.name, g.GAUL0_NAME),
+               round(sum({KM2.format("t.geometry")}), 3) AS km2
         FROM tagged t
-        JOIN un n ON n.objectid = t.un_objectid JOIN gaul g USING (gaul_id)
+        JOIN un n ON n.objectid = t.un_objectid LEFT JOIN gaul g USING (gaul_id)
+        LEFT JOIN entities e ON e.code = t.entity
         WHERE list_contains(t.change_ids, '{change["id"]}')
         GROUP BY ALL ORDER BY km2 DESC
     """).fetchall()
@@ -114,17 +150,6 @@ def _record(change: dict, conn: DuckDBPyConnection) -> dict:
             for c in (dict(zip(columns, v, strict=True)) for v in values)
         ]
     }
-    if change["id"] in VIET_NAM_MOVED:
-        extra |= {"gaul_removed": VIET_NAM}
-    if change["id"] == VIET_NAM_REMOVED:
-        parts, km2, box = conn.execute(f"""--sql
-            SELECT count(*), round(sum(km2), 3),
-                   [min(ST_XMin(geometry)), min(ST_YMin(geometry)),
-                    max(ST_XMax(geometry)), max(ST_YMax(geometry))]
-            FROM '{data("04", "removed")}'
-            WHERE iso3 = '{VIET_NAM}' AND ST_XMin(geometry) > {VIET_NAM_XMIN}
-        """).fetchall()[0]
-        extra |= {"gaul_removed": VIET_NAM, "removed_parts": parts}
     return change | {"km2": km2, "units": units, "bbox": box} | extra
 
 
@@ -141,68 +166,9 @@ def _relabelled(change: dict, value: dict, conn: DuckDBPyConnection) -> dict:
         return value
     change_id, objectid, code, name = rows[0]
     if change_id == change["id"]:
-        return value | {"gaul": code, "gaul_name": name}
+        # A display name for codes UN Geodata leaves unnamed.
+        return value | {"gaul": code, "gaul_name": change["relabel"].get("name", name)}
     return value | {"un_objectid": objectid, "un": code, "un_name": name}
-
-
-def _islands(conn: DuckDBPyConnection) -> list[dict]:
-    """Describe each UN and GAUL ownership pair no curated change covers."""
-    rows = conn.execute("""--sql
-        SELECT DISTINCT c, n.un_iso3, coalesce(n.un_name, n.un_iso3), t.gaul_id,
-               g.GAUL0_NAME
-        FROM (SELECT *, unnest(change_ids) AS c FROM tagged) t
-        JOIN un n ON n.objectid = t.un_objectid JOIN gaul g USING (gaul_id)
-        WHERE c LIKE 'I-%' ORDER BY c
-    """).fetchall()
-    return [
-        {
-            "id": c,
-            "type": "island_ownership",
-            "title": f"{un_name} in UN Geodata, {gaul_name} in GAUL",
-            "description": (
-                f"These islands belong to {un_name} ({iso}) in UN Geodata 2023 and to "
-                f"{gaul_name} in GAUL. Each export keeps its own source's ownership."
-            ),
-            "keys": [],
-            "method": "island attribution",
-            "source": "UN Geodata and GAUL polygons",
-            "comment": "",
-        }
-        for c, iso, un_name, _, gaul_name in rows
-    ]
-
-
-def _removed(conn: DuckDBPyConnection) -> list[dict]:
-    """Summarize GAUL land outside UN land, one record per GAUL entity."""
-    rows = conn.execute(f"""--sql
-        SELECT iso3, gaul_id, round(sum(km2), 3), count(*),
-               [min(ST_XMin(geometry)), min(ST_YMin(geometry)),
-                max(ST_XMax(geometry)), max(ST_YMax(geometry))]
-        FROM '{data("04", "removed")}'
-        WHERE NOT (iso3 = '{VIET_NAM}' AND ST_XMin(geometry) > {VIET_NAM_XMIN})
-        GROUP BY ALL ORDER BY 3 DESC
-    """).fetchall()
-    return [
-        {
-            "id": f"G-{gaul_id}",
-            "type": "gaul_only_land",
-            "title": f"GAUL land outside UN land ({iso3})",
-            "description": (
-                f"{parts} GAUL polygons in {iso3} touch no UN Geodata land, so they "
-                "are not carried over. A later coastline choice can bring them back."
-            ),
-            "keys": [],
-            "method": "not carried over",
-            "source": "GAUL 2025",
-            "comment": "",
-            "km2": km2,
-            "units": 0,
-            "bbox": box,
-            "gaul_removed": iso3,
-            "removed_parts": parts,
-        }
-        for iso3, gaul_id, km2, parts, box in rows
-    ]
 
 
 def _lines(conn: DuckDBPyConnection) -> list[dict]:
@@ -221,6 +187,7 @@ def _lines(conn: DuckDBPyConnection) -> list[dict]:
         SELECT a_code, b_code, least(a_code, b_code) AS x,
                greatest(a_code, b_code) AS y, km2, geometry
         FROM patches WHERE id NOT IN (SELECT id FROM covered)
+          AND (upper(b_code), upper(a_code)) NOT IN (SELECT un, gaul FROM links)
     """)
     write_parquet(
         conn,
@@ -242,7 +209,7 @@ def _lines(conn: DuckDBPyConnection) -> list[dict]:
             "title": f"{x} and {y} line",
             "description": (
                 f"The {x}-{y} line follows UN Geodata 2023 in both exports. The area "
-                "is the land GAUL and UN Geodata polygons give different entities."
+                "shown is land that GAUL and UN Geodata give to different entities."
             ),
             "keys": [],
             "method": "UN line adopted",
@@ -297,44 +264,16 @@ def _island_records(
     ]
 
 
-def _cell_islands(conn: DuckDBPyConnection) -> list[dict]:
-    """Describe islands GAUL never drew, per UN owner and Voronoi cell's entity."""
-    conn.execute(f"""--sql
-        CREATE TEMP TABLE owned AS
-        SELECT un_objectid, geometry, ST_PointOnSurface(geometry) AS point
-        FROM '{data("04", "parts")}' WHERE rule = 'un_owner';
-        CREATE TABLE cell_islands AS
-        SELECT concat('V-', n.un_iso3, '-', v.MAP_CODE) AS change_id, n.un_iso3,
-               coalesce(n.un_name, n.un_iso3) AS un_name, v.MAP_CODE AS cell_code,
-               v.GAUL0_NAME AS cell_name, {KM2.format("p.geometry")} AS km2, p.geometry
-        FROM owned p
-        JOIN un n ON n.objectid = p.un_objectid
-        JOIN '{data("01", "gaul_voronoi")}' v ON ST_Intersects(p.point, v.geometry)
-    """)
-    return _island_records(
-        conn,
-        "V",
-        lambda un_name, cell_name: {
-            "type": "cell_island",
-            "title": f"{un_name} islands in a {cell_name} Voronoi cell",
-            "description": (
-                f"GAUL has no polygon for these islands, which UN Geodata gives to "
-                f"{un_name}. Its Voronoi cells give them to {cell_name}, and both "
-                "exports keep the UN Geodata owner."
-            ),
-            "method": "UN owner kept",
-            "source": "UN Geodata and GAUL Voronoi cells",
-        },
-    )
-
-
 def _island_errors(conn: DuckDBPyConnection) -> list[dict]:
-    """List UN parts under review as errors, without changing any ownership."""
+    """List UN parts FieldMaps gives elsewhere that no change moves yet."""
     conn.execute(f"""--sql
         CREATE TEMP TABLE un_parts AS
-        SELECT *, ST_PointOnSurface(part) AS point FROM (
-            SELECT objectid, iso3cd AS un_iso3, unnest(ST_Dump(geometry)).geom AS part
-            FROM '{data("01", "un_polygons")}');
+        SELECT un_objectid AS objectid, un_iso3, geometry AS part,
+               ST_PointOnSurface(geometry) AS point
+        FROM '{data("02", "un_parts")}'
+        WHERE (un_objectid, un_part) NOT IN (
+            SELECT un_objectid, un_part FROM read_csv('{OVERRIDES}')
+            WHERE un_part IS NOT NULL);
         CREATE TEMP TABLE fieldmaps_cells AS
         SELECT iso_3 AS cell_code, adm0_name1 AS cell_name,
                unnest(ST_Dump(ST_MakeValid(geometry))).geom AS cell
@@ -342,51 +281,33 @@ def _island_errors(conn: DuckDBPyConnection) -> list[dict]:
         CREATE TEMP TABLE placed AS
         SELECT p.objectid, p.un_iso3, p.part, c.cell_code, c.cell_name
         FROM un_parts p JOIN fieldmaps_cells c ON ST_Intersects(p.point, c.cell);
-        INSERT INTO cell_islands
-        SELECT concat('E-', p.un_iso3, '-', p.cell_code), p.un_iso3,
-               coalesce(n.un_name, p.un_iso3), p.cell_code, p.cell_name,
-               {KM2.format("p.part")}, p.part
+        CREATE TABLE cell_islands AS
+        SELECT concat('E-', p.un_iso3, '-', p.cell_code) AS change_id, p.un_iso3,
+               coalesce(n.un_name, p.un_iso3) AS un_name, p.cell_code, p.cell_name,
+               {KM2.format("p.part")} AS km2, p.part AS geometry
         FROM placed p JOIN un n ON n.objectid = p.objectid
         WHERE upper(p.un_iso3) <> upper(p.cell_code)
+          AND (upper(p.un_iso3), upper(p.cell_code)) NOT IN (SELECT un, gaul FROM links)
           AND (p.un_iso3, p.cell_code) NOT IN (
               SELECT un, fieldmaps FROM read_csv('{DECISIONS}')
               WHERE action = 'remove')
     """)
-    records = _island_records(
+    return _island_records(
         conn,
         "E",
         lambda un_name, cell_name: {
             "type": "un_error",
             "title": f"{un_name} parts that FieldMaps gives to {cell_name}",
             "description": (
-                f"Under review: UN Geodata's assignment gives these parts to "
-                f"{un_name}, and FieldMaps gives them to {cell_name}. Ownership "
-                "in both exports is unchanged."
+                f"UN Geodata 2023 gives these parts to {un_name}, and FieldMaps "
+                f"gives them to {cell_name}. Both exports keep UN Geodata's owner "
+                "until a change is listed."
             ),
-            "method": "under review",
+            "method": "not applied",
             "source": "UN Geodata and FieldMaps",
             "review": True,
         },
     )
-    recoded = conn.execute(f"""--sql
-        SELECT concat('E-', un, '-', fieldmaps) FROM read_csv('{DECISIONS}')
-        WHERE action = 'recode'
-    """).fetchall()
-    return [_recoded(r) if (r["id"],) in recoded else r for r in records]
-
-
-def _recoded(record: dict) -> dict:
-    """Turn a review row into an islands row for land that only changes code."""
-    value = record["values"][0]
-    return record | {
-        "type": "island_ownership",
-        "title": f"{value['un_name']} re-coded as {value['gaul_name']}",
-        "description": (
-            f"GAUL disaggregates these UN Geodata parts and re-codes them from "
-            f"{value['un']} to {value['gaul']}. The land is the same."
-        ),
-        "method": "re-coded",
-    }
 
 
 def _labels(conn: DuckDBPyConnection) -> None:
@@ -396,22 +317,22 @@ def _labels(conn: DuckDBPyConnection) -> None:
                CASE WHEN p.c = r.change_id THEN concat(n.un_iso3, ' → ', to_un.un_iso3)
                     WHEN r.change_id IS NOT NULL
                     THEN concat(to_un.un_iso3, ' → ', g.MAP_CODE)
-                    WHEN p.c IN {VIET_NAM_MOVED}
-                    THEN concat('{VIET_NAM} → ', g.MAP_CODE)
+                    WHEN p.entity IS NOT NULL THEN concat(n.un_iso3, ' → ', p.entity)
                     WHEN n.un_iso3 = g.MAP_CODE
                     THEN concat(coalesce(n.un_name, 'None'), ' → ', g.GAUL0_NAME)
                     ELSE concat(n.un_iso3, ' → ', g.MAP_CODE) END,
                round({KM2.format("p.part")}, 3),
                ST_X(ST_MaximumInscribedCircle(p.part).center),
                ST_Y(ST_MaximumInscribedCircle(p.part).center)
-        FROM (SELECT t.c, t.un_objectid, t.gaul_id,
+        FROM (SELECT t.c, t.un_objectid, t.gaul_id, t.entity,
                      unnest(ST_Dump(t.geometry)).geom AS part
-              FROM (SELECT unnest(change_ids) AS c, un_objectid, gaul_id, geometry
+              FROM (SELECT unnest(change_ids) AS c, un_objectid, gaul_id, entity,
+                           geometry
                     FROM tagged) t) p
-        JOIN un n ON n.objectid = p.un_objectid JOIN gaul g USING (gaul_id)
+        JOIN un n ON n.objectid = p.un_objectid LEFT JOIN gaul g USING (gaul_id)
         LEFT JOIN relabels r USING (un_objectid, gaul_id)
         LEFT JOIN un to_un ON to_un.objectid = r.to_objectid
-        QUALIFY n.un_iso3 != g.MAP_CODE OR p.c IN {VIET_NAM_MOVED}
+        QUALIFY n.un_iso3 IS DISTINCT FROM coalesce(p.entity, g.MAP_CODE)
              OR row_number() OVER (
                  PARTITION BY p.c ORDER BY {KM2.format("p.part")} DESC) = 1
         UNION ALL
@@ -440,13 +361,13 @@ def main() -> None:
     write_parquet(
         conn,
         """--sql
-        SELECT t.unit_id, t.un_objectid, t.gaul_id, t.area_id, t.parts,
+        SELECT t.unit_id, t.un_objectid, t.un_owner, t.gaul_id, t.entity, t.area_id,
+               t.parts,
                array_to_string(t.change_ids, ';') AS change_ids, t.geometry
         FROM tagged t""",
         Path(data("05", "units")),
     )
     _crosswalk(conn)
-    cell_islands = _cell_islands(conn)
     island_errors = _island_errors(conn)
     write_parquet(
         conn,
@@ -454,8 +375,8 @@ def main() -> None:
         Path(data("05", "cell_islands")),
     )
     _labels(conn)
-    records = [_record(c, conn) for c in [*changes(), *_islands(conn)]]
-    records += island_errors + _removed(conn) + cell_islands + _lines(conn)
+    records = [_record(c, conn) for c in changes()]
+    records += island_errors + _lines(conn)
     out = stage_dir("05") / "changes.json"
     out.write_text(json.dumps(records, ensure_ascii=False, indent=1) + "\n")
     conn.execute(f"""--sql
@@ -476,10 +397,12 @@ def main() -> None:
         "05",
         [
             Path(data("04", "parts")),
-            Path(data("04", "removed")),
-            Path(data("01", "gaul_voronoi")),
             curated_dir / "changes.json",
             Path(data("01", "un_polygons")),
+            Path(data("02", "un_parts")),
+            OVERRIDES,
+            LINKS,
+            curated_dir / "path.json",
             Path(data("01", "fieldmaps_voronoi")),
             Path(data("01", "line_overlaps")),
             DECISIONS,

@@ -6,7 +6,8 @@
   import type { ExpressionSpecification, StyleSpecification } from "maplibre-gl";
   import { SLOT_COLORS, type Hit } from "$lib/compare.svelte";
   import { catalogPath } from "$lib/layers";
-  import { LINE_DASH, LINE_WIDTHS, globeFitZoom } from "$lib/map/style";
+  import { SATELLITE, SATELLITE_PROTOCOL, satelliteTile } from "$lib/map/satellite";
+  import { LINE_DASH, LINE_WIDTHS, applyBasemap, globeFitZoom } from "$lib/map/style";
   import positron from "$lib/utils/basemap/positron.json";
 
   let {
@@ -14,7 +15,6 @@
     bbox,
     overview,
     tilesBase,
-    showRemoved,
     compare,
     stepChanges,
     parents,
@@ -23,13 +23,14 @@
     legend,
     border,
     sweep,
+    satellite,
+    hasCells,
     onpick,
   }: {
     change: string | null;
     bbox: number[] | null;
     overview: number[] | null;
     tilesBase: string;
-    showRemoved: boolean;
     compare: string[] | null;
     stepChanges: string[];
     parents: number[];
@@ -38,6 +39,8 @@
     legend: string[];
     border: string[] | null;
     sweep: number;
+    satellite: boolean;
+    hasCells: boolean;
     onpick: (hits: Hit[]) => void;
   } = $props();
 
@@ -77,16 +80,17 @@
     if (!container) return;
     const protocol = new Protocol();
     maplibregl.addProtocol("pmtiles", protocol.tile);
+    maplibregl.addProtocol(SATELLITE_PROTOCOL, satelliteTile);
     const m = new maplibregl.Map({ container, style: { ...positron, projection: { type: "globe" }, transition: { duration: 0, delay: 0 } } as StyleSpecification, center: [20, 15], zoom: globeFitZoom(container), hash: import.meta.env.DEV });
     m.once("load", () => {
+      m.addSource("satellite", SATELLITE);
+      m.addLayer({ id: "satellite", type: "raster", source: "satellite", layout: { visibility: "none" } });
       m.addSource("build_units", { type: "vector", url: "pmtiles:///build/build_units.pmtiles" });
       for (const [id, url] of Object.entries(STEP_OUTPUTS)) m.addSource(id, { type: "vector", url: `pmtiles://${url}` });
       const units = { source: "build_units", "source-layer": "build_units", filter: NOTHING } as const;
       m.addLayer({ id: "parents", type: "fill", source: "build_un", "source-layer": "build_un", filter: NOTHING, paint: { "fill-color": SLOT_COLORS.a, "fill-opacity": PARENT_OPACITY } });
       m.addLayer({ ...units, id: "step-changes", type: "fill", paint: { "fill-color": SLOT_COLORS.b } });
       m.addLayer({ ...units, id: "focus", type: "line", paint: { "line-color": SLOT_COLORS.b, "line-width": 3 } });
-      m.addSource("build_removed", { type: "vector", url: "pmtiles:///build/build_removed.pmtiles" });
-      m.addLayer({ id: "removed", type: "fill", source: "build_removed", "source-layer": "build_removed", layout: { visibility: "none" }, paint: { "fill-color": "#D32F2F", "fill-opacity": 0.6 } });
       m.addSource("build_line_patches", { type: "vector", url: "pmtiles:///build/build_line_patches.pmtiles" });
       for (const slot of SLOTS) {
         m.addLayer({ id: `patch-${slot}`, type: "fill", source: "build_line_patches", "source-layer": "build_line_patches", filter: NOTHING, paint: { "fill-color": SLOT_COLORS[slot] } });
@@ -95,10 +99,13 @@
         m.addLayer({ id: `pick-${id}`, type: "fill", source: id, "source-layer": id, layout: { visibility: "none" }, paint: { "fill-opacity": 0 } });
         m.addLayer({ id: `output-${id}`, type: "line", source: id, "source-layer": id, layout: { visibility: "none" }, paint: { "line-width": LINE_WIDTHS, "line-dasharray": LINE_DASH } });
       }
-      m.addSource("build_cell_islands", { type: "vector", url: "pmtiles:///build/build_cell_islands.pmtiles" });
-      const islands = { source: "build_cell_islands", "source-layer": "build_cell_islands", filter: NOTHING } as const;
-      m.addLayer({ ...islands, id: "cell-islands", type: "fill", paint: { "fill-color": SLOT_COLORS.b, "fill-opacity": CHANGE_OPACITY } });
-      m.addLayer({ ...islands, id: "cell-focus", type: "line", paint: { "line-color": SLOT_COLORS.b, "line-width": 3 } });
+      // Stage 08 writes no island tiles when the automatic check finds nothing.
+      if (hasCells) {
+        m.addSource("build_cell_islands", { type: "vector", url: "pmtiles:///build/build_cell_islands.pmtiles" });
+        const islands = { source: "build_cell_islands", "source-layer": "build_cell_islands", filter: NOTHING } as const;
+        m.addLayer({ ...islands, id: "cell-islands", type: "fill", paint: { "fill-color": SLOT_COLORS.b, "fill-opacity": CHANGE_OPACITY } });
+        m.addLayer({ ...islands, id: "cell-focus", type: "line", paint: { "line-color": SLOT_COLORS.b, "line-width": 3 } });
+      }
       m.addSource("labels", { type: "geojson", data: "/build/labels.geojson" });
       m.addLayer({ id: "unit-labels", type: "symbol", source: "labels", filter: NOTHING, layout: { "text-field": ["get", "text"], "text-font": ["Noto Sans Bold"], "text-size": 13, "text-padding": 24 }, paint: { "text-color": "#333333", "text-halo-color": "#FFFFFF", "text-halo-width": 2 } });
       loaded = true;
@@ -119,6 +126,7 @@
       map = null;
       loaded = false;
       maplibregl.removeProtocol("pmtiles");
+      maplibregl.removeProtocol(SATELLITE_PROTOCOL);
     };
   });
 
@@ -127,9 +135,9 @@
     map.setFilter("focus", change ? hasChange(change) : NOTHING);
     map.setFilter("parents", parents.length ? ["in", ["get", "objectid"], ["literal", parents]] : NOTHING);
     map.setFilter("step-changes", stepChanges.length ? ["any", ...stepChanges.map(hasChange)] : NOTHING);
+    if (!hasCells) return;
     map.setFilter("cell-islands", ["in", ["get", "change_id"], ["literal", cells]]);
     map.setFilter("cell-focus", ["==", ["get", "change_id"], change ?? ""]);
-    map.setLayoutProperty("removed", "visibility", showRemoved ? "visible" : "none");
   });
 
   $effect(() => {
@@ -160,6 +168,10 @@
       if (compare) map!.setPaintProperty(`output-${compare[i]}`, "line-opacity", opacity);
       map!.setPaintProperty(`patch-${slot}`, "fill-opacity", PATCH_OPACITY * opacity);
     });
+  });
+
+  $effect(() => {
+    if (map && loaded) applyBasemap(map, satellite);
   });
 
   $effect(() => {

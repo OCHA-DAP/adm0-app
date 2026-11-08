@@ -2,14 +2,11 @@
 
 from argparse import ArgumentParser
 from logging import getLogger
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import tylertoo
 
-from .config import layers, prepare_dir, tiles_dir
-
-if TYPE_CHECKING:
-    from pathlib import Path
+from .config import fresh, layers, prepare_dir, record, tiles_dir
 
 logger = getLogger(__name__)
 
@@ -42,7 +39,7 @@ def tile(src: Path, dest: Path, name: str) -> None:
 
 
 def main() -> None:
-    """Build an overview and PMTiles for each prepared layer, or only ``--only``."""
+    """Tile each layer whose source or settings changed, or exactly ``--only``."""
     parser = ArgumentParser()
     parser.add_argument("--only", nargs="+")
     args, _ = parser.parse_known_args()
@@ -55,5 +52,11 @@ def main() -> None:
         if (prepare_dir / f"{name}.parquet").exists()
     ]
     for name in [n for n in names if not args.only or n in args.only]:
-        tile(prepare_dir / f"{name}.parquet", tiles_dir / f"{name}.pmtiles", name)
+        src, dest = prepare_dir / f"{name}.parquet", tiles_dir / f"{name}.pmtiles"
+        inputs = [src, Path(__file__)]
+        if not args.only and fresh(f"tiles/{name}", inputs, [dest]):
+            logger.info("%s: unchanged", name)
+            continue
+        tile(src, dest, name)
+        record(f"tiles/{name}", inputs)
         logger.info("%s: tiled", name)

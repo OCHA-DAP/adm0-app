@@ -111,8 +111,8 @@ def test_line_patches_cover_the_borders(conn: DuckDBPyConnection) -> None:
 
 
 def test_review_decisions_apply() -> None:
-    """Removed pairs are gone, and recoded pairs sit in the islands step."""
+    """Removed pairs are gone, and codes GAUL links to UN codes raise no row."""
     rows = json.loads((stage_dir("05") / "changes.json").read_text())
-    types = {r["id"]: r["type"] for r in rows}
-    assert "E-xSR-PHL" not in types
-    assert types["E-xRI-XKI"] == "island_ownership"
+    ids = {r["id"] for r in rows}
+    assert "E-xSR-PHL" not in ids
+    assert not ids & {"E-xRI-XKI", "L-xKI-xRI"}

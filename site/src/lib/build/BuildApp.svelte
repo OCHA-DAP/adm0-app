@@ -2,7 +2,8 @@
   import HitsPanel from "$lib/components/HitsPanel.svelte";
   import PageSwitch from "$lib/components/PageSwitch.svelte";
   import PasswordGate from "$lib/components/PasswordGate.svelte";
-  import { CompareState, SLOT_COLORS, type Hit } from "$lib/compare.svelte";
+  import Segmented from "$lib/components/Segmented.svelte";
+  import { BASEMAPS, CompareState, SLOT_COLORS, type Basemap, type Hit } from "$lib/compare.svelte";
   import BuildMap from "$lib/build/BuildMap.svelte";
 
   interface Change {
@@ -13,8 +14,6 @@
     units: number;
     bbox: number[] | null;
     values?: { un_objectid?: number; un: string; un_name: string; gaul: string; gaul_name: string; km2: number }[];
-    gaul_removed?: string;
-    removed_parts?: number;
     largest_patch_bbox?: number[];
     review?: boolean;
   }
@@ -54,7 +53,7 @@
   function sides(c: Change) {
     const values = c.values ?? [];
     const sources = [...new Map(values.map((v) => [v.un, entity(v.un, v.un_name)])).values()];
-    if (!values.length) return { before: [entity("", "No UN land")], after: [entity(c.gaul_removed ?? "", "not carried over")] };
+    if (!values.length) return { before: [], after: [] };
     return { before: sources, after: [entity(values[0].gaul, values[0].gaul_name)] };
   }
   const listedChanges = (s: Step) => stepChanges(s).filter((c) => allLines || !isSmallLine(c));
@@ -104,13 +103,7 @@
     </header>
     <div class="body">
       <aside>
-        <p class="intro">The new GAUL starts from the lines and coastlines of UN Geodata 2023 (260 entities), then brings in GAUL's 272 entities, which are drawn on the 2018 lines.</p>
-        {#if step?.compare}
-          <ul class="legend">
-            <li><span class="chip" style:background={SLOT_COLORS.a}></span>Before</li>
-            <li><span class="chip" style:background={SLOT_COLORS.b}></span>After</li>
-          </ul>
-        {/if}
+        <p class="intro">The UN and GAUL exports both start from the lines and coastlines of UN Geodata 2023 (260 entities). The GAUL export keeps GAUL's 272 entities, which GAUL draws on the 2018 lines.</p>
         {#if failed}
           <p>The change list could not be loaded.</p>
         {/if}
@@ -133,7 +126,7 @@
                               {c.id.slice(2).replace("-", " | ")}
                             {:else}
                               {@const side = sides(c)}
-                              <span class="own" title={c.removed_parts ? `${c.removed_parts} parts` : c.values?.map((v) => `${v.un_name} → ${v.gaul_name}: ${km2.format(v.km2)} km²`).join("\n")}><span>{@render entities(side.before)}</span><span>{@render entities(side.after)}</span></span>
+                              <span class="own" title={c.values?.map((v) => `${v.un_name} → ${v.gaul_name}: ${km2.format(v.km2)} km²`).join("\n")}><span>{@render entities(side.before)}</span><span>{@render entities(side.after)}</span></span>
                             {/if}
                             {#if c.km2 != null}<span class="km2">{km2.format(c.km2)} km²</span>{/if}
                           </span>
@@ -151,7 +144,21 @@
         {/each}
       </aside>
       <div class="stage">
-        <BuildMap change={change?.id ?? null} bbox={change?.largest_patch_bbox ?? change?.bbox ?? null} overview={change?.largest_patch_bbox ? change.bbox : null} {tilesBase} showRemoved={!!change?.removed_parts} compare={step?.compare ?? null} stepChanges={unitChanges} parents={[...new Set(change?.values?.flatMap((v) => v.un_objectid ?? []) ?? [])]} labels={step?.labels ? stepChanges(step).map((c) => c.id) : []} cells={step ? stepChanges(step).filter((c) => c.type === "cell_island" || c.review).map((c) => c.id) : []} legend={step?.legend ?? []} {border} sweep={compare.sweep} onpick={(hits: Hit[]) => (compare.hits = hits)} />
+        <div class="panel">
+          <h2>Basemap</h2>
+          <Segmented stretch label="Basemap" options={BASEMAPS} current={compare.basemap} pick={(id) => (compare.basemap = id as Basemap)} />
+          {#if step?.compare}
+            <h2>Legend</h2>
+            <ul class="legend">
+              {#each [SLOT_COLORS.a, SLOT_COLORS.b] as color, i (i)}
+                <li><span class="chip" style:background={color}></span>{step.legend?.[i] ?? ""}</li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
+        {#if changes.length}
+          <BuildMap change={change?.id ?? null} bbox={change?.largest_patch_bbox ?? change?.bbox ?? null} overview={change?.largest_patch_bbox ? change.bbox : null} {tilesBase} compare={step?.compare ?? null} stepChanges={unitChanges} parents={[...new Set(change?.values?.flatMap((v) => v.un_objectid ?? []) ?? [])]} labels={step?.labels ? stepChanges(step).map((c) => c.id) : []} cells={step ? stepChanges(step).filter((c) => c.type === "cell_island" || c.review).map((c) => c.id) : []} legend={step?.legend ?? []} {border} sweep={compare.sweep} satellite={compare.basemap === "satellite"} hasCells={changes.some((c) => c.review)} onpick={(hits: Hit[]) => (compare.hits = hits)} />
+        {/if}
         <HitsPanel {compare} inset={0} />
       </div>
     </div>
@@ -266,6 +273,13 @@
     background: var(--brand-primary--text);
     color: var(--cd-white);
   }
+  .panel {
+    left: 0.75rem;
+    width: 13rem;
+  }
+  .panel h2:first-child {
+    margin-top: 0;
+  }
   .intro {
     margin: 0 0 0.75rem;
   }
@@ -339,18 +353,10 @@
     min-width: 0;
   }
   .legend {
-    position: sticky;
-    top: -1rem;
-    z-index: 1;
     display: flex;
     flex-wrap: wrap;
     gap: 0.25rem 1rem;
-    margin: -0.75rem 0 0;
-    padding: 1rem 0 0.4rem;
-    background: var(--cd-white);
-    font-size: 0.8125rem;
     font-weight: 500;
-    list-style: none;
   }
   .legend li {
     display: flex;
