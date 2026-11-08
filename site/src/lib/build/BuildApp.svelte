@@ -353,15 +353,14 @@
     min-width: 0;
   }
   .legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem 1rem;
+    display: grid;
+    gap: 0.25rem;
     font-weight: 500;
   }
   .legend li {
     display: flex;
     gap: 0.4rem;
-    align-items: center;
+    align-items: start;
   }
   .chip {
     flex: none;
