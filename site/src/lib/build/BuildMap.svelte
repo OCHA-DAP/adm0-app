@@ -7,7 +7,7 @@
   import { SLOT_COLORS, type Hit } from "$lib/compare.svelte";
   import { catalogPath } from "$lib/layers";
   import { SATELLITE, SATELLITE_PROTOCOL, satelliteTile } from "$lib/map/satellite";
-  import { LINE_DASH, LINE_WIDTHS, applyBasemap, globeFitZoom } from "$lib/map/style";
+  import { LINE_DASH, LINE_WIDTHS, OSM_BORDER_LAYERS, applyBasemap, applyBorderNames, globeFitZoom } from "$lib/map/style";
   import positron from "$lib/utils/basemap/positron.json";
 
   let {
@@ -25,6 +25,7 @@
     sweep,
     satellite,
     hasCells,
+    names,
     onpick,
   }: {
     change: string | null;
@@ -41,6 +42,7 @@
     sweep: number;
     satellite: boolean;
     hasCells: boolean;
+    names: Record<string, string>;
     onpick: (hits: Hit[]) => void;
   } = $props();
 
@@ -85,6 +87,7 @@
     m.once("load", () => {
       m.addSource("satellite", SATELLITE);
       m.addLayer({ id: "satellite", type: "raster", source: "satellite", layout: { visibility: "none" } });
+      for (const layer of OSM_BORDER_LAYERS) m.addLayer(layer);
       m.addSource("build_units", { type: "vector", url: `pmtiles://${tilesBase}/build/build_units.pmtiles` });
       for (const [id, url] of Object.entries(STEP_OUTPUTS)) m.addSource(id, { type: "vector", url: `pmtiles://${url}` });
       const units = { source: "build_units", "source-layer": "build_units", filter: NOTHING } as const;
@@ -138,6 +141,11 @@
     if (!hasCells) return;
     map.setFilter("cell-islands", ["in", ["get", "change_id"], ["literal", cells]]);
     map.setFilter("cell-focus", ["==", ["get", "change_id"], change ?? ""]);
+  });
+
+  $effect(() => {
+    if (!map || !loaded) return;
+    applyBorderNames(map, names);
   });
 
   $effect(() => {

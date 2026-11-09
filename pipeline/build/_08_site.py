@@ -1,10 +1,12 @@
 """Write the build page's tiles and tables into their own folder."""
 
+import json
 from logging import getLogger
 from pathlib import Path
 from shutil import copy2
 
 from pipeline import tiles
+from pipeline.config import prepare_dir
 
 from .common import connect, curated_dir, data, finish, stage_dir, unchanged
 
@@ -19,6 +21,9 @@ LAYERS = {
     "build_path_errors": ("06", "path_errors"),
     "build_path_disputed": ("06", "path_disputed"),
 }
+REF = prepare_dir / "ref.parquet"
+# M49 has no row for Taiwan, which OSM border tiles name as TWN.
+EXTRA_NAMES = {"TWN": "Taiwan Province of China"}
 
 
 def main() -> None:
@@ -44,4 +49,9 @@ def main() -> None:
     tables += [curated_dir / "stages.json", curated_dir / "path.json"]
     for path in tables:
         copy2(path, folder)
-    finish(conn, "08", [settings, *sources, *tables])
+    rows = conn.execute(
+        f"SELECT iso3, name_m49 FROM '{REF}' WHERE iso3 <> ''"
+    ).fetchall()
+    names = dict(rows) | EXTRA_NAMES
+    (folder / "names.json").write_text(json.dumps(names, ensure_ascii=False))
+    finish(conn, "08", [settings, *sources, *tables, REF])

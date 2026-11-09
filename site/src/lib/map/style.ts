@@ -261,6 +261,21 @@ export function applyOpacity(map: Map, draws: Draw[], opacities: number[], satel
   });
 }
 
+// OSM country borders, maritime ones included, named on each side; Positron draws neither.
+const OSM_BORDER_COLOR = "#9E7BA6";
+const OSM_SIDES = { adm0_l: -0.8, adm0_r: 0.8 } as const;
+const OSM_BORDER: FilterSpecification = ["==", ["get", "admin_level"], 2];
+const osmBorders = { source: "openmaptiles", "source-layer": "boundary", filter: OSM_BORDER };
+export const OSM_BORDER_LAYERS: LayerSpecification[] = [
+  { ...osmBorders, id: "osm-borders", type: "line", paint: { "line-color": OSM_BORDER_COLOR, "line-width": 1 } },
+  ...Object.entries(OSM_SIDES).map(([side, y]): LayerSpecification => ({ ...osmBorders, id: `osm-border-${side}`, type: "symbol", layout: { "symbol-placement": "line", "symbol-spacing": 300, "text-field": ["get", side], "text-font": ["Noto Sans Regular"], "text-size": 11, "text-offset": [0, y] }, paint: { "text-color": OSM_BORDER_COLOR, "text-halo-color": "#FFFFFF", "text-halo-width": 1 } })),
+];
+
+// Tiles name each side by ISO3; names maps those to M49 names, and unknown codes stay as codes.
+export function applyBorderNames(map: Map, names: Record<string, string>) {
+  for (const side of Object.keys(OSM_SIDES)) map.setLayoutProperty(`osm-border-${side}`, "text-field", ["coalesce", ["get", ["get", side], ["literal", names]], ["get", side]]);
+}
+
 export function applyBasemap(map: Map, satellite: boolean) {
   for (const id of POSITRON_IDS) map.setLayoutProperty(id, "visibility", satellite ? "none" : "visible");
   map.setLayoutProperty("satellite", "visibility", satellite ? "visible" : "none");
@@ -293,6 +308,7 @@ export function buildStyle(tilesBase: string, draws: Draw[]): StyleSpecification
     layers: [
       ...(positron.layers as LayerSpecification[]),
       { id: "satellite", type: "raster", source: "satellite", layout: { visibility: "none" } },
+      ...OSM_BORDER_LAYERS,
       ...LAYERS.flatMap(entityLayersFor).filter((l) => l.type === "fill"),
       ...differenceLayers(),
       ...LAYERS.flatMap((l) => layersFor(l, draws)),
