@@ -1,4 +1,4 @@
-"""Compare land boundaries and island groupings across sources on OSM land."""
+"""Compare land boundaries on OSM land, and each source's islands in other cells."""
 
 from argparse import ArgumentParser
 from concurrent.futures import ThreadPoolExecutor
@@ -259,7 +259,7 @@ def _overlay(conn: DuckDBPyConnection) -> None:
         LEFT JOIN codes cb ON cb.source = w.b AND cb.entity = w.b_entity;
     """)
     _land_patches(conn)
-    _gaps(conn)
+    _parts(conn)
 
 
 def _named(side: str) -> str:
@@ -282,87 +282,84 @@ def _sided() -> str:
     )
 
 
-# Metres from an island to its source's nearest polygon, capped; 0 where they touch.
-GAP_CAP = 1000
-# Island patches stay in pairs where both sources hold a polygon this near.
-MAPPED_M = 100
-
-
-def _gaps(conn: DuckDBPyConnection) -> None:
-    """Each source's distance from every differing island to its own polygons."""
-    conn.execute("""--sql
-        CREATE OR REPLACE TABLE gap_islands AS
-        SELECT DISTINCT d.fid, l.geom, i.pt, ST_MakeEnvelope(ST_XMin(l.env) - 0.03,
-            ST_YMin(l.env) - 0.03, ST_XMax(l.env) + 0.03, ST_YMax(l.env) + 0.03) AS box
-        FROM island_pairs d JOIN matches m USING (a, b, a_entity, b_entity)
-        JOIN land l USING (fid) JOIN islands i USING (fid) WHERE NOT m.mutual
+def _parts(conn: DuckDBPyConnection) -> None:
+    """Each source's polygon parts off crossed land, placed in every source's cells."""
+    bbox = getenv("DIFF_BBOX")
+    within = f"WHERE ST_Intersects(env, ST_MakeEnvelope({bbox}))" if bbox else ""
+    conn.execute(f"""--sql
+        CREATE OR REPLACE TABLE parts AS
+        SELECT row_number() OVER () AS pid, source, entity, geom, env
+        FROM polygon_parts {within}
     """)
-    # Only polygons near a differing island need subdividing.
+    # Only parts whose box meets crossed land need subdividing to test them.
     _step(
         conn,
-        "near polygons",
-        """CREATE OR REPLACE TABLE gap_near AS
-        SELECT DISTINCT p.rowid AS id FROM polygon_parts p JOIN gap_islands g
-            ON ST_Intersects(p.env, g.box)""",
+        "near parts",
+        """CREATE OR REPLACE TABLE near_parts AS
+        SELECT DISTINCT p.pid FROM parts p JOIN chunks c
+            ON ST_Intersects(p.env, c.env)""",
     )
     _chunks(
         conn,
-        "polygon chunks",
-        "polys",
-        """SELECT source, geom FROM polygon_parts
-        WHERE rowid IN (SELECT id FROM gap_near)""",
+        "part chunks",
+        "part_bits",
+        "SELECT pid, geom FROM parts WHERE pid IN (SELECT pid FROM near_parts)",
     )
-    # An island whose point lies in a polygon touches it, which settles most of them.
-    sources = ", ".join(f"('{s}')" for s in POLYGONS)
     _step(
         conn,
-        "island gaps",
-        f"""CREATE OR REPLACE TABLE gap_inside AS
-        SELECT DISTINCT p.source, g.fid FROM polys p JOIN gap_islands g
-            ON ST_Intersects(p.geom, g.pt);
-        CREATE OR REPLACE TABLE gap_open AS
-        SELECT s.source, g.fid, g.geom, g.box
-        FROM gap_islands g CROSS JOIN (VALUES {sources}) s(source)
-        ANTI JOIN gap_inside USING (source, fid);
-        CREATE OR REPLACE TABLE gap_pairs AS
-        SELECT o.rowid AS island, p.rowid AS polygon, o.source AS a, p.source AS b
-        FROM gap_open o JOIN polys p ON ST_Intersects(p.env, o.box);
-        CREATE OR REPLACE TABLE island_gaps AS
-        SELECT source, fid, 0::DOUBLE AS gap FROM gap_inside
-        UNION ALL
-        SELECT o.source, o.fid, least(coalesce(n.gap, {GAP_CAP}), {GAP_CAP})
-        FROM gap_open o LEFT JOIN (
-            SELECT island, min(CASE WHEN ST_Intersects(geom, polygon_geom) THEN 0
-                ELSE ST_Distance_Sphere(ST_StartPoint(line), ST_EndPoint(line)) END)
-                AS gap
-            FROM (
-                SELECT d.island, o.geom, p.geom AS polygon_geom,
-                    ST_ShortestLine(o.geom, p.geom) AS line
-                FROM gap_pairs d JOIN gap_open o ON o.rowid = d.island
-                JOIN polys p ON p.rowid = d.polygon WHERE d.a = d.b)
-            GROUP BY island) n ON n.island = o.rowid;
-        DROP TABLE gap_pairs; DROP TABLE polys""",
+        "island parts",
+        f"""CREATE OR REPLACE TABLE part_land AS
+        SELECT DISTINCT b.pid FROM part_bits b JOIN chunks c
+            ON ST_Intersects(b.env, c.env) AND ST_Intersects(b.geom, c.geom);
+        CREATE OR REPLACE TABLE island_parts AS
+        SELECT pid, source, entity, {KM2.format("geom")} AS km2,
+            ST_PointOnSurface(geom) AS pt, geom, env
+        FROM parts WHERE pid NOT IN (SELECT pid FROM part_land);
+        DROP TABLE part_bits; DROP TABLE parts""",
     )
+    _step(
+        conn,
+        "parts placed",
+        """CREATE OR REPLACE TABLE part_cells AS
+        SELECT c.source, p.pid, min(c.entity) AS entity
+        FROM island_parts p JOIN cells c ON ST_Intersects(p.pt, c.geom)
+        GROUP BY c.source, p.pid""",
+    )
+    # A part's own source holds it by its polygon, whatever its cell says.
+    conn.execute("""--sql
+        CREATE OR REPLACE TABLE part_placed AS
+        SELECT c.* FROM part_cells c JOIN island_parts p USING (pid)
+        WHERE c.source <> p.source
+        UNION ALL SELECT source, pid, entity FROM island_parts;
+        DROP TABLE part_cells
+    """)
 
 
 def _patches(conn: DuckDBPyConnection) -> None:
-    """Land and mapped island patches where a pair's entities aren't mutual."""
-    conn.execute(f"""--sql
+    """Unshared land per pair, and each source's islands another's cells reassign."""
+    conn.execute("""--sql
         CREATE OR REPLACE TABLE patches AS
         SELECT pair, 'land' AS type, side, item, a_entity, b_entity, a_code, a_name,
-                b_code, b_name, km2, geom::GEOMETRY AS geometry, NULL::BIGINT AS fid,
-                NULL::DOUBLE AS gap
+                b_code, b_name, km2, geom::GEOMETRY AS geometry
         FROM land_review
         UNION ALL
-        SELECT d.a || '|' || d.b, 'island', {SIDE}, r.item, d.a_entity, d.b_entity,
-               ae.code, ae.name, be.code, be.name, d.km2, l.geom::GEOMETRY, fid,
-               greatest(ga.gap, gb.gap)
-        FROM island_pairs d JOIN matches m USING (a, b, a_entity, b_entity)
-        JOIN land l USING (fid) JOIN item_islands r USING (fid)
-        {_named("a")} {_named("b")} {_sided()}
-        LEFT JOIN island_gaps ga ON ga.source = d.a AND ga.fid = d.fid
-        LEFT JOIN island_gaps gb ON gb.source = d.b AND gb.fid = d.fid
-        WHERE NOT m.mutual AND greatest(ga.gap, gb.gap) <= {MAPPED_M}
+        SELECT d.a || '|' || d.b, 'island', d.side, d.item, d.a_entity, d.b_entity,
+               ae.code, ae.name, be.code, be.name, d.km2, d.geom::GEOMETRY
+        FROM (
+            SELECT least(p.source, o.source) AS a, greatest(p.source, o.source) AS b,
+                CASE WHEN p.source < o.source THEN 'a' ELSE 'b' END AS side,
+                CASE WHEN p.source < o.source THEN p.entity ELSE o.entity END
+                    AS a_entity,
+                CASE WHEN p.source < o.source THEN o.entity ELSE p.entity END
+                    AS b_entity,
+                r.item, p.km2, p.geom
+            FROM item_parts r JOIN island_parts p USING (pid)
+            JOIN part_placed o ON o.pid = p.pid AND o.source <> p.source
+            JOIN clusters cp ON cp.source = p.source AND cp.entity = p.entity
+            JOIN clusters co ON co.source = o.source AND co.entity = o.entity
+            WHERE cp.cluster <> co.cluster) d
+        LEFT JOIN entities ae ON ae.source = d.a AND ae.entity = d.a_entity
+        LEFT JOIN entities be ON be.source = d.b AND be.entity = d.b_entity
     """)
 
 
@@ -391,15 +388,16 @@ def _dots(conn: DuckDBPyConnection) -> None:
     """Dot each island that is not crowded by a larger one in its item."""
     conn.execute("""--sql
         CREATE TEMP TABLE dot_islands AS
-        SELECT row_number() OVER () AS id, pair, item, km2, geometry,
+        SELECT row_number() OVER () AS id, pair, side, item, km2, geometry,
             ST_XMin(geometry) AS x0, ST_XMax(geometry) AS x1,
             ST_YMin(geometry) AS y0, ST_YMax(geometry) AS y1
         FROM patches WHERE type = 'island'
     """)
-    _drop_crowded(conn, "dot_islands", "pair, item", "km2")
+    _drop_crowded(conn, "dot_islands", "pair, side, item", "km2")
     write_parquet(
         conn,
-        """SELECT pair, item, ST_MaximumInscribedCircle(geometry).center AS geometry
+        """SELECT pair, side, item,
+            ST_MaximumInscribedCircle(geometry).center AS geometry
         FROM dot_islands""",
         prepare_dir / "differences_dots.parquet",
     )
@@ -493,20 +491,29 @@ def _write(conn: DuckDBPyConnection) -> None:
     )
     write_parquet(
         conn,
-        f"""SELECT i.fid, i.km2, {entity}, any_value(r.item) AS item
+        f"""SELECT i.fid, i.km2, {entity}
         FROM islands i JOIN placed p USING (fid)
         LEFT JOIN entities e USING (source, entity)
-        LEFT JOIN item_islands r USING (fid)
         GROUP BY i.fid, i.km2 ORDER BY i.km2 DESC""",
         register_dir / "islands.parquet",
         geo=False,
+    )
+    write_parquet(
+        conn,
+        f"""SELECT r.pid, any_value(r.drawn) AS drawn, any_value(i.km2) AS km2,
+            {entity}, any_value(r.item) AS item, any_value(i.geom) AS geometry
+        FROM item_parts r JOIN island_parts i USING (pid)
+        JOIN part_placed p USING (pid)
+        LEFT JOIN entities e ON e.source = p.source AND e.entity = p.entity
+        GROUP BY r.pid ORDER BY km2 DESC""",
+        register_dir / "island_parts.parquet",
     )
     _patches(conn)
     _dots(conn)
     _areas(conn)
     write_parquet(
         conn,
-        """SELECT * EXCLUDE (a_entity, b_entity, fid, gap) FROM patches
+        """SELECT * EXCLUDE (a_entity, b_entity) FROM patches
         UNION ALL BY NAME SELECT * FROM areas""",
         prepare_dir / "differences.parquet",
     )
@@ -536,32 +543,22 @@ def _items(conn: DuckDBPyConnection) -> None:
     if lost:
         msg = f"{lost} differences belong to no item"
         raise ValueError(msg)
-    # Island items count only the islands their patches keep.
-    conn.execute("""--sql
-        CREATE OR REPLACE TABLE item_stats AS
-        SELECT item, count(*) AS islands, sum(i.km2) AS km2,
-            min(ST_XMin(l.env)) AS xmin, min(ST_YMin(l.env)) AS ymin,
-            max(ST_XMax(l.env)) AS xmax, max(ST_YMax(l.env)) AS ymax
-        FROM (SELECT DISTINCT item, fid FROM patches WHERE type = 'island')
-        JOIN islands i USING (fid) JOIN land l USING (fid) GROUP BY item
-        UNION ALL SELECT * FROM stats WHERE islands = 0
-    """)
     out = tiles_dir / "items.json"
     conn.execute(f"""--sql
-        COPY (SELECT item, t.title, type, same_code, missing, s.islands, s.km2,
+        COPY (SELECT item, t.title, type, drawn, same_code, missing, s.islands, s.km2,
                 [s.xmin, s.ymin, s.xmax, s.ymax] AS bbox,
                 (SELECT list(DISTINCT pair ORDER BY pair) FROM patches p
                  WHERE p.item = i.item
                     AND NOT (p.type = 'land' AND p.side = 'both')) AS pairs,
                 {cols}
-            FROM items i LEFT JOIN item_stats s USING (item)
+            FROM items i LEFT JOIN stats s USING (item)
             LEFT JOIN titles t USING (item)
             WHERE type <> 'island' OR item IN (SELECT item FROM patches)
             ORDER BY type, s.km2 DESC) TO '{out}' (FORMAT JSON, ARRAY true)
     """)
 
 
-REGISTER = ("matches", "land", "islands", "items", "borders")
+REGISTER = ("matches", "land", "islands", "island_parts", "items", "borders")
 # Each phase reads the tables the phases before it left in the database.
 PHASES = {"land": _land, "assign": _assign, "overlay": _overlay, "review": _write}
 

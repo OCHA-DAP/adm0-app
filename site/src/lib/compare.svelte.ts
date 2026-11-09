@@ -2,7 +2,7 @@ import { DEFAULT_PAIR, LAYERS, SOURCES, layerFor, type SourceLayer } from "$lib/
 import { unionBox, type ItemRow, type Part } from "$lib/attributes";
 import type { Draw, Slot } from "$lib/map/style";
 
-// Voronoi also draws the pair's differing OSM land and islands over the sources' cells.
+// Voronoi also draws the pair's differing OSM land and A's differing islands over the sources' cells.
 export type Kind = SourceLayer["kind"];
 export type View = "fade" | Slot;
 export type Basemap = "map" | "satellite";
@@ -119,9 +119,11 @@ export class CompareState {
   focusItem(row: ItemRow, label: string, fly = true) {
     this.setMode("voronoi");
     const pairs = row.pairs ?? [];
-    if (pairs.length && !pairs.includes(this.diffPair)) {
-      const [a, b] = pairs[0].split("|");
-      this.pair = { a, b };
+    const drawn = row.type === "island" ? row.drawn : null;
+    if (pairs.length && !(pairs.includes(this.diffPair) && (!drawn || this.pair.a === drawn))) {
+      const [a, b] = (pairs.find((p) => !drawn || p.split("|").includes(drawn)) ?? pairs[0]).split("|");
+      // Island items show only with their drawing source in slot A.
+      this.pair = drawn ? { a: drawn, b: a === drawn ? b : a } : { a, b };
     }
     this.focus = null;
     const entities = Object.fromEntries(SOURCES.map((s) => [s, row.entities?.[s] ?? [[row[`code_${s}`], row[`name_${s}`]] as [unknown, unknown]]]));

@@ -50,7 +50,7 @@
 
   const LISTS: { id: GeometryList; label: string; note: string }[] = [
     { id: "land", label: "Land", note: "The two sources put this land in different territories." },
-    { id: "islands", label: "Islands", note: "Both sources draw these islands but put them in different territories." },
+    { id: "islands", label: "Islands", note: "A draws these islands, and B's Voronoi puts them in a different territory." },
   ];
 
   let filter = $state<Filter>({ ...DEFAULT_FILTER });

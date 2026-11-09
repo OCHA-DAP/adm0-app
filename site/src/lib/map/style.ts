@@ -38,9 +38,12 @@ export const LINE_WIDTHS = byType((t) => t.width);
 export const DIFFERENCES = "differences";
 export const DIFF_COLOR = "#7B3FA0";
 const DIFF_FILL_OPACITY = 0.45;
-// Islands are OSM land, outside both sources, so they draw in neutral grey instead of a source's colour.
+// Islands draw in neutral grey, apart from both sources' colours.
 const ISLAND_COLOR = "#424242";
 const ISLAND: ExpressionSpecification = ["==", ["get", "type"], "island"];
+// Island rows are slot A's own islands, so only those drawn by A's tile side show.
+const drawnByA = (swapped: boolean): ExpressionSpecification => ["==", ["get", "side"], swapped ? "b" : "a"];
+const OWN_ISLANDS = (swapped: boolean): ExpressionSpecification => ["any", ["!", ISLAND], drawnByA(swapped)];
 
 // "all" draws islands always and land outside Fade; in Fade, "a" and "b" each draw land in one source's color.
 const DIFF_SETS = ["all", "a", "b"] as const;
@@ -79,10 +82,10 @@ export function applyDifferences(map: Map, pair: string | null, fade: boolean, d
   const byPair: ExpressionSpecification = ["==", ["get", "pair"], pair];
   const inList: ExpressionSpecification[] = listItems ? [["in", ["get", "item"], ["literal", listItems]]] : [];
   map.setLayoutProperty(DIFF_PICK, "visibility", pair ? "visible" : "none");
-  if (pair) map.setFilter(DIFF_PICK, ["all", byPair, NOT_BORDER, ["any", ["!", PATCH], ...(listItems ? inList : [true])]]);
+  if (pair) map.setFilter(DIFF_PICK, ["all", byPair, NOT_BORDER, OWN_ISLANDS(swapped), ["any", ["!", PATCH], ...(listItems ? inList : [true])]]);
   // Every island dot of the pair shows until a difference is picked, then only its own.
   map.setLayoutProperty(DIFF_DOTS, "visibility", pair ? "visible" : "none");
-  if (pair) map.setFilter(DIFF_DOTS, ["all", byPair, ...inList, ...(items ? [["in", ["get", "item"], ["literal", items]] as ExpressionSpecification] : [])]);
+  if (pair) map.setFilter(DIFF_DOTS, ["all", byPair, drawnByA(swapped), ...inList, ...(items ? [["in", ["get", "item"], ["literal", items]] as ExpressionSpecification] : [])]);
   for (const k of DIFF_SETS) {
     const shown = !!pair && (k === "all" || split);
     const kinds: ExpressionSpecification[] = k === "all" ? (split ? [ISLAND] : []) : [["!", ISLAND]];
@@ -91,7 +94,7 @@ export function applyDifferences(map: Map, pair: string | null, fade: boolean, d
       const id = `${DIFFERENCES}-${k}-${type}`;
       map.setLayoutProperty(id, "visibility", shown ? "visible" : "none");
       if (!shown) continue;
-      map.setFilter(id, ["all", byPair, NOT_BORDER, PATCH, ...kinds, ...inList, ...(items ? [FOCUSED_LAND_HIDDEN(items)] : [])]);
+      map.setFilter(id, ["all", byPair, NOT_BORDER, PATCH, OWN_ISLANDS(swapped), ...kinds, ...inList, ...(items ? [FOCUSED_LAND_HIDDEN(items)] : [])]);
       const color: ExpressionSpecification = ["case", ISLAND, type === "line" ? "#FFFFFF" : ISLAND_COLOR, land];
       map.setPaintProperty(id, `${type}-color`, items ? ["case", ["in", ["get", "item"], ["literal", items]], color, ISLAND, type === "line" ? "#FFFFFF" : OTHER_ITEM_COLOR, OTHER_ITEM_COLOR] : color);
     }

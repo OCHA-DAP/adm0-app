@@ -77,30 +77,35 @@ def _components(cells: dict[tuple, list]) -> list[tuple[tuple, list]]:
 
 
 def _island_items(conn: DuckDBPyConnection, label: dict) -> tuple[list, list]:
+    """Group each source's islands that another source's cells give another cluster."""
     pivot = ", ".join(
         f"""max(p.entity) FILTER (p.source = '{s}') AS {s},
             max(c.cluster) FILTER (p.source = '{s}') AS {s}_c"""
         for s in SOURCES
     )
-    same = " AND ".join(f"{s}_c IS NOT DISTINCT FROM {SOURCES[0]}_c" for s in SOURCES)
     rows = conn.execute(f"""--sql
-        SELECT fid, {", ".join(SOURCES)}, ST_X(i.pt), ST_Y(i.pt)
-        FROM (SELECT fid, {pivot} FROM placed p
-              LEFT JOIN clusters c USING (source, entity) GROUP BY fid)
-        JOIN islands i USING (fid) WHERE NOT ({same})
+        SELECT pid, i.source, {", ".join(f"{s}, {s}_c" for s in SOURCES)},
+            ST_X(i.pt), ST_Y(i.pt)
+        FROM (SELECT pid, {pivot} FROM part_placed p
+              LEFT JOIN clusters c USING (source, entity) GROUP BY pid)
+        JOIN island_parts i USING (pid)
     """).fetchall()
     groups: dict[tuple, dict] = defaultdict(lambda: defaultdict(list))
-    for fid, *ents, x, y in rows:
-        groups[tuple(ents)][(floor(x / GRID), floor(y / GRID))].append(fid)
+    for pid, drawn, *vals, x, y in rows:
+        ents, cls = tuple(vals[0::2]), vals[1::2]
+        if all(c == cls[SOURCES.index(drawn)] for c in cls):
+            continue
+        groups[(drawn, ents)][(floor(x / GRID), floor(y / GRID))].append(pid)
     members, entities = [], []
-    for ents, cells in groups.items():
-        for start, fids in _components(cells):
+    for (drawn, ents), cells in groups.items():
+        for start, pids in _components(cells):
             item = _id(
                 "island",
+                drawn,
                 *(label.get(k) for k in zip(SOURCES, ents, strict=True)),
                 start,
             )
-            members += [(fid, item) for fid in fids]
+            members += [(pid, item, drawn) for pid in pids]
             entities += [
                 (item, "island", *k, None) for k in zip(SOURCES, ents, strict=True)
             ]
@@ -151,9 +156,11 @@ def build(conn: DuckDBPyConnection) -> None:
     }
     members, entities = _island_items(conn, label)
     entities += _entity_items(conn, label)
-    conn.execute("CREATE OR REPLACE TABLE item_islands (fid BIGINT, item VARCHAR)")
+    conn.execute(
+        "CREATE OR REPLACE TABLE item_parts (pid BIGINT, item VARCHAR, drawn VARCHAR)"
+    )
     if members:
-        conn.executemany("INSERT INTO item_islands VALUES (?, ?)", members)
+        conn.executemany("INSERT INTO item_parts VALUES (?, ?, ?)", members)
     conn.execute(
         "CREATE OR REPLACE TABLE item_entities (item VARCHAR, type VARCHAR, "
         "source VARCHAR, entity VARCHAR, own BOOLEAN)"
@@ -171,9 +178,9 @@ def build(conn: DuckDBPyConnection) -> None:
         FROM pieces GROUP BY ALL;
         CREATE OR REPLACE TABLE stats AS
         SELECT item, count(*) AS islands, sum(i.km2) AS km2,
-            min(ST_XMin(l.env)) AS xmin, min(ST_YMin(l.env)) AS ymin,
-            max(ST_XMax(l.env)) AS xmax, max(ST_YMax(l.env)) AS ymax
-        FROM item_islands JOIN islands i USING (fid) JOIN land l USING (fid)
+            min(ST_XMin(i.env)) AS xmin, min(ST_YMin(i.env)) AS ymin,
+            max(ST_XMax(i.env)) AS xmax, max(ST_YMax(i.env)) AS ymax
+        FROM item_parts JOIN island_parts i USING (pid)
         GROUP BY item
         UNION ALL
         SELECT item, 0, max(k.km2), min(k.xmin), min(k.ymin), max(k.xmax), max(k.ymax)
@@ -185,12 +192,13 @@ def build(conn: DuckDBPyConnection) -> None:
         FROM item_entities JOIN polygon_parts k USING (source, entity)
         WHERE own AND type = 'no_land' GROUP BY item;
         CREATE OR REPLACE TABLE items AS
-        SELECT ie.item, any_value(ie.type) AS type,
+        SELECT ie.item, any_value(ie.type) AS type, any_value(d.drawn) AS drawn,
             count(DISTINCT upper(e.code)) = 1 AND count(e.code) = {len(SOURCES)}
                 AS same_code,
             list(DISTINCT ie.source ORDER BY ie.source) FILTER (NOT ie.own) AS missing,
             {pivot}
         FROM item_entities ie LEFT JOIN entities e USING (source, entity)
+        LEFT JOIN (SELECT DISTINCT item, drawn FROM item_parts) d USING (item)
         GROUP BY ie.item;
     """)
     write_parquet(
