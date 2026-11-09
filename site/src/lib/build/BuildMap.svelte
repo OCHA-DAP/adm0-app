@@ -53,10 +53,10 @@
   const STEP_OUTPUTS: Record<string, string> = $derived({
     gaul_l0: `${tilesBase}/${catalogPath("gaul_l0")}`,
     gaul_voronoi: `${tilesBase}/${catalogPath("gaul_voronoi")}`,
-    build_un: "/build/build_un.pmtiles",
-    build_path_errors: "/build/build_path_errors.pmtiles",
-    build_path_disputed: "/build/build_path_disputed.pmtiles",
-    build_gaul: "/build/build_gaul.pmtiles",
+    build_un: `${tilesBase}/build/build_un.pmtiles`,
+    build_path_errors: `${tilesBase}/build/build_path_errors.pmtiles`,
+    build_path_disputed: `${tilesBase}/build/build_path_disputed.pmtiles`,
+    build_gaul: `${tilesBase}/build/build_gaul.pmtiles`,
   });
   const PATCH_OPACITY = 0.45;
   const PARENT_OPACITY = 0.3;
@@ -85,13 +85,13 @@
     m.once("load", () => {
       m.addSource("satellite", SATELLITE);
       m.addLayer({ id: "satellite", type: "raster", source: "satellite", layout: { visibility: "none" } });
-      m.addSource("build_units", { type: "vector", url: "pmtiles:///build/build_units.pmtiles" });
+      m.addSource("build_units", { type: "vector", url: `pmtiles://${tilesBase}/build/build_units.pmtiles` });
       for (const [id, url] of Object.entries(STEP_OUTPUTS)) m.addSource(id, { type: "vector", url: `pmtiles://${url}` });
       const units = { source: "build_units", "source-layer": "build_units", filter: NOTHING } as const;
       m.addLayer({ id: "parents", type: "fill", source: "build_un", "source-layer": "build_un", filter: NOTHING, paint: { "fill-color": SLOT_COLORS.a, "fill-opacity": PARENT_OPACITY } });
       m.addLayer({ ...units, id: "step-changes", type: "fill", paint: { "fill-color": SLOT_COLORS.b } });
       m.addLayer({ ...units, id: "focus", type: "line", paint: { "line-color": SLOT_COLORS.b, "line-width": 3 } });
-      m.addSource("build_line_patches", { type: "vector", url: "pmtiles:///build/build_line_patches.pmtiles" });
+      m.addSource("build_line_patches", { type: "vector", url: `pmtiles://${tilesBase}/build/build_line_patches.pmtiles` });
       for (const slot of SLOTS) {
         m.addLayer({ id: `patch-${slot}`, type: "fill", source: "build_line_patches", "source-layer": "build_line_patches", filter: NOTHING, paint: { "fill-color": SLOT_COLORS[slot] } });
       }
@@ -101,12 +101,12 @@
       }
       // Stage 08 writes no island tiles when the automatic check finds nothing.
       if (hasCells) {
-        m.addSource("build_cell_islands", { type: "vector", url: "pmtiles:///build/build_cell_islands.pmtiles" });
+        m.addSource("build_cell_islands", { type: "vector", url: `pmtiles://${tilesBase}/build/build_cell_islands.pmtiles` });
         const islands = { source: "build_cell_islands", "source-layer": "build_cell_islands", filter: NOTHING } as const;
         m.addLayer({ ...islands, id: "cell-islands", type: "fill", paint: { "fill-color": SLOT_COLORS.b, "fill-opacity": CHANGE_OPACITY } });
         m.addLayer({ ...islands, id: "cell-focus", type: "line", paint: { "line-color": SLOT_COLORS.b, "line-width": 3 } });
       }
-      m.addSource("labels", { type: "geojson", data: "/build/labels.geojson" });
+      m.addSource("labels", { type: "geojson", data: `${tilesBase}/build/labels.geojson` });
       m.addLayer({ id: "unit-labels", type: "symbol", source: "labels", filter: NOTHING, layout: { "text-field": ["get", "text"], "text-font": ["Noto Sans Bold"], "text-size": 13, "text-padding": 24 }, paint: { "text-color": "#333333", "text-halo-color": "#FFFFFF", "text-halo-width": 2 } });
       loaded = true;
     });

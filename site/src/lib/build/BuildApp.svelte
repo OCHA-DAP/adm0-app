@@ -60,7 +60,7 @@
 
   $effect(() => {
     if (!tilesBase) return;
-    const load = (name: string) => fetch(`/build/${name}.json`).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
+    const load = (name: string) => fetch(`${tilesBase}/build/${name}.json`).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
     Promise.all([load("path"), load("changes")])
       .then(([p, c]) => {
         steps = p;
@@ -103,7 +103,7 @@
     </header>
     <div class="body">
       <aside>
-        <p class="intro">The UN and GAUL exports both start from the lines and coastlines of UN Geodata 2023 (260 entities). The GAUL export keeps GAUL's 272 entities, which GAUL draws on the 2018 lines.</p>
+        <p class="intro">The UN and GAUL exports both start from the lines and coastlines of UN Geodata 2023 (260 entities). The GAUL export starts from GAUL's 272 entities, which GAUL draws on the 2018 lines. Some changes below add an entity to both exports.</p>
         {#if failed}
           <p>The change list could not be loaded.</p>
         {/if}

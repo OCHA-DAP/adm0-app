@@ -24,6 +24,7 @@ logger = getLogger(__name__)
 CATALOG = root / "catalog"
 DIFFERENCES = ("differences", "differences_dots")
 TABLES = ("attributes", "items")
+BUILD_SITE = root / "outputs/build/08_site"
 HOST = {
     "name": "OCHA Centre for Humanitarian Data",
     "roles": ["host"],
@@ -95,6 +96,18 @@ def _stage(only: list[str] | None) -> list[Path]:
     return out
 
 
+def _stage_build() -> None:
+    """Mirror the build page's files into build/, synced as plain files."""
+    target = CATALOG / "build"
+    target.mkdir(exist_ok=True)
+    names = {f.name for f in BUILD_SITE.iterdir()}
+    for stale in target.iterdir():
+        if stale.name not in names:
+            stale.unlink()
+    for name in names:
+        _link(BUILD_SITE / name, target / name)
+
+
 def _write_providers(collection: Path) -> None:
     """Write the collection's providers and licence into its .portolan/metadata.yaml."""
     producer, licence = PRODUCERS.get(collection.parent.name, (None, {}))
@@ -119,6 +132,8 @@ def main() -> None:
     parser.add_argument("--only", nargs="+", help="Stage only these layer or table ids")
     parser.add_argument("--push", action="store_true", help="Push to PORTOLAN_REMOTE")
     args, _ = parser.parse_known_args()
+    if not args.only:
+        _stage_build()
     for collection in _stage(args.only):
         rel = collection.relative_to(CATALOG).as_posix()
         _write_providers(collection)

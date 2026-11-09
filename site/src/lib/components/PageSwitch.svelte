@@ -1,7 +1,9 @@
 <script lang="ts">
+  import { base, buildBase } from "$lib/utils/paths";
+
   const PAGES = [
-    { id: "explorer", label: "Explorer", href: "/" },
-    { id: "build", label: "Build", href: "/build" },
+    { id: "explorer", label: "Explorer", href: base },
+    { id: "build", label: "Build", href: buildBase },
   ];
   let { current }: { current: "explorer" | "build" } = $props();
 </script>
