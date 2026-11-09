@@ -32,6 +32,7 @@
   let tilesBase = $state<string | null>(null);
   let steps = $state.raw<Step[]>([]);
   let changes = $state.raw<Change[]>([]);
+  let names = $state.raw<Record<string, string>>({});
   let failed = $state(false);
   let stepIndex = $state(0);
   let change = $state.raw<Change | null>(null);
@@ -61,10 +62,11 @@
   $effect(() => {
     if (!tilesBase) return;
     const load = (name: string) => fetch(`${tilesBase}/build/${name}.json`).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
-    Promise.all([load("path"), load("changes")])
-      .then(([p, c]) => {
+    Promise.all([load("path"), load("changes"), load("names")])
+      .then(([p, c, n]) => {
         steps = p;
         changes = c;
+        names = n;
       })
       .catch(() => (failed = true));
   });
@@ -157,7 +159,7 @@
           {/if}
         </div>
         {#if changes.length}
-          <BuildMap change={change?.id ?? null} bbox={change?.largest_patch_bbox ?? change?.bbox ?? null} overview={change?.largest_patch_bbox ? change.bbox : null} {tilesBase} compare={step?.compare ?? null} stepChanges={unitChanges} parents={[...new Set(change?.values?.flatMap((v) => v.un_objectid ?? []) ?? [])]} labels={step?.labels ? stepChanges(step).map((c) => c.id) : []} cells={step ? stepChanges(step).filter((c) => c.type === "cell_island" || c.review).map((c) => c.id) : []} legend={step?.legend ?? []} {border} sweep={compare.sweep} satellite={compare.basemap === "satellite"} hasCells={changes.some((c) => c.review)} onpick={(hits: Hit[]) => (compare.hits = hits)} />
+          <BuildMap change={change?.id ?? null} bbox={change?.largest_patch_bbox ?? change?.bbox ?? null} overview={change?.largest_patch_bbox ? change.bbox : null} {tilesBase} compare={step?.compare ?? null} stepChanges={unitChanges} parents={[...new Set(change?.values?.flatMap((v) => v.un_objectid ?? []) ?? [])]} labels={step?.labels ? stepChanges(step).map((c) => c.id) : []} cells={step ? stepChanges(step).filter((c) => c.type === "cell_island" || c.review).map((c) => c.id) : []} legend={step?.legend ?? []} {border} sweep={compare.sweep} satellite={compare.basemap === "satellite"} hasCells={changes.some((c) => c.review)} {names} onpick={(hits: Hit[]) => (compare.hits = hits)} />
         {/if}
         <HitsPanel {compare} inset={0} />
       </div>

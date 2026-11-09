@@ -7,7 +7,7 @@
   import type { CompareState, Focus, Hit, ItemFocus } from "$lib/compare.svelte";
   import { LAYER_BY_ID } from "$lib/layers";
   import { SATELLITE_PROTOCOL, satelliteTile } from "$lib/map/satellite";
-  import { DIFFERENCES, DIFF_COLOR, DIFF_FILLS, DIFF_PICK, applyBasemap, applyDifferenceFade, applyDifferences, applyDraws, applyFocus, applyOpacity, applyVoronoiFocus, buildStyle, drawFor, globeFitZoom, pickLayerIds, queryLayerId } from "$lib/map/style";
+  import { DIFFERENCES, DIFF_COLOR, DIFF_FILLS, DIFF_PICK, applyBasemap, applyBorderNames, applyDifferenceFade, applyDifferences, applyDraws, applyFocus, applyOpacity, applyVoronoiFocus, buildStyle, drawFor, globeFitZoom, pickLayerIds, queryLayerId } from "$lib/map/style";
 
   let {
     tilesBase,
@@ -42,6 +42,18 @@
   let container = $state<HTMLDivElement>();
   let map = $state.raw<maplibregl.Map | null>(null);
   let loaded = $state(false);
+  let borderNames = $state.raw<Record<string, string> | null>(null);
+
+  $effect(() => {
+    fetch(`${tilesBase}/build/names.json`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((n) => (borderNames = n))
+      .catch(() => {});
+  });
+
+  $effect(() => {
+    if (map && loaded && borderNames) applyBorderNames(map, borderNames);
+  });
   let stopSpin = () => {};
   let framed: Focus | ItemFocus | null = null;
 

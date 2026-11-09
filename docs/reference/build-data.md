@@ -24,7 +24,7 @@ Build with `uv run python -m pipeline --step build`, one stage with `--stage NN`
 | `05_units` | `units`, `crosswalk` (parquet and CSV), `changes` (JSON and CSV), `change_areas`, `line_patches`, `cell_islands` (`change_id`, `km2`), `labels.geojson` (a point inside each polygon of each change: `change`, `km2`, `text`, the UN and GAUL codes, or the UN and GAUL names on the largest polygon only where the code is the same) |
 | `06_export` | `un`, `gaul`, `path_errors` and `path_disputed` (units dissolved with the changes up to that page step applied; `key` plus the source attributes of the GAUL or UN entity each row is at that step), `checks.json` |
 | `07_extend` | `units_voronoi` |
-| `08_site` | PMTiles and tables for the build page |
+| `08_site` | PMTiles and tables for the build page, and `names.json` (ISO3 to M49 name, with TWN added) for the map border labels |
 
 `manifest.json` records, per stage: build time, git commit, tool versions, input and output SHA-256s, and row and area totals. Each folder's `README.md` is generated from `stages.json` and the manifest.
 
