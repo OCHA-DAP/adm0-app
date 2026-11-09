@@ -5,6 +5,7 @@
   import ComparePanel from "$lib/components/ComparePanel.svelte";
   import GlobeMap from "$lib/components/GlobeMap.svelte";
   import HitsPanel from "$lib/components/HitsPanel.svelte";
+  import PageSwitch from "$lib/components/PageSwitch.svelte";
   import PasswordGate from "$lib/components/PasswordGate.svelte";
   import { itemTitle, mergeItems, prepareItems, unionBox, type AttributeRow, type GeometryList, type ItemRow, type Part } from "$lib/attributes";
   import { catalogPath, layerFor } from "$lib/layers";
@@ -155,7 +156,7 @@
 {:else}
   <div class="app">
     <header class="bar">
-      <span class="title">Boundary comparison</span>
+      <div class="heading"><span class="title">Boundary comparison</span><PageSwitch current="explorer" /></div>
       <nav aria-label="Views">
         <span class="pill" style:transform="translateX({pill.left}px)" style:width="{pill.width}px"></span>
         {#each TABS as t, i (t.id)}
@@ -194,6 +195,11 @@
     padding: 0 1.5rem;
     background: var(--cd-white);
     border-bottom: 1px solid var(--brand-grey--border);
+  }
+  .heading {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
   }
   .title {
     font-family: var(--brand-font-heading);

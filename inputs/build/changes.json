@@ -1,0 +1,563 @@
+[
+ {
+  "id": "C01",
+  "type": "restore",
+  "title": "Hala'ib Triangle",
+  "description": "UN Geodata 2023 draws this area inside Sudan. GAUL keeps it as its own entity, xHT. It is cut out along the UN line, and the islands off its coast go with it.",
+  "keys": [
+   [
+    853,
+    "133"
+   ]
+  ],
+  "cut": {
+   "un_objectids": [
+    853
+   ],
+   "un_lines": [
+    227096,
+    227098,
+    228853,
+    227100,
+    227102,
+    227104,
+    227116,
+    227259,
+    227467
+   ]
+  },
+  "method": "UN line, then island attribution",
+  "source": "UN Geodata bndl (Egypt-Sudan lines)",
+  "comment": ""
+ },
+ {
+  "id": "C02",
+  "type": "restore",
+  "title": "Bir Tawil",
+  "description": "UN Geodata 2023 draws this area inside Egypt. GAUL keeps it as its own entity, xMS. It is cut out along the UN line.",
+  "keys": [
+   [
+    727,
+    "110"
+   ]
+  ],
+  "cut": {
+   "un_objectids": [
+    727
+   ],
+   "un_lines": [
+    227096,
+    227098,
+    228853,
+    227100,
+    227102,
+    227104,
+    227116,
+    227259,
+    227467
+   ]
+  },
+  "method": "UN line",
+  "source": "UN Geodata bndl (Egypt-Sudan lines)",
+  "comment": ""
+ },
+ {
+  "id": "C03",
+  "type": "restore",
+  "title": "Ilemi Triangle",
+  "description": "UN Geodata 2023 draws this area inside South Sudan. GAUL keeps it as its own entity, xIT. It is cut out along the UN line.",
+  "keys": [
+   [
+    866,
+    "135"
+   ]
+  ],
+  "cut": {
+   "un_objectids": [
+    866
+   ],
+   "un_lines": [
+    193282,
+    192559,
+    192561,
+    192562
+   ]
+  },
+  "method": "UN line",
+  "source": "UN Geodata bndl (Kenya-South Sudan lines)",
+  "comment": ""
+ },
+ {
+  "id": "C04",
+  "type": "india_china",
+  "title": "India-China disputed areas (xxx)",
+  "description": "GAUL has one entity, xxx, made of four areas along the India-China line. UN Geodata 2023 has no lines for them and divides each between China, India, and Jammu and Kashmir. GAUL's outlines are the cuts, and each area stays separate on each side of the UN line.",
+  "keys": [
+   [
+    704,
+    "238"
+   ],
+   [
+    766,
+    "238"
+   ],
+   [
+    909,
+    "238"
+   ]
+  ],
+  "cut": {
+   "un_objectids": [
+    704,
+    766,
+    909
+   ]
+  },
+  "method": "GAUL outline as cut line",
+  "source": "GAUL 2025 entity 238",
+  "comment": ""
+ },
+ {
+  "id": "C05",
+  "type": "un_error",
+  "title": "India-China line between Nepal and Bhutan",
+  "description": "GAUL and UN Geodata 2023 draw this stretch of the India-China line differently. The area between the two versions is its own unit, and both exports give it to India, as GAUL does.",
+  "keys": [
+   [
+    704,
+    "240"
+   ]
+  ],
+  "cut": {
+   "un_objectids": [
+    704
+   ]
+  },
+  "method": "GAUL line as cut line, ends joined to the UN boundary",
+  "source": "GAUL 2025 boundary between entities 234 and 240",
+  "comment": ""
+ },
+ {
+  "id": "C14",
+  "type": "un_error",
+  "title": "Kuril Islands in the Russian Federation",
+  "description": "UN Geodata 2023 gives part of the Kuril Islands to the Russian Federation and the rest to its disputed code, xRI. GAUL has all of them in xKI, so both exports give the Russian Federation's part to xRI.",
+  "keys": [
+   [
+    850,
+    "249"
+   ]
+  ],
+  "relabel": {
+   "un_objectid": 850,
+   "gaul_id": "249",
+   "to": 912,
+   "name": "Kuril Islands"
+  },
+  "method": "UN disputed code",
+  "source": "UN Geodata 2023",
+  "comment": ""
+ },
+ {
+  "id": "C07a",
+  "type": "split",
+  "title": "Bassas da India",
+  "description": "GAUL has these islands as their own entity. UN Geodata 2023 includes them in the French Southern Territories.",
+  "keys": [
+   [
+    673,
+    "104"
+   ]
+  ],
+  "method": "island attribution",
+  "source": "UN Geodata and GAUL polygons",
+  "comment": ""
+ },
+ {
+  "id": "C07b",
+  "type": "split",
+  "title": "Europa Island",
+  "description": "GAUL has this island as its own entity. UN Geodata 2023 includes it in the French Southern Territories.",
+  "keys": [
+   [
+    673,
+    "125"
+   ]
+  ],
+  "method": "island attribution",
+  "source": "UN Geodata and GAUL polygons",
+  "comment": ""
+ },
+ {
+  "id": "C07c",
+  "type": "split",
+  "title": "Glorioso Islands",
+  "description": "GAUL has these islands as their own entity. UN Geodata 2023 includes them in the French Southern Territories.",
+  "keys": [
+   [
+    673,
+    "130"
+   ]
+  ],
+  "method": "island attribution",
+  "source": "UN Geodata and GAUL polygons",
+  "comment": ""
+ },
+ {
+  "id": "C07d",
+  "type": "split",
+  "title": "Juan de Nova Island",
+  "description": "GAUL has this island as its own entity. UN Geodata 2023 includes it in the French Southern Territories.",
+  "keys": [
+   [
+    673,
+    "136"
+   ]
+  ],
+  "method": "island attribution",
+  "source": "UN Geodata and GAUL polygons",
+  "comment": ""
+ },
+ {
+  "id": "C07e",
+  "type": "split",
+  "title": "Tromelin Island",
+  "description": "GAUL has this island as its own entity. UN Geodata 2023 includes it in the French Southern Territories.",
+  "keys": [
+   [
+    673,
+    "163"
+   ]
+  ],
+  "method": "island attribution",
+  "source": "UN Geodata and GAUL polygons",
+  "comment": ""
+ },
+ {
+  "id": "C08",
+  "type": "split",
+  "title": "Chagos Archipelago",
+  "description": "GAUL has its own entity, IOT. UN Geodata 2023 includes these islands in Mauritius.",
+  "keys": [
+   [
+    816,
+    "233"
+   ]
+  ],
+  "method": "island attribution",
+  "source": "UN Geodata and GAUL polygons",
+  "comment": ""
+ },
+ {
+  "id": "C09",
+  "type": "split",
+  "title": "Ashmore and Cartier Islands",
+  "description": "GAUL has its own entity. UN Geodata 2023 includes these islands in Australia.",
+  "keys": [
+   [
+    675,
+    "342-AUS-1"
+   ]
+  ],
+  "method": "island attribution",
+  "source": "UN Geodata and GAUL polygons",
+  "comment": ""
+ },
+ {
+  "id": "C10",
+  "type": "un_error",
+  "title": "Clipperton Island",
+  "description": "UN Geodata 2023 includes this island in French Polynesia, which it is not part of. GAUL has it as its own entity, and so do both exports.",
+  "keys": [
+   [
+    846,
+    "345"
+   ]
+  ],
+  "method": "island attribution",
+  "source": "UN Geodata and GAUL polygons",
+  "comment": "",
+  "entity": {
+   "code": "CPT",
+   "name": "Clipperton Island"
+  }
+ },
+ {
+  "id": "C11a",
+  "type": "split",
+  "title": "Akrotiri",
+  "description": "GAUL has this area as its own entity. UN Geodata 2023 has one row, xUK, with both Akrotiri and Dekelia.",
+  "keys": [
+   [
+    916,
+    "283"
+   ]
+  ],
+  "method": "island attribution",
+  "source": "UN Geodata and GAUL polygons",
+  "comment": ""
+ },
+ {
+  "id": "C11b",
+  "type": "split",
+  "title": "Dekelia",
+  "description": "GAUL has this area as its own entity. UN Geodata 2023 has one row, xUK, with both Akrotiri and Dekelia.",
+  "keys": [
+   [
+    916,
+    "296"
+   ]
+  ],
+  "method": "island attribution",
+  "source": "UN Geodata and GAUL polygons",
+  "comment": ""
+ },
+ {
+  "id": "C12",
+  "type": "un_error",
+  "title": "Northern Ireland",
+  "description": "UN Geodata 2023 has a separate row for Northern Ireland. GAUL has one United Kingdom entity, so both exports merge it into the United Kingdom.",
+  "keys": [
+   [
+    740,
+    "339"
+   ]
+  ],
+  "method": "merge",
+  "source": "UN Geodata and GAUL attributes",
+  "comment": "",
+  "un_to": 741
+ },
+ {
+  "id": "C15",
+  "type": "un_error",
+  "title": "China parts that likely belong to Taiwan Province of China",
+  "description": "UN Geodata 2023 gives these parts to China. They likely belong to Taiwan Province of China, as in FieldMaps, and both exports give them to it.",
+  "keys": [
+   [
+    704,
+    "273"
+   ]
+  ],
+  "method": "island attribution",
+  "source": "UN Geodata and FieldMaps",
+  "comment": ""
+ },
+ {
+  "id": "C16",
+  "type": "un_error",
+  "title": "China parts that likely belong to Democratic People's Republic of Korea",
+  "description": "UN Geodata 2023 gives these parts to China. They likely belong to Democratic People's Republic of Korea, as in FieldMaps, and both exports give them to it.",
+  "keys": [
+   [
+    704,
+    "237"
+   ]
+  ],
+  "method": "island attribution",
+  "source": "UN Geodata and FieldMaps",
+  "comment": ""
+ },
+ {
+  "id": "C17",
+  "type": "un_error",
+  "title": "Finland parts that likely belong to Åland Islands",
+  "description": "UN Geodata 2023 gives these parts to Finland. They likely belong to Åland Islands, as in FieldMaps, and both exports give them to it.",
+  "keys": [
+   [
+    733,
+    "340"
+   ]
+  ],
+  "method": "island attribution",
+  "source": "UN Geodata and FieldMaps",
+  "comment": ""
+ },
+ {
+  "id": "C18",
+  "type": "un_error",
+  "title": "Micronesia (Federated States of) parts that likely belong to Marshall Islands",
+  "description": "UN Geodata 2023 gives these parts to Micronesia (Federated States of). They likely belong to Marshall Islands, as in FieldMaps, and both exports give them to it.",
+  "keys": [
+   [
+    738,
+    "352"
+   ]
+  ],
+  "method": "island attribution",
+  "source": "UN Geodata and FieldMaps",
+  "comment": ""
+ },
+ {
+  "id": "C19",
+  "type": "un_error",
+  "title": "Russian Federation parts that likely belong to Ukraine",
+  "description": "UN Geodata 2023 gives these parts to Russian Federation. They likely belong to Ukraine, as in FieldMaps, and both exports give them to it.",
+  "keys": [
+   [
+    850,
+    "338"
+   ]
+  ],
+  "method": "island attribution",
+  "source": "UN Geodata and FieldMaps",
+  "comment": ""
+ },
+ {
+  "id": "C20",
+  "type": "un_error",
+  "title": "Bonaire parts that likely belong to Venezuela (Bolivarian Republic Of)",
+  "description": "UN Geodata 2023 gives these parts to Bonaire. They likely belong to Venezuela (Bolivarian Republic Of), as in FieldMaps, and both exports give them to it.",
+  "keys": [
+   [
+    681,
+    "222"
+   ]
+  ],
+  "method": "island attribution",
+  "source": "UN Geodata and FieldMaps",
+  "comment": ""
+ },
+ {
+  "id": "C21",
+  "type": "un_error",
+  "title": "Angola parts that likely belong to Democratic Republic of the Congo",
+  "description": "UN Geodata 2023 gives these parts to Angola. They likely belong to Democratic Republic of the Congo, as in FieldMaps, and both exports give them to it.",
+  "keys": [
+   [
+    663,
+    "118"
+   ]
+  ],
+  "method": "island attribution",
+  "source": "UN Geodata and FieldMaps",
+  "comment": ""
+ },
+ {
+  "id": "C22",
+  "type": "un_error",
+  "title": "Kazakhstan parts that likely belong to Russian Federation",
+  "description": "UN Geodata 2023 gives these parts to Kazakhstan. They likely belong to Russian Federation, as in FieldMaps, and both exports give them to it.",
+  "keys": [
+   [
+    777,
+    "328"
+   ]
+  ],
+  "method": "island attribution",
+  "source": "UN Geodata and FieldMaps",
+  "comment": ""
+ },
+ {
+  "id": "C23",
+  "type": "un_error",
+  "title": "Japan parts that likely belong to Senkaku Islands",
+  "description": "UN Geodata 2023 gives these parts to Japan. They likely belong to Senkaku Islands, as in FieldMaps, and both exports give them to it.",
+  "keys": [
+   [
+    776,
+    "268"
+   ]
+  ],
+  "method": "island attribution",
+  "source": "UN Geodata and FieldMaps",
+  "comment": ""
+ },
+ {
+  "id": "C24",
+  "type": "un_error",
+  "title": "Russian Federation parts that likely belong to Finland",
+  "description": "UN Geodata 2023 gives these parts to Russian Federation. They likely belong to Finland, as in FieldMaps, and both exports give them to it.",
+  "keys": [
+   [
+    850,
+    "300"
+   ]
+  ],
+  "method": "island attribution",
+  "source": "UN Geodata and FieldMaps",
+  "comment": ""
+ },
+ {
+  "id": "C25",
+  "type": "un_error",
+  "title": "Greece parts that likely belong to Türkiye",
+  "description": "UN Geodata 2023 gives these parts to Greece. They likely belong to Türkiye, as in FieldMaps, and both exports give them to it.",
+  "keys": [
+   [
+    751,
+    "278"
+   ]
+  ],
+  "method": "island attribution",
+  "source": "UN Geodata and FieldMaps",
+  "comment": ""
+ },
+ {
+  "id": "C26",
+  "type": "un_error",
+  "title": "Canada parts that likely belong to Hans Island",
+  "description": "UN Geodata 2023 gives these parts to Canada. They are likely Hans Island, as in FieldMaps, and both exports give them their own entity with no GAUL code.",
+  "entity": {
+   "code": "XHI",
+   "name": "Hans Island"
+  },
+  "method": "island attribution",
+  "source": "UN Geodata and FieldMaps",
+  "comment": ""
+ },
+ {
+  "id": "C27",
+  "type": "un_error",
+  "title": "Eritrea parts that likely belong to Doumeira Islands",
+  "description": "UN Geodata 2023 gives these parts to Eritrea. They are likely Doumeira Islands, as in FieldMaps, and both exports give them their own entity with no GAUL code.",
+  "entity": {
+   "code": "XDI",
+   "name": "Doumeira Islands"
+  },
+  "method": "island attribution",
+  "source": "UN Geodata and FieldMaps",
+  "comment": ""
+ },
+ {
+  "id": "C28",
+  "type": "un_error",
+  "title": "Gabon parts that likely belong to Equatorial Guinea",
+  "description": "UN Geodata 2023 gives these parts to Gabon. They likely belong to Equatorial Guinea, as in FieldMaps, and both exports give them to it.",
+  "keys": [
+   [
+    739,
+    "121"
+   ]
+  ],
+  "method": "island attribution",
+  "source": "UN Geodata and FieldMaps",
+  "comment": ""
+ },
+ {
+  "id": "C29",
+  "type": "un_error",
+  "title": "Iran (Islamic Republic of) parts that likely belong to Abu Musa and Tunb Islands",
+  "description": "UN Geodata 2023 gives these parts to Iran (Islamic Republic of). They are likely Abu Musa and Tunb Islands, as in FieldMaps, and both exports give them their own entity with no GAUL code.",
+  "entity": {
+   "code": "XAM",
+   "name": "Abu Musa and Tunb Islands"
+  },
+  "method": "island attribution",
+  "source": "UN Geodata and FieldMaps",
+  "comment": ""
+ },
+ {
+  "id": "C30",
+  "type": "un_error",
+  "title": "New Caledonia parts that likely belong to Hunter and Matthew Islands",
+  "description": "UN Geodata 2023 gives these parts to New Caledonia. They are likely Hunter and Matthew Islands, as in FieldMaps, and both exports give them their own entity with no GAUL code.",
+  "entity": {
+   "code": "XHM",
+   "name": "Hunter and Matthew Islands"
+  },
+  "method": "island attribution",
+  "source": "UN Geodata and FieldMaps",
+  "comment": ""
+ }
+]

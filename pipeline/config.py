@@ -1,7 +1,9 @@
 """Pipeline-wide constants, source definitions and DuckDB helpers."""
 
 import json
+from hashlib import sha256
 from logging import getLogger
+from os import cpu_count
 from pathlib import Path
 
 from duckdb import DuckDBPyConnection, connect
@@ -9,6 +11,7 @@ from duckdb import DuckDBPyConnection, connect
 logger = getLogger(__name__)
 
 CRS = "OGC:CRS84"
+THREADS = max(1, (cpu_count() or 2) // 2)
 TABLE_OPTS = "FORMAT PARQUET, COMPRESSION ZSTD, COMPRESSION_LEVEL 15"
 PARQUET_OPTS = f"({TABLE_OPTS}, GEOPARQUET_VERSION V2)"
 WORLD = "ST_MakeEnvelope(-180, -90, 180, 90)"
@@ -35,6 +38,7 @@ register_dir = root / "outputs/register"
 tiles_dir = root / "outputs/tiles"
 input_dir = root / "inputs"
 layers_json = root / "site/src/lib/layers.json"
+state_path = root / "outputs/state.json"
 
 # Per source: entity id, join code and entity name (default name), then
 # attribute columns (output name: SQL).
@@ -89,12 +93,46 @@ def layers() -> list[dict]:
     return json.loads(layers_json.read_text())
 
 
-def open_db(path: Path | None = None) -> DuckDBPyConnection:
-    """Connect with spatial loaded, to a fresh file at ``path`` or in memory."""
-    if path:
+def file_hash(path: Path) -> str:
+    """Return the SHA-256 of the file at ``path``."""
+    digest = sha256()
+    with path.open("rb") as file:
+        while chunk := file.read(1 << 20):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _state() -> dict:
+    return json.loads(state_path.read_text()) if state_path.exists() else {}
+
+
+def _hashes(inputs: list[Path]) -> dict[str, str]:
+    return {str(path.relative_to(root)): file_hash(path) for path in inputs}
+
+
+def fresh(key: str, inputs: list[Path], outputs: list[Path]) -> bool:
+    """Return whether ``outputs`` exist and ``inputs`` match ``key``'s last record."""
+    recorded = _state().get(key)
+    return (
+        recorded is not None
+        and all(path.exists() for path in outputs)
+        and recorded == _hashes(inputs)
+    )
+
+
+def record(key: str, inputs: list[Path]) -> None:
+    """Remember ``inputs`` as what ``key``'s outputs were built from."""
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state = _state() | {key: _hashes(inputs)}
+    state_path.write_text(json.dumps(state, indent=2) + "\n")
+
+
+def open_db(path: Path | None = None, *, keep: bool = False) -> DuckDBPyConnection:
+    """Connect with spatial loaded, in memory or to ``path``, fresh unless ``keep``."""
+    if path and not keep:
         path.unlink(missing_ok=True)
     conn = connect(path or ":memory:")
-    conn.execute("LOAD spatial")
+    conn.execute(f"LOAD spatial; SET threads = {THREADS}")
     return conn
 
 

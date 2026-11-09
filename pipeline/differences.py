@@ -1,17 +1,22 @@
-"""Compare land boundaries and island groupings across sources on OSM land."""
+"""Compare land boundaries on OSM land, and each source's islands in other cells."""
 
-from itertools import combinations
+from argparse import ArgumentParser
+from concurrent.futures import ThreadPoolExecutor
 from logging import getLogger
 from os import getenv
+from pathlib import Path
 from time import perf_counter
 from typing import TYPE_CHECKING
 
 from . import review
 from .config import (
     SOURCE_COLUMNS,
+    THREADS,
+    fresh,
     layers,
     open_db,
     prepare_dir,
+    record,
     register_dir,
     tiles_dir,
     tmp_dir,
@@ -31,7 +36,8 @@ KM2 = "ST_Area_Spheroid({}) / 1e6"
 VORONOI = {lyr["source"]: lyr["id"] for lyr in layers() if lyr["kind"] == "voronoi"}
 LINES = [lyr["id"] for lyr in layers() if lyr["kind"] == "line"]
 POLYGONS = {lyr["source"]: lyr["id"] for lyr in layers() if lyr["kind"] == "polygon"}
-PAIRS = list(combinations(sorted(VORONOI), 2))
+# Row slices per thread, so the largest geometries don't queue behind each other.
+SLICES = 4 * THREADS
 
 
 def _step(conn: DuckDBPyConnection, name: str, sql: str) -> None:
@@ -40,14 +46,41 @@ def _step(conn: DuckDBPyConnection, name: str, sql: str) -> None:
     logger.info("%s: %.0fs", name, perf_counter() - start)
 
 
-def _chunks(table: str, cols: str, src: str) -> str:
-    """Subdivided parts of ``src`` with their envelopes, as ``table``."""
-    return f"""--sql
+def _entity_name(source: str) -> str:
+    columns = SOURCE_COLUMNS[source]
+    return columns.get("entity", columns["name"])
+
+
+def _parallel(conn: DuckDBPyConnection, statements: list[str]) -> None:
+    """Run ``statements`` side by side, each on its own cursor."""
+    with ThreadPoolExecutor(THREADS) as pool:
+        list(pool.map(lambda sql: conn.cursor().execute(sql), statements))
+
+
+def _chunks(conn: DuckDBPyConnection, name: str, table: str, src: str) -> None:
+    """Write ``src``'s rows to ``table``, subdivided, with envelopes, slice by slice."""
+    start = perf_counter()
+    # One statement over a few hundred large rows would run on one thread.
+    conn.execute(f"""--sql
+        CREATE OR REPLACE TABLE chunk_rows AS
+        SELECT *, row_number() OVER (ORDER BY ST_NPoints(geom) DESC) % {SLICES} AS slice
+        FROM ({src});
         CREATE OR REPLACE TABLE {table} AS
-        SELECT *, ST_Envelope(geom) AS env FROM (
-            SELECT {cols}, unnest(ST_Dump(ST_Subdivide(geom, {VERTICES}))).geom AS geom
-            FROM ({src}))
-    """
+        SELECT * EXCLUDE slice, geom AS env FROM chunk_rows LIMIT 0
+    """)
+    _parallel(
+        conn,
+        [
+            f"""INSERT INTO {table} BY NAME
+            SELECT * EXCLUDE (geom, part, slice), part AS geom,
+                ST_Envelope(part) AS env
+            FROM (SELECT *, unnest(ST_Dump(ST_Subdivide(geom, {VERTICES}))).geom AS part
+                FROM chunk_rows WHERE slice = {i})"""
+            for i in range(SLICES)
+        ],
+    )
+    conn.execute("DROP TABLE chunk_rows")
+    logger.info("%s: %.0fs", name, perf_counter() - start)
 
 
 def _land(conn: DuckDBPyConnection) -> None:
@@ -69,21 +102,18 @@ def _land(conn: DuckDBPyConnection) -> None:
         f"SELECT geometry AS geom FROM read_parquet('{prepare_dir / name}.parquet')"
         for name in LINES
     )
-    _step(conn, "segments", _chunks("segs", "1 AS one", lines))
+    _chunks(conn, "segments", "segs", lines)
     _step(
         conn,
         "candidates",
         """CREATE OR REPLACE TABLE candidates AS
         SELECT DISTINCT l.fid FROM land l JOIN segs s ON ST_Intersects(l.env, s.env)""",
     )
-    _step(
+    _chunks(
         conn,
         "candidate chunks",
-        _chunks(
-            "chunks",
-            "fid",
-            "SELECT fid, geom FROM land JOIN candidates USING (fid)",
-        ),
+        "chunks",
+        "SELECT fid, geom FROM land JOIN candidates USING (fid)",
     )
     _step(
         conn,
@@ -92,71 +122,118 @@ def _land(conn: DuckDBPyConnection) -> None:
         SELECT DISTINCT c.fid FROM chunks c JOIN segs s
           ON ST_Intersects(c.env, s.env) AND ST_Intersects(c.geom, s.geom)""",
     )
-    conn.execute("""--sql
-        DELETE FROM chunks WHERE fid NOT IN (SELECT fid FROM crossed);
+    conn.execute(f"""--sql
         CREATE OR REPLACE TABLE chunks AS
-        SELECT row_number() OVER () AS chunk, * FROM chunks;
+        SELECT row_number() OVER () AS chunk, *, {KM2.format("geom")} AS km2
+        FROM chunks WHERE fid IN (SELECT fid FROM crossed);
         CREATE OR REPLACE TABLE islands AS
         SELECT fid, km2, ST_PointOnSurface(geom) AS pt FROM land
         WHERE fid NOT IN (SELECT fid FROM crossed);
     """)
     n = conn.execute(
         "SELECT (SELECT count(*) FROM crossed), (SELECT count(*) FROM islands)"
-    ).fetchone()
+    ).fetchall()[0]
     logger.info("land: %d crossed polygons, %d islands", *n)
 
 
-def _assign(conn: DuckDBPyConnection, source: str) -> None:
-    """Clip land chunks to ``source``'s cells and put each island in one cell."""
-    c = SOURCE_COLUMNS[source]
-    cells = f"""SELECT coalesce(({c["id"]})::VARCHAR, '') AS entity,
-            ({c["code"]})::VARCHAR AS code,
-            ({c.get("entity", c["name"])})::VARCHAR AS name,
-            geometry AS geom
-        FROM read_parquet('{prepare_dir / VORONOI[source]}.parquet')"""
-    _step(conn, f"{source} cells", _chunks("cells", "entity, code, name", cells))
-    conn.execute(f"""--sql
-        INSERT INTO entities
-        SELECT DISTINCT '{source}', entity, code, name FROM cells
+def _polygons(conn: DuckDBPyConnection) -> None:
+    """Load every source's polygon parts and each entity's area and extent."""
+    conn.execute("""--sql
+        CREATE OR REPLACE TABLE polygon_parts (source VARCHAR, entity VARCHAR,
+            code VARCHAR, name VARCHAR, geom GEOMETRY, env GEOMETRY)
     """)
-    _step(
+    start = perf_counter()
+    _parallel(
         conn,
-        f"{source} pieces",
-        f"""INSERT INTO pieces
-        SELECT '{source}', k.chunk, c.entity, ST_CollectionExtract(
-            ST_Intersection(k.geom, c.geom), 3)
-        FROM chunks k JOIN cells c
-          ON ST_Intersects(k.env, c.env) AND ST_Intersects(k.geom, c.geom)""",
+        [
+            f"""INSERT INTO polygon_parts
+            SELECT *, ST_Envelope(geom) FROM (
+                SELECT '{s}', coalesce(({SOURCE_COLUMNS[s]["id"]})::VARCHAR, ''),
+                    ({SOURCE_COLUMNS[s]["code"]})::VARCHAR,
+                    ({_entity_name(s)})::VARCHAR,
+                    unnest(ST_Dump(geometry)).geom AS geom
+                FROM read_parquet('{prepare_dir / polygons}.parquet'))"""
+            for s, polygons in POLYGONS.items()
+        ],
     )
+    logger.info("polygon parts: %.0fs", perf_counter() - start)
     _step(
         conn,
-        f"{source} islands",
-        f"""INSERT INTO placed
-        SELECT '{source}', i.fid, any_value(c.entity)
+        "polygon areas",
+        """CREATE OR REPLACE TABLE polygon_areas AS
+        SELECT source, code, name, sum(ST_Area_Spheroid(geom)) AS m2
+        FROM polygon_parts GROUP BY ALL""",
+    )
+
+
+def _assign(conn: DuckDBPyConnection) -> None:
+    """Clip land chunks to every source's cells and put each island in one cell."""
+    cells = " UNION ALL ".join(
+        f"""SELECT '{s}' AS source, coalesce(({c["id"]})::VARCHAR, '') AS entity,
+            ({c["code"]})::VARCHAR AS code,
+            ({_entity_name(s)})::VARCHAR AS name, geometry AS geom
+        FROM read_parquet('{prepare_dir / VORONOI[s]}.parquet')"""
+        for s, c in ((s, SOURCE_COLUMNS[s]) for s in sorted(VORONOI))
+    )
+    _chunks(conn, "cells", "cells", cells)
+    conn.execute("""--sql
+        CREATE OR REPLACE TABLE entities AS
+        SELECT DISTINCT source, entity, code, name FROM cells
+    """)
+    # A chunk inside a cell stays as it is, which spares every overlay it enters.
+    _step(
+        conn,
+        "pieces",
+        f"""CREATE OR REPLACE TABLE pieces AS
+        SELECT source, chunk, entity, whole, geom, CASE WHEN whole THEN chunk_km2
+                ELSE {KM2.format("geom")} END AS km2,
+            ST_XMin(geom) AS x0, ST_YMin(geom) AS y0,
+            ST_XMax(geom) AS x1, ST_YMax(geom) AS y1
+        FROM (
+            SELECT *, CASE WHEN whole THEN chunk_geom ELSE ST_CollectionExtract(
+                    ST_Intersection(chunk_geom, cell_geom), 3) END AS geom
+            FROM (
+                SELECT c.source, k.chunk, c.entity, k.km2 AS chunk_km2,
+                    k.geom AS chunk_geom, c.geom AS cell_geom,
+                    ST_Covers(c.geom, k.geom) AS whole
+                FROM chunks k JOIN cells c
+                  ON ST_Intersects(k.env, c.env) AND ST_Intersects(k.geom, c.geom)))
+        """,
+    )
+    _polygons(conn)
+    _step(
+        conn,
+        "islands placed",
+        """CREATE OR REPLACE TABLE placed AS
+        SELECT c.source, i.fid, min(c.entity) AS entity
         FROM islands i JOIN cells c ON ST_Intersects(i.pt, c.geom)
-        GROUP BY i.fid""",
+        GROUP BY c.source, i.fid""",
     )
 
 
 def _overlay(conn: DuckDBPyConnection) -> None:
     """Overlay every source pair's pieces and islands, then mutual best matches."""
-    conn.execute(
-        "CREATE OR REPLACE TABLE overlay (a VARCHAR, b VARCHAR, "
-        "a_entity VARCHAR, b_entity VARCHAR, km2 DOUBLE, geom GEOMETRY)"
+    # Pieces of one chunk overlap only if their boxes do, and a whole piece cuts
+    # nothing, so two whole pieces just name their chunk.
+    _step(
+        conn,
+        "overlay",
+        f"""CREATE OR REPLACE TABLE overlay AS
+        SELECT a, b, a_entity, b_entity, chunk,
+            coalesce(known, {KM2.format("geom")}) AS km2, geom
+        FROM (
+            SELECT pa.source AS a, pb.source AS b, pa.entity AS a_entity,
+                pb.entity AS b_entity, pa.chunk,
+                CASE WHEN pa.whole THEN pb.km2 WHEN pb.whole THEN pa.km2 END AS known,
+                CASE WHEN pa.whole AND pb.whole THEN NULL
+                    WHEN pa.whole THEN pb.geom WHEN pb.whole THEN pa.geom
+                    ELSE ST_CollectionExtract(ST_Intersection(pa.geom, pb.geom), 3)
+                    END AS geom
+            FROM pieces pa JOIN pieces pb ON pa.chunk = pb.chunk
+                AND pa.source < pb.source AND pa.x0 <= pb.x1 AND pb.x0 <= pa.x1
+                AND pa.y0 <= pb.y1 AND pb.y0 <= pa.y1)
+        WHERE geom IS NULL OR NOT ST_IsEmpty(geom)""",
     )
-    for a, b in PAIRS:
-        _step(
-            conn,
-            f"{a}|{b} overlay",
-            f"""INSERT INTO overlay
-            SELECT * EXCLUDE g, {KM2.format("g")}, g FROM (
-                SELECT '{a}', '{b}', pa.entity, pb.entity,
-                       ST_CollectionExtract(ST_Intersection(pa.geom, pb.geom), 3) AS g
-                FROM pieces pa JOIN pieces pb USING (chunk)
-                WHERE pa.source = '{a}' AND pb.source = '{b}'
-                  AND ST_Intersects(pa.geom, pb.geom))
-            WHERE NOT ST_IsEmpty(g)""",
-        )
     conn.execute("""--sql
         CREATE OR REPLACE TABLE island_pairs AS
         SELECT pa.source AS a, pb.source AS b, i.fid, pa.entity AS a_entity,
@@ -181,6 +258,8 @@ def _overlay(conn: DuckDBPyConnection) -> None:
         LEFT JOIN codes ca ON ca.source = w.a AND ca.entity = w.a_entity
         LEFT JOIN codes cb ON cb.source = w.b AND cb.entity = w.b_entity;
     """)
+    _land_patches(conn)
+    _parts(conn)
 
 
 def _named(side: str) -> str:
@@ -188,6 +267,8 @@ def _named(side: str) -> str:
         ON {side}e.source = d.{side} AND {side}e.entity = d.{side}_entity"""
 
 
+PAIR_COLUMNS = """d.a || '|' || d.b AS pair, d.a, d.b, d.a_entity, ae.code AS a_code,
+    ae.name AS a_name, d.b_entity, be.code AS b_code, be.name AS b_name"""
 # A patch shows in the source whose entity has no mutual match in the other.
 SIDE = """CASE WHEN pa.entity IS NULL AND pb.entity IS NOT NULL THEN 'a'
     WHEN pb.entity IS NULL AND pa.entity IS NOT NULL THEN 'b' ELSE 'both' END"""
@@ -201,60 +282,84 @@ def _sided() -> str:
     )
 
 
-# Metres from an island to its source's nearest polygon, capped; 0 where they touch.
-GAP_CAP = 1000
-# Island patches stay in pairs where both sources hold a polygon this near.
-MAPPED_M = 100
-
-
-def _gaps(conn: DuckDBPyConnection) -> None:
-    """Each source's distance from every differing island to its own polygons."""
-    conn.execute("""--sql
-        CREATE OR REPLACE TABLE gap_islands AS
-        SELECT DISTINCT d.fid, l.geom, ST_XMin(l.env) - 0.03 AS x0,
-            ST_YMin(l.env) - 0.03 AS y0, ST_XMax(l.env) + 0.03 AS x1,
-            ST_YMax(l.env) + 0.03 AS y1
-        FROM island_pairs d JOIN matches m USING (a, b, a_entity, b_entity)
-        JOIN land l USING (fid) WHERE NOT m.mutual;
-        CREATE OR REPLACE TABLE island_gaps (source VARCHAR, fid BIGINT, gap DOUBLE)
+def _parts(conn: DuckDBPyConnection) -> None:
+    """Each source's polygon parts off crossed land, placed in every source's cells."""
+    bbox = getenv("DIFF_BBOX")
+    within = f"WHERE ST_Intersects(env, ST_MakeEnvelope({bbox}))" if bbox else ""
+    conn.execute(f"""--sql
+        CREATE OR REPLACE TABLE parts AS
+        SELECT row_number() OVER () AS pid, source, entity, geom, env
+        FROM polygon_parts {within}
     """)
-    for source, polygons in POLYGONS.items():
-        path = prepare_dir / f"{polygons}.parquet"
-        src = f"SELECT geometry AS geom FROM read_parquet('{path}')"
-        _step(conn, f"{source} polygons", _chunks("polys", "1 AS one", src))
-        _step(
-            conn,
-            f"{source} gaps",
-            f"""INSERT INTO island_gaps
-            SELECT '{source}', g.fid, least(coalesce(min(CASE
-                WHEN ST_Intersects(g.geom, p.geom) THEN 0
-                ELSE ST_Distance_Sphere(ST_StartPoint(ST_ShortestLine(g.geom, p.geom)),
-                    ST_EndPoint(ST_ShortestLine(g.geom, p.geom))) END), {GAP_CAP}),
-                {GAP_CAP})
-            FROM gap_islands g LEFT JOIN polys p
-                ON ST_Intersects(p.env, ST_MakeEnvelope(g.x0, g.y0, g.x1, g.y1))
-            GROUP BY g.fid""",
-        )
+    # Only parts whose box meets crossed land need subdividing to test them.
+    _step(
+        conn,
+        "near parts",
+        """CREATE OR REPLACE TABLE near_parts AS
+        SELECT DISTINCT p.pid FROM parts p JOIN chunks c
+            ON ST_Intersects(p.env, c.env)""",
+    )
+    _chunks(
+        conn,
+        "part chunks",
+        "part_bits",
+        "SELECT pid, geom FROM parts WHERE pid IN (SELECT pid FROM near_parts)",
+    )
+    _step(
+        conn,
+        "island parts",
+        f"""CREATE OR REPLACE TABLE part_land AS
+        SELECT DISTINCT b.pid FROM part_bits b JOIN chunks c
+            ON ST_Intersects(b.env, c.env) AND ST_Intersects(b.geom, c.geom);
+        CREATE OR REPLACE TABLE island_parts AS
+        SELECT pid, source, entity, {KM2.format("geom")} AS km2,
+            ST_PointOnSurface(geom) AS pt, geom, env
+        FROM parts WHERE pid NOT IN (SELECT pid FROM part_land);
+        DROP TABLE part_bits; DROP TABLE parts""",
+    )
+    _step(
+        conn,
+        "parts placed",
+        """CREATE OR REPLACE TABLE part_cells AS
+        SELECT c.source, p.pid, min(c.entity) AS entity
+        FROM island_parts p JOIN cells c ON ST_Intersects(p.pt, c.geom)
+        GROUP BY c.source, p.pid""",
+    )
+    # A part's own source holds it by its polygon, whatever its cell says.
+    conn.execute("""--sql
+        CREATE OR REPLACE TABLE part_placed AS
+        SELECT c.* FROM part_cells c JOIN island_parts p USING (pid)
+        WHERE c.source <> p.source
+        UNION ALL SELECT source, pid, entity FROM island_parts;
+        DROP TABLE part_cells
+    """)
 
 
 def _patches(conn: DuckDBPyConnection) -> None:
-    """Land and mapped island patches where a pair's entities aren't mutual."""
-    conn.execute(f"""--sql
+    """Unshared land per pair, and each source's islands another's cells reassign."""
+    conn.execute("""--sql
         CREATE OR REPLACE TABLE patches AS
         SELECT pair, 'land' AS type, side, item, a_entity, b_entity, a_code, a_name,
-                b_code, b_name, km2, geom::GEOMETRY AS geometry, NULL::BIGINT AS fid,
-                NULL::DOUBLE AS gap
+                b_code, b_name, km2, geom::GEOMETRY AS geometry
         FROM land_review
         UNION ALL
-        SELECT d.a || '|' || d.b, 'island', {SIDE}, r.item, d.a_entity, d.b_entity,
-               ae.code, ae.name, be.code, be.name, d.km2, l.geom::GEOMETRY, fid,
-               greatest(ga.gap, gb.gap)
-        FROM island_pairs d JOIN matches m USING (a, b, a_entity, b_entity)
-        JOIN land l USING (fid) JOIN item_islands r USING (fid)
-        {_named("a")} {_named("b")} {_sided()}
-        LEFT JOIN island_gaps ga ON ga.source = d.a AND ga.fid = d.fid
-        LEFT JOIN island_gaps gb ON gb.source = d.b AND gb.fid = d.fid
-        WHERE NOT m.mutual AND greatest(ga.gap, gb.gap) <= {MAPPED_M}
+        SELECT d.a || '|' || d.b, 'island', d.side, d.item, d.a_entity, d.b_entity,
+               ae.code, ae.name, be.code, be.name, d.km2, d.geom::GEOMETRY
+        FROM (
+            SELECT least(p.source, o.source) AS a, greatest(p.source, o.source) AS b,
+                CASE WHEN p.source < o.source THEN 'a' ELSE 'b' END AS side,
+                CASE WHEN p.source < o.source THEN p.entity ELSE o.entity END
+                    AS a_entity,
+                CASE WHEN p.source < o.source THEN o.entity ELSE p.entity END
+                    AS b_entity,
+                r.item, p.km2, p.geom
+            FROM item_parts r JOIN island_parts p USING (pid)
+            JOIN part_placed o ON o.pid = p.pid AND o.source <> p.source
+            JOIN clusters cp ON cp.source = p.source AND cp.entity = p.entity
+            JOIN clusters co ON co.source = o.source AND co.entity = o.entity
+            WHERE cp.cluster <> co.cluster) d
+        LEFT JOIN entities ae ON ae.source = d.a AND ae.entity = d.a_entity
+        LEFT JOIN entities be ON be.source = d.b AND be.entity = d.b_entity
     """)
 
 
@@ -283,15 +388,16 @@ def _dots(conn: DuckDBPyConnection) -> None:
     """Dot each island that is not crowded by a larger one in its item."""
     conn.execute("""--sql
         CREATE TEMP TABLE dot_islands AS
-        SELECT row_number() OVER () AS id, pair, item, km2, geometry,
+        SELECT row_number() OVER () AS id, pair, side, item, km2, geometry,
             ST_XMin(geometry) AS x0, ST_XMax(geometry) AS x1,
             ST_YMin(geometry) AS y0, ST_YMax(geometry) AS y1
         FROM patches WHERE type = 'island'
     """)
-    _drop_crowded(conn, "dot_islands", "pair, item", "km2")
+    _drop_crowded(conn, "dot_islands", "pair, side, item", "km2")
     write_parquet(
         conn,
-        """SELECT pair, item, ST_MaximumInscribedCircle(geometry).center AS geometry
+        """SELECT pair, side, item,
+            ST_MaximumInscribedCircle(geometry).center AS geometry
         FROM dot_islands""",
         prepare_dir / "differences_dots.parquet",
     )
@@ -306,14 +412,6 @@ def _areas(conn: DuckDBPyConnection) -> None:
         FROM patches WHERE NOT (type = 'land' AND side = 'both')
             AND a_entity IS NOT NULL AND b_entity IS NOT NULL
     """)
-    cells = " UNION ALL ".join(
-        f"""SELECT '{s}' AS source, coalesce(({c["id"]})::VARCHAR, '') AS entity,
-            geometry AS geom FROM read_parquet('{prepare_dir / VORONOI[s]}.parquet')
-        WHERE entity IN (SELECT a_entity FROM targets WHERE a = '{s}'
-            UNION SELECT b_entity FROM targets WHERE b = '{s}')"""
-        for s, c in ((s, SOURCE_COLUMNS[s]) for s in sorted(VORONOI))
-    )
-    _step(conn, "area cells", _chunks("vcells", "source, entity", cells))
     _step(
         conn,
         "area overlay",
@@ -323,8 +421,8 @@ def _areas(conn: DuckDBPyConnection) -> None:
                 SELECT t.pair, t.a_entity, t.b_entity, ST_Union_Agg(
                     ST_CollectionExtract(ST_Intersection(ca.geom, cb.geom), 3)) AS g
                 FROM targets t
-                JOIN vcells ca ON ca.source = t.a AND ca.entity = t.a_entity
-                JOIN vcells cb ON cb.source = t.b AND cb.entity = t.b_entity
+                JOIN cells ca ON ca.source = t.a AND ca.entity = t.a_entity
+                JOIN cells cb ON cb.source = t.b AND cb.entity = t.b_entity
                     AND ST_Intersects(ca.env, cb.env)
                     AND ST_Intersects(ca.geom, cb.geom)
                 GROUP BY ALL))""",
@@ -346,31 +444,36 @@ def _areas(conn: DuckDBPyConnection) -> None:
     )
 
 
-def _write(conn: DuckDBPyConnection) -> None:
-    register_dir.mkdir(parents=True, exist_ok=True)
+def _land_patches(conn: DuckDBPyConnection) -> None:
+    """Split the land each pair's entities don't share into patches."""
     conn.execute("""--sql
         CREATE OR REPLACE TABLE paired AS
         SELECT DISTINCT a, b, 'a' AS side, a_entity AS entity FROM matches WHERE mutual
         UNION SELECT DISTINCT a, b, 'b', b_entity FROM matches WHERE mutual
     """)
-    cols = """d.a || '|' || d.b AS pair, d.a, d.b, d.a_entity, ae.code AS a_code,
-        ae.name AS a_name, d.b_entity, be.code AS b_code, be.name AS b_name"""
-    write_parquet(
-        conn,
-        f"SELECT {cols}, d.km2, d.mutual FROM matches d {_named('a')} {_named('b')}",
-        register_dir / "matches.parquet",
-        geo=False,
-    )
     _step(
         conn,
         "land patches",
         f"""CREATE OR REPLACE TABLE land_diff AS
-        SELECT {cols}, {SIDE} AS side, {KM2.format("geom")} AS km2, geom FROM (
+        SELECT {PAIR_COLUMNS}, {SIDE} AS side, {KM2.format("geom")} AS km2, geom FROM (
             SELECT a, b, a_entity, b_entity, unnest(ST_Dump(g)).geom AS geom FROM (
-                SELECT a, b, a_entity, b_entity, ST_Union_Agg(o.geom) AS g
+                SELECT a, b, a_entity, b_entity,
+                    ST_Union_Agg(coalesce(o.geom, k.geom)) AS g
                 FROM overlay o JOIN matches m USING (a, b, a_entity, b_entity)
+                LEFT JOIN chunks k USING (chunk)
                 WHERE NOT m.mutual GROUP BY ALL)) d {_named("a")} {_named("b")}
         {_sided()}""",
+    )
+
+
+def _write(conn: DuckDBPyConnection) -> None:
+    register_dir.mkdir(parents=True, exist_ok=True)
+    write_parquet(
+        conn,
+        f"""SELECT {PAIR_COLUMNS}, d.km2, d.mutual
+        FROM matches d {_named("a")} {_named("b")}""",
+        register_dir / "matches.parquet",
+        geo=False,
     )
     review.build(conn)
     write_parquet(
@@ -388,21 +491,29 @@ def _write(conn: DuckDBPyConnection) -> None:
     )
     write_parquet(
         conn,
-        f"""SELECT i.fid, i.km2, {entity}, any_value(r.item) AS item
+        f"""SELECT i.fid, i.km2, {entity}
         FROM islands i JOIN placed p USING (fid)
         LEFT JOIN entities e USING (source, entity)
-        LEFT JOIN item_islands r USING (fid)
         GROUP BY i.fid, i.km2 ORDER BY i.km2 DESC""",
         register_dir / "islands.parquet",
         geo=False,
     )
-    _gaps(conn)
+    write_parquet(
+        conn,
+        f"""SELECT r.pid, any_value(r.drawn) AS drawn, any_value(i.km2) AS km2,
+            {entity}, any_value(r.item) AS item, any_value(i.geom) AS geometry
+        FROM item_parts r JOIN island_parts i USING (pid)
+        JOIN part_placed p USING (pid)
+        LEFT JOIN entities e ON e.source = p.source AND e.entity = p.entity
+        GROUP BY r.pid ORDER BY km2 DESC""",
+        register_dir / "island_parts.parquet",
+    )
     _patches(conn)
     _dots(conn)
     _areas(conn)
     write_parquet(
         conn,
-        """SELECT * EXCLUDE (a_entity, b_entity, fid, gap) FROM patches
+        """SELECT * EXCLUDE (a_entity, b_entity) FROM patches
         UNION ALL BY NAME SELECT * FROM areas""",
         prepare_dir / "differences.parquet",
     )
@@ -411,26 +522,16 @@ def _write(conn: DuckDBPyConnection) -> None:
 
 def _items(conn: DuckDBPyConnection) -> None:
     """Write items.json, titling each item with its smallest entity's own name."""
-    areas = " UNION ALL ".join(
-        f"""SELECT '{s}' AS source, ({c["code"]})::VARCHAR AS code,
-            ({c.get("entity", c["name"])})::VARCHAR AS name,
-            sum(ST_Area_Spheroid(geometry)) AS m2
-        FROM read_parquet('{prepare_dir / POLYGONS[s]}.parquet') GROUP BY ALL"""
-        for s, c in SOURCE_COLUMNS.items()
-        if s in POLYGONS
-    )
     named = " UNION ALL ".join(
         f"SELECT item, '{s}' AS source, {s}_code AS code, {s}_name AS name FROM items"
         for s in sorted(VORONOI)
     )
-    _step(
-        conn,
-        "item titles",
-        f"""CREATE OR REPLACE TABLE titles AS
+    conn.execute(f"""--sql
+        CREATE OR REPLACE TABLE titles AS
         SELECT n.item, arg_min(n.name, a.m2) AS title
-        FROM ({named}) n JOIN ({areas}) a USING (source, code, name)
-        GROUP BY n.item""",
-    )
+        FROM ({named}) n JOIN polygon_areas a USING (source, code, name)
+        GROUP BY n.item
+    """)
     cols = ", ".join(
         f"{s}_code AS code_{s}, {s}_name AS name_{s}" for s in sorted(VORONOI)
     )
@@ -438,49 +539,56 @@ def _items(conn: DuckDBPyConnection) -> None:
         SELECT count(*) FROM (
             SELECT item FROM patches WHERE NOT (type = 'land' AND side = 'both')
             UNION ALL SELECT item FROM areas)
-        WHERE item IS NULL OR item NOT IN (SELECT item FROM items)""").fetchone()[0]
+        WHERE item IS NULL OR item NOT IN (SELECT item FROM items)""").fetchall()[0][0]
     if lost:
         msg = f"{lost} differences belong to no item"
         raise ValueError(msg)
-    # Island items count only the islands their patches keep.
-    conn.execute("""--sql
-        CREATE OR REPLACE TABLE item_stats AS
-        SELECT item, count(*) AS islands, sum(i.km2) AS km2,
-            min(ST_XMin(l.env)) AS xmin, min(ST_YMin(l.env)) AS ymin,
-            max(ST_XMax(l.env)) AS xmax, max(ST_YMax(l.env)) AS ymax
-        FROM (SELECT DISTINCT item, fid FROM patches WHERE type = 'island')
-        JOIN islands i USING (fid) JOIN land l USING (fid) GROUP BY item
-        UNION ALL SELECT * FROM stats WHERE islands = 0
-    """)
     out = tiles_dir / "items.json"
     conn.execute(f"""--sql
-        COPY (SELECT item, t.title, type, same_code, missing, s.islands, s.km2,
+        COPY (SELECT item, t.title, type, drawn, same_code, missing, s.islands, s.km2,
                 [s.xmin, s.ymin, s.xmax, s.ymax] AS bbox,
                 (SELECT list(DISTINCT pair ORDER BY pair) FROM patches p
                  WHERE p.item = i.item
                     AND NOT (p.type = 'land' AND p.side = 'both')) AS pairs,
                 {cols}
-            FROM items i LEFT JOIN item_stats s USING (item)
+            FROM items i LEFT JOIN stats s USING (item)
             LEFT JOIN titles t USING (item)
             WHERE type <> 'island' OR item IN (SELECT item FROM patches)
             ORDER BY type, s.km2 DESC) TO '{out}' (FORMAT JSON, ARRAY true)
     """)
 
 
+REGISTER = ("matches", "land", "islands", "island_parts", "items", "borders")
+# Each phase reads the tables the phases before it left in the database.
+PHASES = {"land": _land, "assign": _assign, "overlay": _overlay, "review": _write}
+
+
 def main() -> None:
     """Write land and island differences for every source pair."""
-    conn = open_db(tmp_dir / "differences.duckdb")
-    conn.execute("SET geometry_always_xy = true; SET preserve_insertion_order = false")
+    parser = ArgumentParser()
+    parser.add_argument("--from", dest="start", choices=PHASES, default="land")
+    args, _ = parser.parse_known_args()
+    code = [Path(__file__), Path(review.__file__)]
+    layer_ids = [*VORONOI.values(), *POLYGONS.values(), *LINES, "osm_land"]
+    inputs = code + [prepare_dir / f"{name}.parquet" for name in layer_ids]
+    outputs = [
+        tiles_dir / "items.json",
+        prepare_dir / "differences.parquet",
+        prepare_dir / "differences_dots.parquet",
+        *(register_dir / f"{name}.parquet" for name in REGISTER),
+    ]
+    names = list(PHASES)
+    complete = args.start == names[0] and not getenv("DIFF_BBOX")
+    if complete and fresh("differences", inputs, outputs):
+        logger.info("differences: unchanged")
+        return
+    conn = open_db(tmp_dir / "differences.duckdb", keep=args.start != names[0])
     conn.execute("""--sql
-        CREATE TABLE entities (source VARCHAR, entity VARCHAR, code VARCHAR,
-                               name VARCHAR);
-        CREATE TABLE pieces (source VARCHAR, chunk BIGINT, entity VARCHAR,
-                             geom GEOMETRY);
-        CREATE TABLE placed (source VARCHAR, fid BIGINT, entity VARCHAR);
+        SET GLOBAL geometry_always_xy = true;
+        SET GLOBAL preserve_insertion_order = false
     """)
-    _land(conn)
-    for source in sorted(VORONOI):
-        _assign(conn, source)
-    _overlay(conn)
-    _write(conn)
+    for name in names[names.index(args.start) :]:
+        PHASES[name](conn)
     conn.close()
+    # A partial run leaves the next plain run nothing to skip.
+    record("differences", inputs if complete else [])

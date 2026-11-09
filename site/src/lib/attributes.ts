@@ -68,12 +68,14 @@ export type ItemType = "island" | "land" | "no_land";
 export type GeometryList = "islands" | "land";
 
 // A geometry difference from items.json; title is its smallest entity's name, and pairs are the
-// map's source pairs it has patches in. items lists the differences merged into this row.
+// map's source pairs it has patches in, and drawn the source whose islands they are. items lists the
+// differences merged into this row.
 export interface ItemRow {
   item: string;
   items?: string[];
   title: string | null;
   type: ItemType;
+  drawn: string | null;
   same_code: boolean;
   missing: string[] | null;
   islands: number | null;
@@ -117,7 +119,7 @@ export function mergeItems(items: ItemRow[], a: string, b: string): ItemRow[] {
   const entity = (it: ItemRow, s: string) => [it[`code_${s}`], it[`name_${s}`]].join("|");
   const own = (it: ItemRow) => Object.fromEntries([a, b].map((s) => [s, [[it[`code_${s}`], it[`name_${s}`]] as [unknown, unknown]]]));
   // A no_land entity exists in one source only, so it counts when A or B holds it.
-  const relevant = items.filter((it) => (it.type === "no_land" ? [a, b].some((s) => it[`entity_${s}`]) : it.pairs?.includes(pair)));
+  const relevant = items.filter((it) => (it.type === "no_land" ? [a, b].some((s) => it[`entity_${s}`]) : it.pairs?.includes(pair) && (it.type !== "island" || it.drawn === a)));
   for (const it of relevant) {
     const key = [entity(it, a), entity(it, b)].sort().join("||");
     const list: GeometryList = it.type === "island" ? "islands" : "land";
