@@ -518,5 +518,46 @@
   "method": "island attribution",
   "source": "UN Geodata and FieldMaps",
   "comment": ""
+ },
+ {
+  "id": "C28",
+  "type": "un_error",
+  "title": "Gabon parts that likely belong to Equatorial Guinea",
+  "description": "UN Geodata 2023 gives these parts to Gabon. They likely belong to Equatorial Guinea, as in FieldMaps, and both exports give them to it.",
+  "keys": [
+   [
+    739,
+    "121"
+   ]
+  ],
+  "method": "island attribution",
+  "source": "UN Geodata and FieldMaps",
+  "comment": ""
+ },
+ {
+  "id": "C29",
+  "type": "un_error",
+  "title": "Iran (Islamic Republic of) parts that likely belong to Abu Musa and Tunb Islands",
+  "description": "UN Geodata 2023 gives these parts to Iran (Islamic Republic of). They are likely Abu Musa and Tunb Islands, as in FieldMaps, and both exports give them their own entity with no GAUL code.",
+  "entity": {
+   "code": "XAM",
+   "name": "Abu Musa and Tunb Islands"
+  },
+  "method": "island attribution",
+  "source": "UN Geodata and FieldMaps",
+  "comment": ""
+ },
+ {
+  "id": "C30",
+  "type": "un_error",
+  "title": "New Caledonia parts that likely belong to Hunter and Matthew Islands",
+  "description": "UN Geodata 2023 gives these parts to New Caledonia. They are likely Hunter and Matthew Islands, as in FieldMaps, and both exports give them their own entity with no GAUL code.",
+  "entity": {
+   "code": "XHM",
+   "name": "Hunter and Matthew Islands"
+  },
+  "method": "island attribution",
+  "source": "UN Geodata and FieldMaps",
+  "comment": ""
  }
 ]

@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 TOLERANCE = 1e-9
-UN_ROWS, GAUL_ROWS = 262, 274
+UN_ROWS, GAUL_ROWS = 264, 276
 PATH_OUTPUTS = {"errors": "path_errors", "disputed": "path_disputed"}
 
 
