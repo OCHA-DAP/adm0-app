@@ -44,6 +44,14 @@ jobs:
           TILES_URL: ${{ secrets.TILES_URL }}
         run: |
           if grep -rqF "$TILES_URL" dist; then echo "TILES_URL found in dist"; exit 1; fi
+      - name: Check for broken links
+        uses: lycheeverse/lychee-action@v2.9.0
+        with:
+          args: >-
+            --offline --no-progress --root-dir ${{ github.workspace }}/site/dist
+            --remap 'file://${{ github.workspace }}/site/dist${{ steps.pages.outputs.base_path }} file://${{ github.workspace }}/site/dist'
+            'site/dist/**/*.html'
+          lycheeVersion: v0.24.2
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site/dist
