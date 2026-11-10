@@ -3,6 +3,7 @@
 import html
 import json
 import re
+from argparse import ArgumentParser
 from concurrent.futures import ThreadPoolExecutor
 from logging import getLogger
 from pathlib import Path
@@ -398,16 +399,27 @@ def _inputs(folder: Path) -> list[Path]:
 
 
 def main() -> None:
-    """Prepare every source whose download or preparing code changed, side by side."""
+    """Prepare each source whose inputs changed, or exactly ``--only``, in parallel."""
+    parser = ArgumentParser()
+    parser.add_argument("--only", nargs="+")
+    args, _ = parser.parse_known_args()
+    known = {fn.__name__ for fn, _, _ in SOURCES}
+    if args.only and (unknown := set(args.only) - known):
+        msg = f"unknown sources: {sorted(unknown)}"
+        raise ValueError(msg)
     prepare_dir.mkdir(parents=True, exist_ok=True)
     conn = open_db()
     stale = [
         (fn, _inputs(folder))
         for fn, folder, names in SOURCES
-        if not fresh(
-            f"prepare/{fn.__name__}",
-            _inputs(folder),
-            [prepare_dir / f"{name}.parquet" for name in names],
+        if (
+            fn.__name__ in args.only
+            if args.only
+            else not fresh(
+                f"prepare/{fn.__name__}",
+                _inputs(folder),
+                [prepare_dir / f"{name}.parquet" for name in names],
+            )
         )
     ]
     with ThreadPoolExecutor(THREADS) as pool:

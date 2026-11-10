@@ -1,6 +1,7 @@
 """Download every source into ``tmp/download/{source}/`` with a ``.date`` file."""
 
 import re
+from argparse import ArgumentParser
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
@@ -204,7 +205,10 @@ def _fetch(source: str, fn: Callable[[Path], str]) -> None:
 
 
 def main() -> None:
-    """Download all sources in parallel."""
+    """Download all sources, or exactly ``--only``, in parallel."""
+    parser = ArgumentParser()
+    parser.add_argument("--only", nargs="+")
+    args, _ = parser.parse_known_args()
     jobs = {
         "gaul": partial(_zip, GAUL_URL),
         "lsib": _lsib,
@@ -214,6 +218,11 @@ def main() -> None:
         "fieldmaps": _fieldmaps,
         "wb": _wb,
     }
+    if args.only:
+        if unknown := set(args.only) - set(jobs):
+            msg = f"unknown sources: {sorted(unknown)}"
+            raise ValueError(msg)
+        jobs = {s: fn for s, fn in jobs.items() if s in args.only}
     with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
         futures = [pool.submit(_fetch, s, fn) for s, fn in jobs.items()]
     for f in futures:
