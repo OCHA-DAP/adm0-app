@@ -23,6 +23,8 @@ LAYERS = {
     "build_coast_un": ("08", "un"),
     "build_new_islands": ("08", "new_islands"),
     "build_dropped": ("08", "dropped"),
+    "build_gained": ("08", "gained"),
+    "build_lost": ("08", "lost"),
 }
 REF = prepare_dir / "ref.parquet"
 # M49 has no row for Taiwan, which OSM border tiles name as TWN.
