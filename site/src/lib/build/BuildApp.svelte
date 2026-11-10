@@ -10,6 +10,7 @@
     id: string;
     type: string;
     title: string;
+    description?: string;
     km2: number | null;
     units: number;
     bbox: number[] | null;
@@ -18,6 +19,8 @@
     review?: boolean;
     gained_km2?: number;
     lost_km2?: number;
+    dropped_km2?: number;
+    added_km2?: number;
     islands?: number;
   }
   interface Step {
@@ -63,16 +66,16 @@
     if (!values.length) return { before: [], after: [] };
     return { before: sources, after: [entity(values[0].gaul, values[0].gaul_name)] };
   }
-  const COAST_TYPES = ["coast", "new_island", "un_only"];
+  const COAST_TYPES = ["coast", "new_island"];
   const isCoast = (c: Change) => COAST_TYPES.includes(c.type);
   const coastDetail = (c: Change) =>
     c.type === "coast"
-      ? `+${km2.format(c.gained_km2 ?? 0)} / −${km2.format(c.lost_km2 ?? 0)} km²`
+      ? `+${km2.format((c.gained_km2 ?? 0) + (c.added_km2 ?? 0))} / −${km2.format((c.lost_km2 ?? 0) + (c.dropped_km2 ?? 0))} km²`
       : c.type === "new_island"
         ? `${km2Format.format(c.islands ?? 0)} ${c.islands === 1 ? "island" : "islands"}${c.id.split("-").length > 2 ? ` · ${c.id.split("-").slice(2).join("-")}` : ""}`
-        : "Dropped";
-  const coastHead: Record<string, string> = { coast: "Gained / lost", new_island: "Added", un_only: "OSM lacks" };
-  const coastPatches = $derived(step ? stepChanges(step).filter((c) => c.type === "new_island" || c.type === "un_only").map((c) => c.id) : []);
+        : "";
+  const coastHead: Record<string, string> = { coast: "Land gained / lost", new_island: "Added" };
+  const coastPatches = $derived(step ? stepChanges(step).filter(isCoast).map((c) => c.id) : []);
   const listedChanges = (s: Step) => stepChanges(s).filter((c) => allLines || !isSmallLine(c));
 
   $effect(() => {
@@ -146,7 +149,7 @@
                               {c.id.slice(2).replace("-", " | ")}
                             {:else if isCoast(c)}
                               {@const v = c.values?.[0]}
-                              <span class="own" title={c.title}><span>{#if v}{@render entities([entity(v.un, v.un_name)])}{/if}</span><span class:review={c.review}>{coastDetail(c)}</span></span>
+                              <span class="own" title={c.description ?? c.title}><span>{#if v}{@render entities([entity(v.un, v.un_name)])}{/if}</span><span class:review={c.review}>{coastDetail(c)}</span></span>
                             {:else}
                               {@const side = sides(c)}
                               <span class="own" title={c.values?.map((v) => `${v.un_name} → ${v.gaul_name}: ${km2.format(v.km2)} km²`).join("\n")}><span>{@render entities(side.before)}</span><span>{@render entities(side.after)}</span></span>

@@ -66,6 +66,7 @@
     build_coast_un: `${tilesBase}/build/build_coast_un.pmtiles`,
   });
   const COAST_PATCHES = ["build_new_islands", "build_dropped"] as const;
+  const COAST_SLOTS = { a: "build_lost", b: "build_gained" } as const;
   const PATCH_OPACITY = 0.45;
   const PARENT_OPACITY = 0.3;
   const CHANGE_OPACITY = 0.7;
@@ -122,6 +123,11 @@
           m.addLayer({ id: `${id}-fill`, type: "fill", source: id, "source-layer": id, filter: NOTHING, paint: { "fill-color": color, "fill-opacity": CHANGE_OPACITY } });
           m.addLayer({ id: `${id}-focus`, type: "line", source: id, "source-layer": id, filter: NOTHING, paint: { "line-color": color, "line-width": 3 } });
         });
+        for (const slot of SLOTS) {
+          const id = COAST_SLOTS[slot];
+          m.addSource(id, { type: "vector", url: `pmtiles://${tilesBase}/build/${id}.pmtiles` });
+          m.addLayer({ id: `${id}-fill`, type: "fill", source: id, "source-layer": id, filter: NOTHING, paint: { "fill-color": SLOT_COLORS[slot] } });
+        }
       }
       m.addSource("labels", { type: "geojson", data: `${tilesBase}/build/labels.geojson` });
       m.addLayer({ id: "unit-labels", type: "symbol", source: "labels", filter: NOTHING, layout: { "text-field": ["get", "text"], "text-font": ["Noto Sans Bold"], "text-size": 13, "text-padding": 24 }, paint: { "text-color": "#333333", "text-halo-color": "#FFFFFF", "text-halo-width": 2 } });
@@ -157,6 +163,7 @@
         map.setFilter(`${id}-fill`, ["in", ["get", "change_id"], ["literal", coastPatches]]);
         map.setFilter(`${id}-focus`, ["==", ["get", "change_id"], change ?? ""]);
       }
+      for (const id of Object.values(COAST_SLOTS)) map.setFilter(`${id}-fill`, ["==", ["get", "change_id"], change ?? ""]);
     }
     if (!hasCells) return;
     map.setFilter("cell-islands", ["in", ["get", "change_id"], ["literal", cells]]);
@@ -195,6 +202,7 @@
       const opacity = slot === "a" ? 1 - sweep : sweep;
       if (compare) map!.setPaintProperty(`output-${compare[i]}`, "line-opacity", opacity);
       map!.setPaintProperty(`patch-${slot}`, "fill-opacity", PATCH_OPACITY * opacity);
+      if (hasCoast) map!.setPaintProperty(`${COAST_SLOTS[slot]}-fill`, "fill-opacity", PATCH_OPACITY * opacity);
     });
   });
 

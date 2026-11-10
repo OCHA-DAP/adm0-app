@@ -249,7 +249,7 @@ def _patches(conn: DuckDBPyConnection) -> None:
         FROM chunks k JOIN fclass f USING (fid) WHERE f.n = 1
         UNION ALL SELECT chunk, fid, unit_id, geom FROM placed WHERE n >= 2;
         CREATE TABLE gained_raw AS
-        SELECT o.unit_id, CASE WHEN u.geom IS NULL THEN o.geom
+        SELECT o.unit_id, o.fid, CASE WHEN u.geom IS NULL THEN o.geom
                    ELSE ST_CollectionExtract(ST_Difference(o.geom, u.geom), 3)
                    END AS geom
         FROM owned o LEFT JOIN un_in_chunk u USING (chunk);
@@ -260,16 +260,32 @@ def _patches(conn: DuckDBPyConnection) -> None:
         FROM bits b LEFT JOIN land_in_bit l USING (bit);
         """,
     )
+    # Chunks of one OSM polygon or UN part are rejoined, so a patch is never split.
+    rejoin = """SELECT unit_id, {key}, unnest(ST_Dump(geom)).geom AS geom FROM (
+            SELECT unit_id, {key}, geom FROM pieces WHERE n = 1
+            UNION ALL SELECT unit_id, {key}, ST_Union_Agg(geom) FROM pieces
+            WHERE n > 1 GROUP BY unit_id, {key})"""
+    pieces = """WITH pieces AS (
+            SELECT *, count(*) OVER (PARTITION BY unit_id, {key}) AS n FROM (
+                SELECT unit_id, {key}, unnest(ST_Dump(geom)).geom AS geom FROM {raw}
+                WHERE NOT ST_IsEmpty(geom)))"""
+    _step(
+        conn,
+        "rejoin",
+        f"""--sql
+        CREATE TABLE gained_joined AS
+        {pieces.format(key="fid", raw="gained_raw")} {rejoin.format(key="fid")};
+        CREATE TABLE lost_joined AS
+        {pieces.format(key="part_no", raw="lost_raw")} {rejoin.format(key="part_no")};
+        """,
+    )
     km2 = KM2.format("geom")
     conn.execute(f"""--sql
         CREATE TABLE gained AS
-        SELECT unit_id, geom, {km2} AS km2, ST_PointOnSurface(geom) AS pt FROM (
-            SELECT unit_id, unnest(ST_Dump(geom)).geom AS geom FROM gained_raw
-            WHERE NOT ST_IsEmpty(geom));
+        SELECT unit_id, geom, {km2} AS km2, ST_PointOnSurface(geom) AS pt
+        FROM gained_joined;
         CREATE TABLE lost AS
-        SELECT unit_id, part_no, geom, {km2} AS km2 FROM (
-            SELECT unit_id, part_no, unnest(ST_Dump(geom)).geom AS geom FROM lost_raw
-            WHERE NOT ST_IsEmpty(geom));
+        SELECT unit_id, part_no, geom, {km2} AS km2 FROM lost_joined;
         CREATE TABLE gained_fm AS
         SELECT g.unit_id, g.km2, g.geom, min(c.fm_code) AS fm_code
         FROM gained g JOIN fm_cells c ON ST_Intersects(g.pt, c.geom)
@@ -312,7 +328,7 @@ def _records(conn: DuckDBPyConnection) -> list[dict]:
                              NOT IN (SELECT un, fm FROM decisions)
                     THEN 'N-' || c.code || '-' || i.fm_code
                     WHEN i.straddle THEN 'N-' || c.code || '-straddle'
-                    ELSE 'N-' || c.code END AS change_id
+                    ELSE 'K-' || c.code END AS change_id
         FROM new_islands i JOIN codes c USING (unit_id);
         CREATE TABLE gained_tagged AS
         SELECT g.*, c.code, 'K-' || c.code AS change_id,
@@ -324,7 +340,7 @@ def _records(conn: DuckDBPyConnection) -> list[dict]:
         SELECT l.*, 'K-' || c.code AS change_id
         FROM lost l JOIN codes c USING (unit_id);
         CREATE TABLE dropped_tagged AS
-        SELECT d.*, c.code, c.name, 'D-' || c.code AS change_id
+        SELECT d.*, c.code, c.name, 'K-' || c.code AS change_id
         FROM dropped d JOIN codes c USING (unit_id);
     """)
     box = """[min(ST_XMin(geom)), min(ST_YMin(geom)),
@@ -345,42 +361,62 @@ def _records(conn: DuckDBPyConnection) -> list[dict]:
     coast = conn.execute(f"""--sql
         WITH un_area AS (SELECT unit_id, sum(km2) AS km2 FROM bits GROUP BY 1),
         kept AS (SELECT unit_id, sum(km2) AS km2 FROM touch GROUP BY 1),
-        gain AS (SELECT code, sum(km2) AS km2,
-                        sum(km2) FILTER (fm_differs) AS fm_km2, {box} AS box,
-                        {largest} AS big, count(*) AS n
-                 FROM gained_tagged GROUP BY 1),
-        loss AS (SELECT c.code, sum(l.km2) AS km2, {box.replace("geom", "l.geom")}
-                     AS box, count(*) AS n
-                 FROM lost l JOIN codes c USING (unit_id) GROUP BY 1)
+        parts AS (
+            SELECT code, 'gain' AS kind, km2, fm_differs, geom FROM gained_tagged
+            UNION ALL SELECT c.code, 'loss', l.km2, false, l.geom
+                FROM lost l JOIN codes c USING (unit_id)
+            UNION ALL SELECT code, 'drop', km2, false, geom FROM dropped_tagged
+            UNION ALL SELECT code, 'add', km2, false, geom FROM new_tagged
+                WHERE change_id = 'K-' || code),
+        agg AS (SELECT code,
+                       coalesce(sum(km2) FILTER (kind = 'gain'), 0) AS gain,
+                       coalesce(sum(km2) FILTER (kind = 'loss'), 0) AS loss,
+                       coalesce(sum(km2) FILTER (kind = 'drop'), 0) AS drop,
+                       coalesce(sum(km2) FILTER (kind = 'add'), 0) AS add,
+                       count(*) FILTER (kind = 'add') AS islands,
+                       sum(km2) FILTER (fm_differs) AS fm_km2,
+                       {box} AS box, {largest} AS big, count(*) AS n
+                FROM parts GROUP BY code)
         SELECT c.code, any_value(c.name), sum(u.km2), sum(coalesce(k.km2, 0)),
-               coalesce(any_value(g.km2), 0), coalesce(any_value(l.km2), 0),
-               any_value(g.fm_km2),
-               coalesce(any_value(g.box), any_value(l.box)), any_value(g.big),
-               coalesce(any_value(g.n), 0) + coalesce(any_value(l.n), 0)
+               any_value(a.gain), any_value(a.loss), any_value(a.drop),
+               any_value(a.add), any_value(a.islands), any_value(a.fm_km2),
+               any_value(a.box), any_value(a.big), any_value(a.n)
         FROM codes c JOIN un_area u USING (unit_id) LEFT JOIN kept k USING (unit_id)
-        LEFT JOIN gain g ON g.code = c.code LEFT JOIN loss l ON l.code = c.code
+        LEFT JOIN agg a ON a.code = c.code
         GROUP BY c.code ORDER BY c.code
     """).fetchall()
-    for code, name, un_km2, kept, gain, loss, fm_km2, bbox, big, n in coast:
+    for row in coast:
+        code, name, un_km2, kept, gain, loss, drop, add, isles, fm_km2, *rest = row
+        bbox, big, n = rest
         if not n:
             continue
+        parts = [
+            f"gains {gain:,.1f} km² that UN Geodata 2023 draws as water",
+            f"loses {loss:,.1f} km² that OSM draws as water",
+        ]
+        if drop:
+            parts.append(f"drops {drop:,.1f} km² of UN Geodata land that OSM lacks")
+        if isles:
+            parts.append(f"adds {isles} OSM islands ({add:,.1f} km²) in its cell")
         records.append(
             {
                 "id": f"K-{code}",
                 "type": "coast",
                 "title": f"{name} coastline",
                 "description": (
-                    f"The coastline of {name} follows OSM land. It gains "
-                    f"{gain:,.1f} km² that UN Geodata 2023 draws as water and loses "
-                    f"{loss:,.1f} km² that OSM draws as water. No land changes owner."
+                    f"The coastline of {name} follows OSM land. It "
+                    f"{', '.join(parts[:-1])} and {parts[-1]}. No land changes owner."
                 ),
                 "keys": [],
                 "method": "OSM land clipped to the extended units",
                 "source": "OpenStreetMap land polygons",
                 "comment": "",
-                "km2": round(gain + loss, 3),
+                "km2": round(gain + loss + drop + add, 3),
                 "gained_km2": round(gain, 3),
                 "lost_km2": round(loss, 3),
+                "dropped_km2": round(drop, 3),
+                "added_km2": round(add, 3),
+                "islands": isles,
                 "un_km2": round(un_km2, 3),
                 "kept_km2": round(kept, 3),
                 "fieldmaps_differs_km2": round(fm_km2 or 0, 3),
@@ -388,14 +424,15 @@ def _records(conn: DuckDBPyConnection) -> list[dict]:
                 "bbox": bbox,
                 "largest_patch_bbox": big,
                 "patches": n,
-                "values": [value(code, name, gain - loss)],
+                "values": [value(code, name, gain + add - loss - drop)],
             }
         )
     islands = conn.execute(f"""--sql
         SELECT change_id, code, any_value(name), any_value(fm_code), sum(km2),
                count(*), count(*) FILTER (straddle), {box}, {largest},
                string_agg(DISTINCT override_reason, ' ' ORDER BY override_reason)
-        FROM new_tagged GROUP BY change_id, code ORDER BY 5 DESC
+        FROM new_tagged WHERE change_id <> 'K-' || code
+        GROUP BY change_id, code ORDER BY 5 DESC
     """).fetchall()
     for change_id, code, name, fm, km2, n, straddles, bbox, big, reason in islands:
         review = change_id != f"N-{code}"
@@ -403,10 +440,8 @@ def _records(conn: DuckDBPyConnection) -> list[dict]:
             note = reason
         elif change_id.endswith("-straddle"):
             note = "A line between two units' cells crosses each of them."
-        elif review:
-            note = f"FieldMaps' cell gives them to {fm}."
         else:
-            note = "FieldMaps' cell agrees."
+            note = f"FieldMaps' cell gives them to {fm}."
         records.append(
             {
                 "id": change_id,
@@ -429,33 +464,6 @@ def _records(conn: DuckDBPyConnection) -> list[dict]:
                 "patches": n,
                 "values": [value(code, name, km2)],
                 "review": review,
-            }
-        )
-    drops = conn.execute(f"""--sql
-        SELECT change_id, code, any_value(name), sum(km2), count(*), {box}, {largest}
-        FROM dropped_tagged GROUP BY change_id, code ORDER BY 4 DESC
-    """).fetchall()
-    for change_id, code, name, km2, n, bbox, big in drops:
-        records.append(
-            {
-                "id": change_id,
-                "type": "un_only",
-                "title": f"{name} land OSM lacks",
-                "description": (
-                    f"{n} UN Geodata 2023 parts of {name} touch no OSM land, so both "
-                    "exports drop them."
-                ),
-                "keys": [],
-                "method": "dropped",
-                "source": "UN Geodata 2023",
-                "comment": "",
-                "km2": round(km2, 3),
-                "units": 0,
-                "bbox": bbox,
-                "largest_patch_bbox": big,
-                "patches": n,
-                "values": [value(code, name, km2)],
-                "review": True,
             }
         )
     return records
