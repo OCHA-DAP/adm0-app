@@ -3,7 +3,7 @@
   "id": "C01",
   "type": "restore",
   "title": "Hala'ib Triangle",
-  "description": "UN Geodata 2023 draws this area inside Sudan. GAUL keeps it as its own entity, xHT. It is cut out along the UN line, and the islands off its coast go with it.",
+  "description": "UN Geodata 2023 draws this area inside Sudan. GAUL keeps it as its own entity, XHT. It is cut out along the UN line, and the islands off its coast go with it.",
   "keys": [
    [
     853,
@@ -34,7 +34,7 @@
   "id": "C02",
   "type": "restore",
   "title": "Bir Tawil",
-  "description": "UN Geodata 2023 draws this area inside Egypt. GAUL keeps it as its own entity, xMS. It is cut out along the UN line.",
+  "description": "UN Geodata 2023 draws this area inside Egypt. GAUL keeps it as its own entity, XMS. It is cut out along the UN line.",
   "keys": [
    [
     727,
@@ -65,7 +65,7 @@
   "id": "C03",
   "type": "restore",
   "title": "Ilemi Triangle",
-  "description": "UN Geodata 2023 draws this area inside South Sudan. GAUL keeps it as its own entity, xIT. It is cut out along the UN line.",
+  "description": "UN Geodata 2023 draws this area inside South Sudan. GAUL keeps it as its own entity, XIT. It is cut out along the UN line.",
   "keys": [
    [
     866,
@@ -90,8 +90,8 @@
  {
   "id": "C04",
   "type": "india_china",
-  "title": "India-China disputed areas (xxx)",
-  "description": "GAUL has one entity, xxx, made of four areas along the India-China line. UN Geodata 2023 has no lines for them and divides each between China, India, and Jammu and Kashmir. GAUL's outlines are the cuts, and each area stays separate on each side of the UN line.",
+  "title": "India-China disputed areas (XXX)",
+  "description": "GAUL has one entity, XXX, made of four areas along the India-China line. UN Geodata 2023 has no lines for them and divides each between China, India, and Jammu and Kashmir. GAUL's outlines are the cuts, and each area stays separate on each side of the UN line.",
   "keys": [
    [
     704,
@@ -141,7 +141,7 @@
   "id": "C14",
   "type": "un_error",
   "title": "Kuril Islands in the Russian Federation",
-  "description": "UN Geodata 2023 gives part of the Kuril Islands to the Russian Federation and the rest to its disputed code, xRI. GAUL has all of them in xKI, so both exports give the Russian Federation's part to xRI.",
+  "description": "UN Geodata 2023 gives part of the Kuril Islands to the Russian Federation and the rest to the disputed code XKI. GAUL has all of them in XKI, so both exports give the Russian Federation's part to XKI too.",
   "keys": [
    [
     850,
@@ -286,7 +286,7 @@
   "id": "C11a",
   "type": "split",
   "title": "Akrotiri",
-  "description": "GAUL has this area as its own entity. UN Geodata 2023 has one row, xUK, with both Akrotiri and Dekelia.",
+  "description": "GAUL has this area as its own entity. UN Geodata 2023 has one row, XUK, with both Akrotiri and Dekelia.",
   "keys": [
    [
     916,
@@ -301,7 +301,7 @@
   "id": "C11b",
   "type": "split",
   "title": "Dekelia",
-  "description": "GAUL has this area as its own entity. UN Geodata 2023 has one row, xUK, with both Akrotiri and Dekelia.",
+  "description": "GAUL has this area as its own entity. UN Geodata 2023 has one row, XUK, with both Akrotiri and Dekelia.",
   "keys": [
    [
     916,

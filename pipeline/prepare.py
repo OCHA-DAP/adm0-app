@@ -1,6 +1,7 @@
 """Normalize downloaded sources into GeoParquet under ``tmp/prepare/``."""
 
 import html
+import json
 import re
 from concurrent.futures import ThreadPoolExecutor
 from logging import getLogger
@@ -186,12 +187,49 @@ def wp(conn: DuckDBPyConnection) -> None:
     _gpkg(conn, path, "regexp_full_match(name, 'DoS_WP_\\d+_\\d+')", "wp_polygons")
 
 
+def _reefs(conn: DuckDBPyConnection) -> None:
+    """Build table ``reefs`` from the Overpass features in ``reefs.json``."""
+    path = download_dir / "osm/reefs.json"
+    rows = [
+        (
+            e["type"],
+            e["id"],
+            [
+                "LINESTRING("
+                + ", ".join(f"{p['lon']} {p['lat']}" for p in ring["geometry"])
+                + ")"
+                for ring in ([e] if e["type"] == "way" else e["members"])
+            ],
+        )
+        for e in json.loads(path.read_text())["elements"]
+    ]
+    conn.execute(
+        "CREATE TABLE reef_rings (osm_type VARCHAR, osm_id BIGINT, rings VARCHAR[])"
+    )
+    conn.executemany("INSERT INTO reef_rings VALUES (?, ?, ?)", rows)
+    conn.execute("""--sql
+        CREATE TABLE reefs AS
+        SELECT osm_type, osm_id, ST_BuildArea(ST_Collect(
+            list_transform(rings, lambda x: ST_GeomFromText(x)))) AS geom
+        FROM reef_rings
+    """)
+
+
 def osm(conn: DuckDBPyConnection) -> None:
-    """Copy OSM land polygons."""
+    """Copy OSM land polygons, with the reefs OSM leaves out of its land."""
     path = next((download_dir / "osm").rglob("land_polygons.shp"))
+    conn.execute(f"CREATE TABLE osm_shp AS SELECT geom FROM ST_Read('{path}')")
+    _reefs(conn)
+    touching = conn.execute("""--sql
+        SELECT list(r.osm_type || ' ' || r.osm_id) FROM reefs r JOIN osm_shp l
+          ON ST_Intersects(r.geom, l.geom)""").fetchall()[0][0]
+    if touching:
+        msg = f"OSM reefs intersect OSM land: {touching}"
+        raise ValueError(msg)
     _copy(
         conn,
-        f"SELECT row_number() OVER () AS fid, geom AS geometry FROM ST_Read('{path}')",
+        """SELECT row_number() OVER () AS fid, geom AS geometry FROM (
+            SELECT geom FROM osm_shp UNION ALL SELECT geom FROM reefs)""",
         "osm_land",
     )
 

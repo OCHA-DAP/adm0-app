@@ -24,7 +24,7 @@ logger = getLogger(__name__)
 CATALOG = root / "catalog"
 DIFFERENCES = ("differences", "differences_dots")
 TABLES = ("attributes", "items")
-BUILD_SITE = root / "outputs/build/08_site"
+BUILD_SITE = root / "outputs/build/09_site"
 HOST = {
     "name": "OCHA Centre for Humanitarian Data",
     "roles": ["host"],

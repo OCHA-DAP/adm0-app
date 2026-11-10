@@ -16,6 +16,10 @@ UN's own lines make the cuts wherever they exist. UN lines stop at the coast, so
 
 The India-China areas have no UN lines, so GAUL's outlines and line are used. The cut lines are stored with their source so each can be reviewed.
 
-## Extending last
+## Extending last, then the OSM coastline
 
-The units are extended into the water only after they have been reviewed. The resulting cells separate political divisions from the coastline, so a coastline becomes a final clip that can be swapped.
+The units are extended into the water only after they have been reviewed. The resulting cells separate political divisions from the coastline, so OSM land becomes a final clip that decides where land is, while the cells decide who holds it.
+
+The clip works per OSM polygon, so an island is never divided. A polygon with land of one unit goes to that unit whole. A polygon with land of several units (a mainland, or an island such as Hispaniola) is cut by their cells, whose lines on land are UN's own, so no UN Geodata land changes owner. A polygon with no UN Geodata land goes to the cell holding its inner point. UN Geodata land that touches no OSM land, such as reefs and the Caspian sectors, is dropped, and both are listed per entity.
+
+The cell of the reviewed units decides new islands, and FieldMaps' cells only check them. FieldMaps knows neither the curated changes nor the entities GAUL keeps, so following it would reopen settled ownership. Islands where the two agree need no review.

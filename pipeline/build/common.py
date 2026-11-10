@@ -31,7 +31,8 @@ STAGES = {
     "05": "units",
     "06": "export",
     "07": "extend",
-    "08": "site",
+    "08": "coast",
+    "09": "site",
 }
 
 

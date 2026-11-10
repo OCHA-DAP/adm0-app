@@ -25,6 +25,8 @@
     sweep,
     satellite,
     hasCells,
+    hasCoast,
+    coastPatches,
     names,
     onpick,
   }: {
@@ -42,6 +44,8 @@
     sweep: number;
     satellite: boolean;
     hasCells: boolean;
+    hasCoast: boolean;
+    coastPatches: string[];
     names: Record<string, string>;
     onpick: (hits: Hit[]) => void;
   } = $props();
@@ -59,7 +63,9 @@
     build_path_errors: `${tilesBase}/build/build_path_errors.pmtiles`,
     build_path_disputed: `${tilesBase}/build/build_path_disputed.pmtiles`,
     build_gaul: `${tilesBase}/build/build_gaul.pmtiles`,
+    build_coast_un: `${tilesBase}/build/build_coast_un.pmtiles`,
   });
+  const COAST_PATCHES = ["build_new_islands", "build_dropped"] as const;
   const PATCH_OPACITY = 0.45;
   const PARENT_OPACITY = 0.3;
   const CHANGE_OPACITY = 0.7;
@@ -102,12 +108,20 @@
         m.addLayer({ id: `pick-${id}`, type: "fill", source: id, "source-layer": id, layout: { visibility: "none" }, paint: { "fill-opacity": 0 } });
         m.addLayer({ id: `output-${id}`, type: "line", source: id, "source-layer": id, layout: { visibility: "none" }, paint: { "line-width": LINE_WIDTHS, "line-dasharray": LINE_DASH } });
       }
-      // Stage 08 writes no island tiles when the automatic check finds nothing.
+      // Stage 09 writes no island tiles when the automatic check finds nothing.
       if (hasCells) {
         m.addSource("build_cell_islands", { type: "vector", url: `pmtiles://${tilesBase}/build/build_cell_islands.pmtiles` });
         const islands = { source: "build_cell_islands", "source-layer": "build_cell_islands", filter: NOTHING } as const;
         m.addLayer({ ...islands, id: "cell-islands", type: "fill", paint: { "fill-color": SLOT_COLORS.b, "fill-opacity": CHANGE_OPACITY } });
         m.addLayer({ ...islands, id: "cell-focus", type: "line", paint: { "line-color": SLOT_COLORS.b, "line-width": 3 } });
+      }
+      if (hasCoast) {
+        COAST_PATCHES.forEach((id, i) => {
+          m.addSource(id, { type: "vector", url: `pmtiles://${tilesBase}/build/${id}.pmtiles` });
+          const color = i === 0 ? SLOT_COLORS.b : SLOT_COLORS.a;
+          m.addLayer({ id: `${id}-fill`, type: "fill", source: id, "source-layer": id, filter: NOTHING, paint: { "fill-color": color, "fill-opacity": CHANGE_OPACITY } });
+          m.addLayer({ id: `${id}-focus`, type: "line", source: id, "source-layer": id, filter: NOTHING, paint: { "line-color": color, "line-width": 3 } });
+        });
       }
       m.addSource("labels", { type: "geojson", data: `${tilesBase}/build/labels.geojson` });
       m.addLayer({ id: "unit-labels", type: "symbol", source: "labels", filter: NOTHING, layout: { "text-field": ["get", "text"], "text-font": ["Noto Sans Bold"], "text-size": 13, "text-padding": 24 }, paint: { "text-color": "#333333", "text-halo-color": "#FFFFFF", "text-halo-width": 2 } });
@@ -138,6 +152,12 @@
     map.setFilter("focus", change ? hasChange(change) : NOTHING);
     map.setFilter("parents", parents.length ? ["in", ["get", "objectid"], ["literal", parents]] : NOTHING);
     map.setFilter("step-changes", stepChanges.length ? ["any", ...stepChanges.map(hasChange)] : NOTHING);
+    if (hasCoast) {
+      for (const id of COAST_PATCHES) {
+        map.setFilter(`${id}-fill`, ["in", ["get", "change_id"], ["literal", coastPatches]]);
+        map.setFilter(`${id}-focus`, ["==", ["get", "change_id"], change ?? ""]);
+      }
+    }
     if (!hasCells) return;
     map.setFilter("cell-islands", ["in", ["get", "change_id"], ["literal", cells]]);
     map.setFilter("cell-focus", ["==", ["get", "change_id"], change ?? ""]);

@@ -248,14 +248,14 @@ un_objectid,un_iso3,un_name,gaul_id,gaul_code,gaul_name
 918,ZAF,South Africa,159,ZAF,South Africa
 919,ZMB,Zambia,168,ZMB,Zambia
 920,ZWE,Zimbabwe,169,ZWE,Zimbabwe
-906,xAB,Abyei,100,xAB,Abyei
-907,xAC,Aksai Chin,224,xAC,Aksai Chin
-908,xAP,,226,IND,Arunachal Pradesh
-909,xJK,Jammu and Kashmir,245,xJK,Jammu And Kashmir
-910,xJL,,239,xJL,Disputed Area(xJL)
-911,xPI,,262,xPI,Paracel Islands
-912,xRI,,249,xKI,Kuril Islands
-913,xSI,,270,xSI,Spratly Islands
-914,xSK,,268,xSK,Senkaku Islands
-915,xSR,,267,xSR,Scarborough Reef
-916,xUK,,296,xUK,Dekelia
+906,XAB,Abyei,100,XAB,Abyei
+907,XAC,Aksai Chin,224,XAC,Aksai Chin
+908,XAP,,226,IND,Arunachal Pradesh
+909,XJK,Jammu and Kashmir,245,XJK,Jammu And Kashmir
+910,XJL,,239,XJL,Disputed Area(XJL)
+911,XPI,,262,XPI,Paracel Islands
+912,XKI,,249,XKI,Kuril Islands
+913,XSI,,270,XSI,Spratly Islands
+914,XSK,,268,XSK,Senkaku Islands
+915,XSR,,267,XSR,Scarborough Reef
+916,XUK,,296,XUK,Dekelia

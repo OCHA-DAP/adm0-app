@@ -16,6 +16,9 @@
     values?: { un_objectid?: number; un: string; un_name: string; gaul: string; gaul_name: string; km2: number }[];
     largest_patch_bbox?: number[];
     review?: boolean;
+    gained_km2?: number;
+    lost_km2?: number;
+    islands?: number;
   }
   interface Step {
     id: string;
@@ -27,7 +30,9 @@
     labels?: boolean;
   }
   const MIN_LINE_KM2 = 10;
-  const km2 = new Intl.NumberFormat("en", { maximumFractionDigits: 1 });
+  const MIN_KM2 = 0.05;
+  const km2Format = new Intl.NumberFormat("en", { maximumFractionDigits: 1 });
+  const km2 = { format: (v: number) => (v > 0 && v < MIN_KM2 ? "<0.1" : km2Format.format(v)) };
 
   let tilesBase = $state<string | null>(null);
   let steps = $state.raw<Step[]>([]);
@@ -45,7 +50,8 @@
   const border = $derived(change?.type === "line_update" ? change.id.slice(2).split("-") : null);
   const byArea = (a: Change, b: Change) => (b.km2 ?? 0) - (a.km2 ?? 0);
   const stepChanges = (s: Step) => {
-    const list = changes.filter((c) => s.types.includes(c.type));
+    const list = changes.filter((c) => s.types.includes(c.type) && !(c.type === "coast" && (c.km2 ?? 0) < MIN_KM2));
+    if (s.types.some((t) => COAST_TYPES.includes(t))) return list.sort((a, b) => Number(!!b.review) - Number(!!a.review) || byArea(a, b));
     return s.types.includes("un_error") ? list.sort(byArea) : list;
   };
   const unitChanges = $derived(step?.compare ? stepChanges(step).filter((c) => c.units > 0).map((c) => c.id) : []);
@@ -57,18 +63,28 @@
     if (!values.length) return { before: [], after: [] };
     return { before: sources, after: [entity(values[0].gaul, values[0].gaul_name)] };
   }
+  const COAST_TYPES = ["coast", "new_island", "un_only"];
+  const isCoast = (c: Change) => COAST_TYPES.includes(c.type);
+  const coastDetail = (c: Change) =>
+    c.type === "coast"
+      ? `+${km2.format(c.gained_km2 ?? 0)} / −${km2.format(c.lost_km2 ?? 0)} km²`
+      : c.type === "new_island"
+        ? `${km2Format.format(c.islands ?? 0)} ${c.islands === 1 ? "island" : "islands"}${c.id.split("-").length > 2 ? ` · ${c.id.split("-").slice(2).join("-")}` : ""}`
+        : "Dropped";
+  const coastHead: Record<string, string> = { coast: "Gained / lost", new_island: "Added", un_only: "OSM lacks" };
+  const coastPatches = $derived(step ? stepChanges(step).filter((c) => c.type === "new_island" || c.type === "un_only").map((c) => c.id) : []);
   const listedChanges = (s: Step) => stepChanges(s).filter((c) => allLines || !isSmallLine(c));
 
   $effect(() => {
     if (!tilesBase) return;
     const load = (name: string) => fetch(`${tilesBase}/build/${name}.json`).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
-    Promise.all([load("path"), load("changes"), load("names")])
-      .then(([p, c, n]) => {
+    Promise.all([load("path"), load("changes")])
+      .then(([p, c]) => {
         steps = p;
         changes = c;
-        names = n;
       })
       .catch(() => (failed = true));
+    load("names").then((n) => (names = n), () => {});
   });
 
   $effect(() => {
@@ -118,7 +134,9 @@
                 {#if listedChanges(s).length}
                   <ul>
                     {#each listedChanges(s) as c, i (c.id)}
-                      {#if i === 0 && c.type !== "line_update"}
+                      {#if isCoast(c) && (i === 0 || listedChanges(s)[i - 1].type !== c.type)}
+                        <li class="own-head"><span class="own"><span>Entity</span><span>{coastHead[c.type]}</span></span><span class="km2">Area</span></li>
+                      {:else if i === 0 && c.type !== "line_update" && !isCoast(c)}
                         <li class="own-head"><span class="own"><span>UN Geodata</span><span>{c.type === "un_error" ? "Corrected" : "GAUL"}</span></span><span class="km2">Area</span></li>
                       {/if}
                       <li>
@@ -126,6 +144,9 @@
                           <span class="head">
                             {#if c.type === "line_update"}
                               {c.id.slice(2).replace("-", " | ")}
+                            {:else if isCoast(c)}
+                              {@const v = c.values?.[0]}
+                              <span class="own" title={c.title}><span>{#if v}{@render entities([entity(v.un, v.un_name)])}{/if}</span><span class:review={c.review}>{coastDetail(c)}</span></span>
                             {:else}
                               {@const side = sides(c)}
                               <span class="own" title={c.values?.map((v) => `${v.un_name} → ${v.gaul_name}: ${km2.format(v.km2)} km²`).join("\n")}><span>{@render entities(side.before)}</span><span>{@render entities(side.after)}</span></span>
@@ -159,7 +180,7 @@
           {/if}
         </div>
         {#if changes.length}
-          <BuildMap change={change?.id ?? null} bbox={change?.largest_patch_bbox ?? change?.bbox ?? null} overview={change?.largest_patch_bbox ? change.bbox : null} {tilesBase} compare={step?.compare ?? null} stepChanges={unitChanges} parents={[...new Set(change?.values?.flatMap((v) => v.un_objectid ?? []) ?? [])]} labels={step?.labels ? stepChanges(step).map((c) => c.id) : []} cells={step ? stepChanges(step).filter((c) => c.type === "cell_island" || c.review).map((c) => c.id) : []} legend={step?.legend ?? []} {border} sweep={compare.sweep} satellite={compare.basemap === "satellite"} hasCells={changes.some((c) => c.review)} {names} onpick={(hits: Hit[]) => (compare.hits = hits)} />
+          <BuildMap change={change?.id ?? null} bbox={change?.largest_patch_bbox ?? change?.bbox ?? null} overview={change?.largest_patch_bbox ? change.bbox : null} {tilesBase} compare={step?.compare ?? null} stepChanges={unitChanges} parents={[...new Set(change?.values?.flatMap((v) => v.un_objectid ?? []) ?? [])]} labels={step?.labels ? stepChanges(step).map((c) => c.id) : []} cells={step ? stepChanges(step).filter((c) => c.type === "cell_island" || (c.review && !isCoast(c))).map((c) => c.id) : []} legend={step?.legend ?? []} {border} sweep={compare.sweep} satellite={compare.basemap === "satellite"} hasCells={changes.some((c) => c.review && !isCoast(c))} hasCoast={changes.some(isCoast)} {coastPatches} {names} onpick={(hits: Hit[]) => (compare.hits = hits)} />
         {/if}
         <HitsPanel {compare} inset={0} />
       </div>
@@ -347,6 +368,10 @@
     margin-left: auto;
     color: var(--brand-grey--text);
     text-align: right;
+  }
+  .review {
+    color: var(--brand-primary--text);
+    font-weight: 600;
   }
   .stage {
     position: relative;

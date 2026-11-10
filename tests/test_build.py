@@ -1,6 +1,7 @@
 """Check the built build layer against the promises the crosswalk makes."""
 
 import json
+import re
 
 import pytest
 from duckdb import DuckDBPyConnection, connect
@@ -111,8 +112,8 @@ def test_line_patches_cover_the_borders(conn: DuckDBPyConnection) -> None:
 
 
 def test_review_decisions_apply() -> None:
-    """Removed pairs are gone, and codes GAUL links to UN codes raise no row."""
+    """Removed pairs are gone, and no change id carries a lower-case x code."""
     rows = json.loads((stage_dir("05") / "changes.json").read_text())
     ids = {r["id"] for r in rows}
-    assert "E-xSR-PHL" not in ids
-    assert not ids & {"E-xRI-XKI", "L-xKI-xRI"}
+    assert "E-XSR-PHL" not in ids
+    assert not [i for i in ids if re.search(r"\bx[A-Z]{2}\b", i)]
