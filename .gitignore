@@ -1,6 +1,7 @@
 .venv/
 __pycache__/
 tmp/
+.tmp/
 outputs/
 .env
 node_modules/

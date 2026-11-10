@@ -1,5 +1,5 @@
 un,fieldmaps,action,reason
-xSR,PHL,remove,FieldMaps has no land here so its Voronoi cell only fills the sea
+XSR,PHL,remove,FieldMaps has no land here so its Voronoi cell only fills the sea
 RUS,XKI,remove,Same land as C14
 IND,PAK,remove,False positive
 LKA,IND,remove,False positive

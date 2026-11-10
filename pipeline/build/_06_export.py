@@ -28,25 +28,30 @@ UN_ROWS, GAUL_ROWS = 264, 276
 PATH_OUTPUTS = {"errors": "path_errors", "disputed": "path_disputed"}
 
 
-def _dissolve(key: str) -> str:
+def _dissolve(key: str, units: str | None = None) -> str:
     return f"""--sql
         SELECT {key}, ST_Multi(ST_CollectionExtract(ST_Union_Agg(geometry), 3))
             AS geometry
-        FROM '{data("05", "units")}' GROUP BY 1"""
+        FROM '{units or data("05", "units")}' GROUP BY 1"""
 
 
-def _sources(conn: DuckDBPyConnection) -> None:
-    """Add the entities changes create to both sources, keyed like the dissolves."""
-    rows = [(e["code"], e["name"]) for c in changes() if (e := c.get("entity"))]
-    conn.execute("CREATE TABLE entities (code VARCHAR, name VARCHAR)")
-    conn.executemany("INSERT INTO entities VALUES (?, ?)", rows)
-    units = data("05", "units")
+def _sources(conn: DuckDBPyConnection, units: str, extra: tuple) -> None:
+    """Add the entities changes and ``extra`` create to both sources, keyed by code."""
+    rows = [
+        (e["code"], e["name"], None, None) for c in changes() if (e := c.get("entity"))
+    ]
+    conn.execute(
+        "CREATE TABLE entities (code VARCHAR, name VARCHAR, stscod SMALLINT, "
+        "status_label VARCHAR)"
+    )
+    conn.executemany("INSERT INTO entities VALUES (?, ?, ?, ?)", [*rows, *extra])
     conn.execute(f"""--sql
         CREATE TABLE un_src AS
         SELECT 'UN ' || objectid AS key, * EXCLUDE geometry
         FROM '{data("01", "un_polygons")}'
         UNION ALL BY NAME
-        SELECT 'NEW ' || code AS key, code AS iso3cd, name AS romnam, name AS maplab
+        SELECT 'NEW ' || code AS key, code AS iso3cd, name AS romnam, name AS maplab,
+               stscod, status_label
         FROM entities;
         CREATE TABLE gaul_src AS
         SELECT 'GAUL ' || gaul_id AS key, * EXCLUDE geometry
@@ -57,6 +62,25 @@ def _sources(conn: DuckDBPyConnection) -> None:
         FROM entities
         WHERE code IN (SELECT entity FROM '{units}' WHERE gaul_id IS NULL);
     """)
+
+
+def exports(
+    conn: DuckDBPyConnection, units: str, un: str, gaul: str, extra: tuple = ()
+) -> None:
+    """Dissolve ``units`` by key, adding (code, name, stscod, status) ``extra``."""
+    _sources(conn, units, extra)
+    for path, src, key in (
+        (un, "un_src", "coalesce('NEW ' || entity, 'UN ' || un_owner)"),
+        (gaul, "gaul_src", "coalesce('GAUL ' || gaul_id, 'NEW ' || entity)"),
+    ):
+        write_parquet(
+            conn,
+            f"""--sql
+            SELECT s.* EXCLUDE key, d.geometry
+            FROM ({_dissolve(f"{key} AS key", units)}) d
+            JOIN {src} s USING (key)""",
+            Path(path),
+        )
 
 
 def _path_state(types: list[str]) -> str:
@@ -185,19 +209,7 @@ def main() -> None:
         return
     conn = connect()
     un, gaul = data("06", "un"), data("06", "gaul")
-    _sources(conn)
-    for path, src, key in (
-        (un, "un_src", "coalesce('NEW ' || entity, 'UN ' || un_owner)"),
-        (gaul, "gaul_src", "coalesce('GAUL ' || gaul_id, 'NEW ' || entity)"),
-    ):
-        write_parquet(
-            conn,
-            f"""--sql
-            SELECT s.* EXCLUDE key, d.geometry
-            FROM ({_dissolve(f"{key} AS key")}) d
-            JOIN {src} s USING (key)""",
-            Path(path),
-        )
+    exports(conn, data("05", "units"), un, gaul)
     _path_outputs(conn)
     checks = _checks(conn, un, gaul)
     (stage_dir("06") / "checks.json").write_text(

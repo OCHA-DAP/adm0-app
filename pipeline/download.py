@@ -34,6 +34,9 @@ GAUL_URL = (
 LAND_OSM_URL = (
     "https://osmdata.openstreetmap.de/download/land-polygons-complete-4326.zip"
 )
+OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+# Scarborough Shoal and Minerva Reefs: mapped as reefs, so absent from OSM land.
+OSM_REEFS = {"way": (43145194, 43145209), "relation": (18554868,)}
 LAND_WP_URL = "https://data.geodata.state.gov/WorldPolygons.zip"
 LSIB_URL = "https://data.geodata.state.gov/LSIB.gpkg"
 LSIB_META_URL = "https://geodata.state.gov/geonetwork/srv/api/records/3bdb81a0-c1b9-439a-a0b1-85dac30c59b2"
@@ -112,6 +115,33 @@ def _zip(
     return date
 
 
+@_retry
+def _reefs(out: Path) -> None:
+    """Write the ``OSM_REEFS`` features with their geometry to ``reefs.json``."""
+    ids = "".join(f"{t}(id:{','.join(map(str, v))});" for t, v in OSM_REEFS.items())
+    with _client() as client:
+        r = client.post(
+            OVERPASS_URL,
+            data={"data": f"[out:json][timeout:60];({ids});out geom;"},
+            timeout=Timeout(120, connect=30),
+            # Overpass answers 406 to browser-like user agents.
+            headers={"User-Agent": "adm0-site"},
+        )
+        r.raise_for_status()
+    found = {(e["type"], e["id"]) for e in r.json()["elements"]}
+    expected = {(t, i) for t, v in OSM_REEFS.items() for i in v}
+    if found != expected:
+        msg = f"Overpass reefs missing: {sorted(expected - found)}"
+        raise ValueError(msg)
+    (out / "reefs.json").write_text(r.text)
+
+
+def _osm(out: Path) -> str:
+    date = _zip(LAND_OSM_URL, out, required=True)
+    _reefs(out)
+    return date
+
+
 def _wp(out: Path) -> str:
     # The outer zip also ships a Deflate64 hash .txt that zipfile can't read.
     _zip(LAND_WP_URL, out, only="*WorldPolygon*.zip")
@@ -178,7 +208,7 @@ def main() -> None:
     jobs = {
         "gaul": partial(_zip, GAUL_URL),
         "lsib": _lsib,
-        "osm": partial(_zip, LAND_OSM_URL, required=True),
+        "osm": _osm,
         "wp": _wp,
         "ref": _ref,
         "fieldmaps": _fieldmaps,

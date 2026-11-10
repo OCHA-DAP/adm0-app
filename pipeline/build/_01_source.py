@@ -2,6 +2,7 @@
 
 from logging import getLogger
 from pathlib import Path
+from shutil import copy2
 from typing import TYPE_CHECKING
 
 from pipeline.config import prepare_dir, write_parquet
@@ -20,6 +21,29 @@ SOURCES = {
     "gaul_voronoi": "gaul_voronoi",
     "fieldmaps_voronoi": "fieldmaps_voronoi",
 }
+CODE_COLUMNS = {
+    "un_polygons": ["iso3cd", "isoclr"],
+    "un_lines": ["iso3cd"],
+    "gaul_polygons": ["ISO3_CODE", "MAP_CODE"],
+    "gaul_voronoi": ["ISO3_CODE", "MAP_CODE"],
+}
+# ISO 3166-1 user-assigned codes are upper case; GAUL and FieldMaps code the Kurils XKI.
+CODE_RENAMES = {"xRI": "XKI"}
+# Copied byte for byte: rewriting 79M vertices of OSM land would take minutes.
+COPIES = {"osm_land": "osm_land"}
+
+
+def _coded(name: str, path: Path) -> str:
+    """Select a source with its lower-case x codes as user-assigned codes."""
+    renames = "".join(f"WHEN '{a}' THEN '{b}' " for a, b in CODE_RENAMES.items())
+    fixed = [
+        f"""CASE {col} {renames}
+            ELSE CASE WHEN regexp_full_match({col}, 'x[A-Za-z]{{2}}') THEN upper({col})
+                 ELSE {col} END END AS {col}"""
+        for col in CODE_COLUMNS.get(name, [])
+    ]
+    replace = f" REPLACE ({', '.join(fixed)})" if fixed else ""
+    return f"SELECT *{replace} FROM '{path}'"
 
 
 def _subdivided(rows: str) -> str:
@@ -63,11 +87,14 @@ def _line_overlaps(conn: DuckDBPyConnection) -> None:
 def main() -> None:
     """Copy each source into the stage folder and overlap GAUL with UN Geodata."""
     paths = [prepare_dir / f"{src}.parquet" for src in SOURCES.values()]
-    if all(unchanged("01", p) for p in [Path(__file__), *paths]):
+    copies = [prepare_dir / f"{src}.parquet" for src in COPIES.values()]
+    if all(unchanged("01", p) for p in [Path(__file__), *paths, *copies]):
         logger.info("stage 01: inputs unchanged")
         return
     conn = connect()
     for name, path in zip(SOURCES, paths, strict=True):
-        write_parquet(conn, f"SELECT * FROM '{path}'", Path(data("01", name)))
+        write_parquet(conn, _coded(name, path), Path(data("01", name)))
+    for name, path in zip(COPIES, copies, strict=True):
+        copy2(path, data("01", name))
     _line_overlaps(conn)
-    finish(conn, "01", [Path(__file__), *paths])
+    finish(conn, "01", [Path(__file__), *paths, *copies])
