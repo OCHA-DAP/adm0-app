@@ -1,0 +1,650 @@
+{
+ "C01": {
+  "title": "Hala'ib Triangle",
+  "method": "UN line, then island attribution",
+  "source": "UN Geodata bndl (Egypt-Sudan lines)",
+  "text": "Egypt claims Hala'ib under the 22nd parallel of the 1899 agreement, and Sudan under the 1902 administrative line. Egypt has run the area since the 1990s.",
+  "sources": [
+   {
+    "title": "UN Security Council, 812th meeting, S/PV.812 (1958)",
+    "url": "https://documents.un.org/doc/undoc/gen/n58/182/92/pdf/n5818292.pdf"
+   },
+   {
+    "title": "Letter from Sudan to the Security Council, S/2017/791",
+    "url": "https://documents.un.org/doc/undoc/gen/n17/292/87/pdf/n1729287.pdf"
+   },
+   {
+    "title": "Letter from Egypt to the Security Council, S/2017/953",
+    "url": "https://documents.un.org/doc/undoc/gen/n17/383/61/pdf/n1738361.pdf"
+   }
+  ]
+ },
+ "C02": {
+  "title": "Bir Tawil",
+  "method": "UN line",
+  "source": "UN Geodata bndl (Egypt-Sudan lines)",
+  "text": "Each country's line from the Hala'ib dispute gives Bir Tawil to the other, so neither claims it.",
+  "sources": [
+   {
+    "title": "US Department of State, International Boundary Study No. 18, Egypt-Sudan boundary (1962)",
+    "url": "https://library.law.fsu.edu/Digital-Collections/LimitsinSeas/pdf/ibs018.pdf"
+   },
+   {
+    "title": "Bir Tawil, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Bir_Tawil"
+   }
+  ]
+ },
+ "C03": {
+  "title": "Ilemi Triangle",
+  "method": "UN line",
+  "source": "UN Geodata bndl (Kenya-South Sudan lines)",
+  "text": "Kenya administers the Ilemi Triangle up to the 1950 patrol line, and South Sudan disputes it. The two agreed in 2019 to set up a joint border commission but have not settled the border.",
+  "sources": [
+   {
+    "title": "Ilemi Triangle, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Ilemi_Triangle"
+   },
+   {
+    "title": "East African Herald, 2019",
+    "url": "https://www.eastafricanherald.com/politics/2019/7/2/kenya-south-sudan-to-establish-joint-border-commission"
+   },
+   {
+    "title": "Eye Radio, 2019",
+    "url": "https://www.eyeradio.org/s-sudan-kenya-sign-new-mou-on-illemi-and-cross-border-relations/"
+   }
+  ]
+ },
+ "C04": {
+  "title": "India-China disputed areas (XXX)",
+  "method": "GAUL outline as cut line",
+  "source": "GAUL 2025 entity 238",
+  "text": "China holds Aksai Chin, which India claims, and India administers Arunachal Pradesh, which China claims. Agreements in 1993 and 1996 keep both sides to the Line of Actual Control without settling the boundary.",
+  "sources": [
+   {
+    "title": "India-China Agreement on the Line of Actual Control (1993), UN Peacemaker",
+    "url": "https://peacemaker.un.org/sites/default/files/document/files/2024/05/cn20in930907agreement20on20india-china20border20areas.pdf"
+   },
+   {
+    "title": "India-China Agreement on Confidence-Building Measures along the Line of Actual Control (1996), UN Peacemaker",
+    "url": "https://peacemaker.un.org/sites/default/files/document/files/2024/05/cn20in961129agreement20between20china20and20india.pdf"
+   },
+   {
+    "title": "Al Jazeera, 2023",
+    "url": "https://www.aljazeera.com/news/2023/8/30/india-lodges-protest-with-china-over-map-claiming-border-territory"
+   }
+  ]
+ },
+ "C05": {
+  "title": "India-China line between Nepal and Bhutan",
+  "method": "GAUL line as cut line, ends joined to the UN boundary",
+  "source": "GAUL 2025 boundary between entities 234 and 240",
+  "text": "The 1890 Anglo-Chinese Convention set this Sikkim section of the India-China border on the watershed between the Teesta and the Mochu.",
+  "sources": [
+   {
+    "title": "Convention between Great Britain and China relating to Sikkim and Tibet (1890), UK Treaty Series 1894 No. 11",
+    "url": "https://web.archive.org/web/20170709135501/http://treaties.fco.gov.uk/docs/pdf/1894/TS0011.pdf"
+   }
+  ]
+ },
+ "C14": {
+  "title": "Kuril Islands in the Russian Federation",
+  "method": "UN disputed code",
+  "source": "UN Geodata 2023",
+  "text": "The Soviet Union took the southern Kurils in 1945. Russia administers them, and Japan claims them.",
+  "sources": [
+   {
+    "title": "Treaty of Peace with Japan (1951), UN Treaty Series No. 1832",
+    "url": "https://treaties.un.org/doc/Publication/UNTS/Volume%20136/volume-136-I-1832-English.pdf"
+   },
+   {
+    "title": "Joint Declaration by the USSR and Japan (1956), UN Treaty Series No. 3768",
+    "url": "https://treaties.un.org/doc/Publication/UNTS/Volume%20263/v263.pdf#page=126"
+   }
+  ]
+ },
+ "C07a": {
+  "title": "Bassas da India",
+  "method": "island attribution",
+  "source": "UN Geodata and GAUL polygons",
+  "text": "Bassas da India is one of France's Scattered Islands in the Mozambique Channel, a district of the French Southern and Antarctic Lands, and Madagascar claims it.",
+  "sources": [
+   {
+    "title": "UN General Assembly resolution 34/91 (1979)",
+    "url": "https://documents.un.org/doc/resolution/gen/nr0/377/18/pdf/nr037718.pdf"
+   },
+   {
+    "title": "IEDOM, Portrait des TAAF",
+    "url": "https://www.iedom.fr/IMG/pdf/portrait_des_taaf_vf-2.pdf"
+   }
+  ]
+ },
+ "C07b": {
+  "title": "Europa Island",
+  "method": "island attribution",
+  "source": "UN Geodata and GAUL polygons",
+  "text": "Europa Island is one of France's Scattered Islands in the Mozambique Channel, a district of the French Southern and Antarctic Lands, and Madagascar claims it.",
+  "sources": [
+   {
+    "title": "UN General Assembly resolution 34/91 (1979)",
+    "url": "https://documents.un.org/doc/resolution/gen/nr0/377/18/pdf/nr037718.pdf"
+   },
+   {
+    "title": "IEDOM, Portrait des TAAF",
+    "url": "https://www.iedom.fr/IMG/pdf/portrait_des_taaf_vf-2.pdf"
+   }
+  ]
+ },
+ "C07c": {
+  "title": "Glorioso Islands",
+  "method": "island attribution",
+  "source": "UN Geodata and GAUL polygons",
+  "text": "The Glorioso Islands are one of France's Scattered Islands in the Mozambique Channel, a district of the French Southern and Antarctic Lands, and Madagascar claims them.",
+  "sources": [
+   {
+    "title": "UN General Assembly resolution 34/91 (1979)",
+    "url": "https://documents.un.org/doc/resolution/gen/nr0/377/18/pdf/nr037718.pdf"
+   },
+   {
+    "title": "IEDOM, Portrait des TAAF",
+    "url": "https://www.iedom.fr/IMG/pdf/portrait_des_taaf_vf-2.pdf"
+   }
+  ]
+ },
+ "C07d": {
+  "title": "Juan de Nova Island",
+  "method": "island attribution",
+  "source": "UN Geodata and GAUL polygons",
+  "text": "Juan de Nova is one of France's Scattered Islands in the Mozambique Channel, a district of the French Southern and Antarctic Lands, and Madagascar claims it.",
+  "sources": [
+   {
+    "title": "UN General Assembly resolution 34/91 (1979)",
+    "url": "https://documents.un.org/doc/resolution/gen/nr0/377/18/pdf/nr037718.pdf"
+   },
+   {
+    "title": "IEDOM, Portrait des TAAF",
+    "url": "https://www.iedom.fr/IMG/pdf/portrait_des_taaf_vf-2.pdf"
+   }
+  ]
+ },
+ "C07e": {
+  "title": "Tromelin Island",
+  "method": "island attribution",
+  "source": "UN Geodata and GAUL polygons",
+  "text": "Tromelin, east of Madagascar, is one of France's Scattered Islands, a district of the French Southern and Antarctic Lands, and Mauritius claims it.",
+  "sources": [
+   {
+    "title": "Note from France to the UN Secretary-General on Tromelin (2009), UN DOALOS",
+    "url": "https://www.un.org/depts/los/LEGISLATIONANDTREATIES/PDFFILES/DEPOSIT/communicationsredeposit/mzn63_2008_fra_en.pdf"
+   },
+   {
+    "title": "Note from Mauritius to the UN Secretary-General on Tromelin (2011), UN DOALOS",
+    "url": "https://www.un.org/depts/los/LEGISLATIONANDTREATIES/PDFFILES/DEPOSIT/communicationsredeposit/mzn63_2008_mus2.pdf"
+   },
+   {
+    "title": "IEDOM, Portrait des TAAF",
+    "url": "https://www.iedom.fr/IMG/pdf/portrait_des_taaf_vf-2.pdf"
+   }
+  ]
+ },
+ "C08": {
+  "title": "Chagos Archipelago",
+  "method": "island attribution",
+  "source": "UN Geodata and GAUL polygons",
+  "text": "The United Kingdom runs the Chagos Archipelago as the British Indian Ocean Territory, and Mauritius claims it. A 2025 treaty would recognise Mauritian sovereignty and let the United Kingdom keep the Diego Garcia base for 99 years, but it is not in force.",
+  "sources": [
+   {
+    "title": "ICJ advisory opinion on the Chagos Archipelago (2019)",
+    "url": "https://www.icj-cij.org/case/169"
+   },
+   {
+    "title": "UN General Assembly resolution 73/295 (2019)",
+    "url": "https://documents.un.org/api/symbol/access?s=A/RES/73/295&l=en&t=pdf"
+   },
+   {
+    "title": "UK-Mauritius agreement concerning the Chagos Archipelago (2025), not in force",
+    "url": "https://assets.publishing.service.gov.uk/media/682f25afc054883884bff42a/CS_Mauritius_1.2025_Agreement_Chagos_Diego_Garcia.pdf"
+   },
+   {
+    "title": "Al Jazeera, 2 October 2026",
+    "url": "https://www.aljazeera.com/news/2026/10/2/uk-mauritius-chagos-sovereignty-deal-stalls-amid-fears-of-further-delays"
+   }
+  ]
+ },
+ "C09": {
+  "title": "Ashmore and Cartier Islands",
+  "method": "island attribution",
+  "source": "UN Geodata and GAUL polygons",
+  "text": "Ashmore and Cartier Islands are an Australian external territory in the Timor Sea, where a 1974 agreement lets traditional Indonesian fishers work.",
+  "sources": [
+   {
+    "title": "Ashmore and Cartier Islands Acceptance Act 1933",
+    "url": "https://www.legislation.gov.au/C1933A00060/latest"
+   },
+   {
+    "title": "Australia-Indonesia memorandum of understanding on traditional fishermen (1974), FAOLEX",
+    "url": "https://faolex.fao.org/docs/pdf/bi-1631.pdf"
+   }
+  ]
+ },
+ "C10": {
+  "title": "Clipperton Island",
+  "method": "island attribution",
+  "source": "UN Geodata and GAUL polygons",
+  "text": "Clipperton is a French possession in the eastern Pacific under the direct authority of the French government, which delegates powers there to the High Commissioner in French Polynesia.",
+  "sources": [
+   {
+    "title": "Arbitral award on Clipperton Island (1931), UN Reports of International Arbitral Awards",
+    "url": "https://legal.un.org/riaa/cases/vol_II/1105-1111.pdf"
+   },
+   {
+    "title": "French National Assembly, report No. 4219 on the status of Clipperton (2016)",
+    "url": "https://www.assemblee-nationale.fr/14/pdf/rapports/r4219.pdf"
+   }
+  ]
+ },
+ "C11a": {
+  "title": "Akrotiri",
+  "method": "island attribution",
+  "source": "UN Geodata and GAUL polygons",
+  "text": "Akrotiri is one of the two Sovereign Base Areas the United Kingdom kept in Cyprus under the 1960 Treaty of Establishment.",
+  "sources": [
+   {
+    "title": "Treaty concerning the Establishment of the Republic of Cyprus (1960), UN Treaty Series No. 5476",
+    "url": "https://treaties.un.org/doc/Publication/UNTS/Volume%20382/v382.pdf#page=20"
+   }
+  ]
+ },
+ "C11b": {
+  "title": "Dekelia",
+  "method": "island attribution",
+  "source": "UN Geodata and GAUL polygons",
+  "text": "Dekelia is one of the two Sovereign Base Areas the United Kingdom kept in Cyprus under the 1960 Treaty of Establishment.",
+  "sources": [
+   {
+    "title": "Treaty concerning the Establishment of the Republic of Cyprus (1960), UN Treaty Series No. 5476",
+    "url": "https://treaties.un.org/doc/Publication/UNTS/Volume%20382/v382.pdf#page=20"
+   }
+  ]
+ },
+ "C12": {
+  "title": "Northern Ireland",
+  "method": "merge",
+  "source": "UN Geodata and GAUL attributes",
+  "text": "ISO 3166 lists the United Kingdom of Great Britain and Northern Ireland as one country (GB), with Northern Ireland as its subdivision GB-NIR.",
+  "sources": [
+   {
+    "title": "ISO 3166: GB",
+    "url": "https://www.iso.org/obp/ui/#iso:code:3166:GB"
+   },
+   {
+    "title": "UN M49 standard country list",
+    "url": "https://unstats.un.org/unsd/methodology/m49/"
+   }
+  ]
+ },
+ "C15": {
+  "title": "China parts that likely belong to Taiwan Province of China",
+  "method": "island attribution",
+  "source": "UN Geodata",
+  "text": "Kinmen, Lieyu and the Matsu islands lie off Fujian and are administered from Taipei.",
+  "sources": [
+   {
+    "title": "Kinmen, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Kinmen"
+   },
+   {
+    "title": "Matsu Islands, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Matsu_Islands"
+   }
+  ]
+ },
+ "C16": {
+  "title": "China parts that likely belong to Democratic People's Republic of Korea",
+  "method": "island attribution",
+  "source": "UN Geodata",
+  "text": "The 1962 China-DPRK border treaty gave each river island to the side whose people lived on or farmed it, otherwise to the nearer bank, and most Yalu islands went to the DPRK.",
+  "sources": [
+   {
+    "title": "China-DPRK boundary treaty (1962), Chinese Wikisource",
+    "url": "https://zh.wikisource.org/wiki/%E4%B8%AD%E5%8D%8E%E4%BA%BA%E6%B0%91%E5%85%B1%E5%92%8C%E5%9B%BD%E5%92%8C%E6%9C%9D%E9%B2%9C%E6%B0%91%E4%B8%BB%E4%B8%BB%E4%B9%89%E4%BA%BA%E6%B0%91%E5%85%B1%E5%92%8C%E5%9B%BD%E8%BE%B9%E7%95%8C%E6%9D%A1%E7%BA%A6"
+   },
+   {
+    "title": "China-North Korea border, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/China%E2%80%93North_Korea_border"
+   },
+   {
+    "title": "Hwanggumpyong Island, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Hwanggumpyong_Island"
+   }
+  ]
+ },
+ "C17": {
+  "title": "Finland parts that likely belong to Åland Islands",
+  "method": "island attribution",
+  "source": "UN Geodata",
+  "text": "In 1921 the League of Nations left Åland with Finland as a self-governing territory, and the Åland Convention of 20 October 1921 neutralised it. ISO 3166 lists it on its own (AX).",
+  "sources": [
+   {
+    "title": "Åland Convention (1921), League of Nations Treaty Series No. 255",
+    "url": "https://treaties.un.org/doc/Publication/UNTS/LON/Volume%209/v9.pdf#page=213"
+   },
+   {
+    "title": "ISO 3166: AX",
+    "url": "https://www.iso.org/obp/ui/#iso:code:3166:AX"
+   },
+   {
+    "title": "UN M49 standard country list",
+    "url": "https://unstats.un.org/unsd/methodology/m49/"
+   }
+  ]
+ },
+ "C18": {
+  "title": "Micronesia (Federated States of) parts that likely belong to Marshall Islands",
+  "method": "island attribution",
+  "source": "UN Geodata",
+  "text": "Enewetak and Ujelang are the westernmost atolls of the Marshall Islands.",
+  "sources": [
+   {
+    "title": "Marshall Islands baselines and maritime zones (2016), M.Z.N.120.2016.LOS, UN DOALOS",
+    "url": "https://www.un.org/depts/los/LEGISLATIONANDTREATIES/PDFFILES/DEPOSIT/mhl_mzn120_2016_2.pdf"
+   },
+   {
+    "title": "Micronesia-Marshall Islands maritime boundary treaty (2006), UN DOALOS",
+    "url": "https://www.un.org/depts/los/LEGISLATIONANDTREATIES/PDFFILES/FSM-RMI.pdf"
+   }
+  ]
+ },
+ "C19": {
+  "title": "Russian Federation parts that likely belong to Ukraine",
+  "method": "island attribution",
+  "source": "UN Geodata",
+  "text": "Tuzla Island in the Kerch Strait is part of Crimea, which Russia has held since 2014. UN General Assembly resolution 68/262 calls on states not to recognise any change to Crimea's status.",
+  "sources": [
+   {
+    "title": "UN General Assembly resolution 68/262 (2014)",
+    "url": "https://documents.un.org/doc/undoc/gen/n13/455/17/pdf/n1345517.pdf"
+   }
+  ]
+ },
+ "C20": {
+  "title": "Bonaire parts that likely belong to Venezuela (Bolivarian Republic Of)",
+  "method": "island attribution",
+  "source": "UN Geodata",
+  "text": "The 1978 Venezuela-Netherlands boundary treaty puts Las Aves (Aves de Sotavento), east of Bonaire, on Venezuela's side.",
+  "sources": [
+   {
+    "title": "Venezuela-Netherlands boundary delimitation treaty (1978), UN DOALOS",
+    "url": "https://static.un.org/depts/los/LEGISLATIONANDTREATIES/PDFFILES/TREATIES/VEN-NLD1978BD.PDF"
+   }
+  ]
+ },
+ "C21": {
+  "title": "Angola parts that likely belong to Democratic Republic of the Congo",
+  "method": "island attribution",
+  "source": "UN Geodata",
+  "text": "The 1891 Brussels convention between Portugal and the Congo Free State runs the lower Congo border along the navigation channel and names Mateba, Bulabemba and the Princes islands on the Congo side.",
+  "sources": [
+   {
+    "title": "US Department of State, International Boundary Study No. 144, Angola-DRC boundary (1974)",
+    "url": "https://library.law.fsu.edu/Digital-Collections/LimitsinSeas/pdf/ibs144.pdf"
+   }
+  ]
+ },
+ "C22": {
+  "title": "Kazakhstan parts that likely belong to Russian Federation",
+  "method": "island attribution",
+  "source": "UN Geodata",
+  "text": "Kazakhstan and the Russian Federation signed their border treaty on 18 January 2005, and it entered into force on 12 January 2006.",
+  "sources": [
+   {
+    "title": "Kazakhstan-Russia state border treaty (2005), UN Treaty Series No. 52717",
+    "url": "https://treaties.un.org/doc/Publication/UNTS/Volume%203037/v3037.pdf#page=76"
+   }
+  ]
+ },
+ "C23": {
+  "title": "Japan parts that likely belong to Senkaku Islands",
+  "method": "island attribution",
+  "source": "UN Geodata",
+  "text": "Taishō-tō (Chiwei Yu) is the easternmost of the Senkaku Islands, which Japan administers and China claims.",
+  "sources": [
+   {
+    "title": "China, baselines of Diaoyu Dao and its affiliated islands (2012), M.Z.N.89.2012.LOS, UN DOALOS",
+    "url": "https://www.un.org/depts/los/LEGISLATIONANDTREATIES/PDFFILES/DEPOSIT/chn_mzn89_2012_e.pdf"
+   },
+   {
+    "title": "Note from Japan on M.Z.N.89.2012.LOS (2012), UN DOALOS",
+    "url": "https://www.un.org/depts/los/LEGISLATIONANDTREATIES/PDFFILES/DEPOSIT/communicationsredeposit/mzn89_2012_jpn.pdf"
+   },
+   {
+    "title": "Senkaku Islands dispute, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Senkaku_Islands_dispute"
+   }
+  ]
+ },
+ "C24": {
+  "title": "Russian Federation parts that likely belong to Finland",
+  "method": "island attribution",
+  "source": "UN Geodata",
+  "text": "Finland ceded a number of Gulf of Finland islands to the Soviet Union in 1940, and the 1947 Paris Peace Treaty confirmed that border.",
+  "sources": [
+   {
+    "title": "Treaty of Peace with Finland (1947), UN Treaty Series No. 746",
+    "url": "https://treaties.un.org/doc/Publication/UNTS/Volume%2048/v48.pdf#page=238"
+   },
+   {
+    "title": "Finland-USSR agreement on the Gulf of Finland (1965), UN DOALOS",
+    "url": "https://static.un.org/depts/los/LEGISLATIONANDTREATIES/PDFFILES/TREATIES/FIN-RUS1965CS.PDF"
+   },
+   {
+    "title": "Moscow Peace Treaty (1940), Finnish Treaty Series 3/1940",
+    "url": "https://www.finlex.fi/fi/valtiosopimukset/sopimussarja/1940/3"
+   }
+  ]
+ },
+ "C25": {
+  "title": "Greece parts that likely belong to Türkiye",
+  "method": "island attribution",
+  "source": "UN Geodata",
+  "text": "Article 12 of the 1923 Treaty of Lausanne keeps islands less than three miles from the Asian coast under Turkish sovereignty.",
+  "sources": [
+   {
+    "title": "Treaty of Lausanne (1923), League of Nations Treaty Series No. 701",
+    "url": "https://treaties.un.org/doc/Publication/UNTS/LON/Volume%2028/v28.pdf#page=21"
+   }
+  ]
+ },
+ "C26": {
+  "title": "Canada parts that likely belong to Hans Island",
+  "method": "island attribution",
+  "source": "UN Geodata",
+  "text": "Canada and Denmark both claimed Hans Island until a 14 June 2022 agreement split it between Canada and Greenland.",
+  "sources": [
+   {
+    "title": "Joint statement by Canada and Denmark at the 32nd Meeting of States Parties to UNCLOS (2022)",
+    "url": "https://um.dk/fnnewyork/en/statements/statement-on-behalf-of-canada-and-the-kingdom-of-denmark-at-the-32nd-meeting-of-splos/"
+   },
+   {
+    "title": "Library of Congress, The Hans Island agreement (2022)",
+    "url": "https://blogs.loc.gov/law/2022/06/the-hans-island-peace-agreement-between-canada-denmark-and-greenland/"
+   }
+  ]
+ },
+ "C27": {
+  "title": "Eritrea parts that likely belong to Doumeira Islands",
+  "method": "island attribution",
+  "source": "UN Geodata",
+  "text": "Djibouti and Eritrea both claim Ras Doumeira and Doumeira Island. They fought there in 2008, and Qatari observers held the area from 2010 to 2017.",
+  "sources": [
+   {
+    "title": "UN Security Council resolution 1862 (2009)",
+    "url": "https://documents.un.org/doc/undoc/gen/n09/208/38/pdf/n0920838.pdf"
+   },
+   {
+    "title": "Report of the Monitoring Group on Somalia and Eritrea, S/2017/925",
+    "url": "https://documents.un.org/doc/undoc/gen/n17/302/02/pdf/n1730202.pdf"
+   }
+  ]
+ },
+ "C28": {
+  "title": "Gabon parts that likely belong to Equatorial Guinea",
+  "method": "island attribution",
+  "source": "UN Geodata",
+  "text": "Gabon holds Mbanié and nearby islets. In May 2025 the International Court of Justice found that the title Spain held in 1968, to which Equatorial Guinea succeeded, is the one with the force of law.",
+  "sources": [
+   {
+    "title": "Report of the International Court of Justice 2024-2025, A/80/4",
+    "url": "https://documents.un.org/doc/undoc/gen/n25/221/33/pdf/n2522133.pdf"
+   },
+   {
+    "title": "ICJ, Land and Maritime Delimitation and Sovereignty over Islands (Gabon/Equatorial Guinea)",
+    "url": "https://www.icj-cij.org/case/179"
+   }
+  ]
+ },
+ "C29": {
+  "title": "Iran (Islamic Republic of) parts that likely belong to Abu Musa and Tunb Islands",
+  "method": "island attribution",
+  "source": "UN Geodata",
+  "text": "Iran took the Greater and Lesser Tunbs on 30 November 1971 and, under a memorandum of understanding with Sharjah, part of Abu Musa. The United Arab Emirates claims all three.",
+  "sources": [
+   {
+    "title": "UN Security Council, 1610th meeting, S/PV.1610 (1971)",
+    "url": "https://documents.un.org/doc/undoc/gen/n73/822/25/pdf/n7382225.pdf"
+   },
+   {
+    "title": "Letter from the United Arab Emirates to the Security Council, S/1996/693",
+    "url": "https://documents.un.org/doc/undoc/gen/n96/219/67/pdf/n9621967.pdf"
+   },
+   {
+    "title": "Peace Palace Library, The Tunbs and Abu Musa",
+    "url": "https://peacepalacelibrary.nl/blog/2013/unresolved-territorial-disputes-tunbs-and-abu-musa-gulf"
+   }
+  ]
+ },
+ "C30": {
+  "title": "New Caledonia parts that likely belong to Hunter and Matthew Islands",
+  "method": "island attribution",
+  "source": "UN Geodata",
+  "text": "France administers Matthew and Hunter islands as part of New Caledonia, and Vanuatu claims them. In 2026 Vanuatu filed an application at the International Court of Justice, which cannot proceed unless France consents.",
+  "sources": [
+   {
+    "title": "ICJ press release 2026/22, Vanuatu files an application concerning a dispute with France",
+    "url": "https://www.icj-cij.org/sites/default/files/press-releases/0/000-20260901-pre-01-00-en.pdf"
+   },
+   {
+    "title": "PINA, 2026",
+    "url": "https://pina.com.fj/2026/09/03/vanuatu-takes-matthew-and-hunter-dispute-to-icj/"
+   }
+  ]
+ },
+ "N-XCO": {
+  "text": "Conejo is a small island in the Gulf of Fonseca that the 1992 International Court of Justice judgment on the El Salvador-Honduras border did not address. Honduras has personnel there, and El Salvador claims it.",
+  "sources": [
+   {
+    "title": "ICJ, Land, Island and Maritime Frontier Dispute (El Salvador/Honduras)",
+    "url": "https://www.icj-cij.org/case/75"
+   },
+   {
+    "title": "Conejo Island, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Conejo_Island"
+   }
+  ]
+ },
+ "N-XGR": {
+  "text": "Banc du Geyser is a mostly submerged reef north of Madagascar that France holds with the Glorioso Islands. Madagascar and the Comoros claim it.",
+  "sources": [
+   {
+    "title": "Banc du Geyser, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Banc_du_Geyser"
+   }
+  ]
+ },
+ "N-XIK": {
+  "text": "Greece holds Imia (Kardak), two islets off Bodrum, which it says Italy ceded with the Dodecanese in 1947. Türkiye disputes this, and the two nearly went to war over them in January 1996.",
+  "sources": [
+   {
+    "title": "Treaty of Peace with Italy (1947), UN Treaty Series No. 747",
+    "url": "https://treaties.un.org/doc/Publication/UNTS/Volume%2049/v49.pdf#page=138"
+   },
+   {
+    "title": "US Congressional Research Service, Greece and Turkey: the rocky islet crisis (1996)",
+    "url": "https://www.everycrsreport.com/reports/96-140.html"
+   },
+   {
+    "title": "Imia, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Imia"
+   }
+  ]
+ },
+ "N-XLR": {
+  "text": "The Republic of Korea holds the Liancourt Rocks (Dokdo, Takeshima) in the Sea of Japan, and Japan claims them.",
+  "sources": [
+   {
+    "title": "Liancourt Rocks dispute, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Liancourt_Rocks_dispute"
+   },
+   {
+    "title": "Republic of Korea, Ministry of Foreign Affairs: basic position on Dokdo",
+    "url": "https://dokdo.mofa.go.kr/eng/dokdo/government_position.jsp"
+   },
+   {
+    "title": "Japan, Cabinet Secretariat: Japan's response on Takeshima",
+    "url": "https://www.cas.go.jp/jp/ryodo_eg/taiou/index.html"
+   }
+  ]
+ },
+ "N-XMA": {
+  "text": "Canada staffs the lighthouse on Machias Seal Island, and the United States claims the island under the 1783 Treaty of Paris.",
+  "sources": [
+   {
+    "title": "Machias Seal Island, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Machias_Seal_Island"
+   },
+   {
+    "title": "ICJ, Delimitation of the Maritime Boundary in the Gulf of Maine Area (Canada/United States)",
+    "url": "https://www.icj-cij.org/case/67"
+   }
+  ]
+ },
+ "N-XMR": {
+  "text": "Tonga claimed the Minerva Reefs in 1972, and Fiji told the UN in 2018 that the area is in dispute.",
+  "sources": [
+   {
+    "title": "Tonga: Proclamation on the Minerva Reefs (1972), FAOLEX",
+    "url": "https://faolex.fao.org/docs/pdf/ton5226.pdf"
+   },
+   {
+    "title": "Note from Fiji to the UN Secretary-General on Tonga's submission (2018), UN DOALOS",
+    "url": "https://www.un.org/depts/los/clcs_new/submissions_files/ton73_14/ton1_clcs47_2018.pdf"
+   }
+  ]
+ },
+ "N-XPA": {
+  "text": "Perejil (Parsley) Island lies off Morocco near Ceuta. After a Moroccan landing in July 2002, Spain and Morocco agreed to leave it empty, without settling sovereignty.",
+  "sources": [
+   {
+    "title": "Dawn, 2002",
+    "url": "https://www.dawn.com/news/amp/49439"
+   },
+   {
+    "title": "Perejil Island, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Perejil_Island"
+   }
+  ]
+ },
+ "N-XSA": {
+  "text": "Belize holds the Sapodilla Cayes, and Honduras claims them. Belize took the case to the International Court of Justice in 2022, and in 2026 the Court allowed Guatemala, which also claims them, to intervene.",
+  "sources": [
+   {
+    "title": "ICJ press release, Belize v. Honduras (2022)",
+    "url": "https://www.icj-cij.org/node/106273"
+   },
+   {
+    "title": "ICJ, Sovereignty over the Sapodilla Cayes (Belize v. Honduras: Guatemala intervening)",
+    "url": "https://www.icj-cij.org/case/185"
+   }
+  ]
+ }
+}

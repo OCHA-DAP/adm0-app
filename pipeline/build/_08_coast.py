@@ -6,7 +6,7 @@ from os import getenv
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from pipeline.config import file_hash, root, tmp_dir, write_parquet
+from pipeline.config import file_hash, prepare_dir, root, tmp_dir, write_parquet
 from pipeline.differences import SLICES, _chunks, _parallel, _step
 
 from . import _06_export as export
@@ -18,6 +18,7 @@ from .common import (
     data,
     finish,
     manifest_path,
+    names,
     stage_dir,
     unchanged,
 )
@@ -30,6 +31,9 @@ logger = getLogger(__name__)
 BBOX = getenv("COAST_BBOX")
 OVERRIDES = curated_dir / "coast_overrides.csv"
 DECISIONS = curated_dir / "review_decisions.csv"
+WP = prepare_dir / "wp_polygons.parquet"
+PARTIES = curated_dir / "dispute_parties.csv"
+GRID = 1e-9
 # UN Geodata's status for its disputed areas, given to entities the overrides add.
 DISPUTED = (99, "Undetermined")
 TOLERANCE_KM2 = 0.01
@@ -117,8 +121,27 @@ def _place(conn: DuckDBPyConnection) -> None:
         SELECT l.fid, count(DISTINCT t.unit_id) AS n, min(t.unit_id) AS only_unit
         FROM land l LEFT JOIN touch t USING (fid) GROUP BY l.fid;
         CREATE TABLE todo AS
-        SELECT k.* FROM chunks k JOIN fclass f USING (fid) WHERE f.n <> 1;
+        SELECT k.* FROM chunks k JOIN fclass f USING (fid) WHERE f.n >= 2;
+        CREATE TABLE decisions AS
+        SELECT upper(un) AS un, upper(fieldmaps) AS fm FROM read_csv('{DECISIONS}')
+        WHERE action = 'remove';
+        CREATE TABLE unit_codes AS
+        SELECT u.unit_id, upper(coalesce(u.entity, n.iso3cd)) AS code
+        FROM '{data("05", "units")}' u
+        LEFT JOIN '{data("01", "un_polygons")}' n ON n.objectid = u.un_owner;
     """)
+    _step(
+        conn,
+        "fieldmaps pieces",
+        """CREATE TABLE fm_share AS
+        SELECT k.fid, upper(c.fm_code) AS fm_code,
+               sum(ST_Area(CASE WHEN ST_Covers(c.geom, k.geom) THEN k.geom
+                   ELSE ST_Intersection(k.geom, c.geom) END)) AS area
+        FROM chunks k JOIN fm_cells c
+          ON ST_Intersects(k.env, c.env) AND ST_Intersects(k.geom, c.geom)
+        WHERE k.fid IN (SELECT fid FROM fclass WHERE n = 0)
+        GROUP BY ALL""",
+    )
     _step(
         conn,
         "cell pieces",
@@ -141,12 +164,29 @@ def _place(conn: DuckDBPyConnection) -> None:
         CREATE TABLE new_pts AS
         SELECT fid, ST_PointOnSurface(geom) AS pt FROM land
         WHERE fid IN (SELECT fid FROM fclass WHERE n = 0);
-        CREATE TABLE new_owner AS
+        CREATE TABLE cell_owner AS
         SELECT p.fid, min(c.unit_id) AS unit_id
         FROM new_pts p JOIN cells c ON ST_Intersects(p.pt, c.geom) GROUP BY p.fid;
+        CREATE TABLE fm_owner AS
+        SELECT fid, arg_max(fm_code, area) AS fm_code, count(*) > 1 AS straddle
+        FROM fm_share GROUP BY fid;
+        CREATE TABLE fm_moves AS
+        SELECT w.fid, f.fm_code FROM cell_owner w JOIN fm_owner f USING (fid)
+        JOIN unit_codes u USING (unit_id)
+        WHERE f.fm_code <> u.code
+          AND (u.code, f.fm_code) NOT IN (SELECT * FROM decisions);
+        CREATE TABLE fm_target AS
+        SELECT m.fid, arg_min(b.unit_id, ST_Distance(p.pt, b.geom)) AS unit_id
+        FROM fm_moves m JOIN new_pts p USING (fid)
+        JOIN unit_codes u ON u.code = m.fm_code JOIN bits b USING (unit_id)
+        GROUP BY m.fid;
+        CREATE TABLE new_owner AS
+        SELECT w.fid, coalesce(t.unit_id, m.fm_code, w.unit_id) AS unit_id
+        FROM cell_owner w LEFT JOIN fm_moves m USING (fid)
+        LEFT JOIN fm_target t USING (fid);
         CREATE TABLE override_rows AS {overrides};
         CREATE TABLE overrides AS
-        SELECT l.fid, o.unit_id, o.change_id, o.reason
+        SELECT l.fid, o.unit_id, o.change_id
         FROM override_rows o
         JOIN land l ON ST_Intersects(l.geom, ST_Point(o.lon, o.lat));
         CREATE TABLE all_units AS
@@ -155,11 +195,15 @@ def _place(conn: DuckDBPyConnection) -> None:
         SELECT unit_id, unit_id AS entity, any_value(change_id) AS change_ids
         FROM override_rows WHERE unit_id <> 'drop'
           AND unit_id NOT IN (SELECT unit_id FROM '{data("05", "units")}')
-        GROUP BY unit_id;
+        GROUP BY unit_id
+        UNION ALL BY NAME
+        SELECT DISTINCT unit_id, unit_id AS entity FROM new_owner
+        WHERE unit_id NOT IN (SELECT unit_id FROM '{data("05", "units")}')
+          AND unit_id NOT IN (SELECT unit_id FROM override_rows);
         CREATE TABLE whole AS
         SELECT f.fid, f.n, coalesce(o.unit_id,
                    CASE WHEN f.n = 1 THEN f.only_unit ELSE w.unit_id END) AS unit_id,
-               o.change_id AS override_change, o.reason AS override_reason
+               o.change_id AS override_change
         FROM fclass f LEFT JOIN new_owner w USING (fid)
         LEFT JOIN overrides o USING (fid)
         WHERE f.n <= 1;
@@ -221,41 +265,49 @@ def _codes(conn: DuckDBPyConnection) -> None:
         INSERT INTO new_entities
         SELECT DISTINCT o.unit_id, o.name FROM override_rows o
         JOIN all_units u USING (unit_id) WHERE u.un_objectid IS NULL;
+        INSERT INTO new_entities
+        SELECT u.unit_id, f.name
+        FROM all_units u JOIN ({names()}) f ON f.code = u.unit_id
+        WHERE u.un_objectid IS NULL
+          AND u.unit_id NOT IN (SELECT code FROM new_entities);
         CREATE TABLE codes AS
         SELECT u.unit_id, coalesce(u.entity, n.iso3cd) AS code,
-               coalesce(e.name, n.romnam, n.iso3cd) AS name
+               coalesce(f.name, e.name, n.romnam, n.iso3cd) AS name
         FROM all_units u
         LEFT JOIN '{data("01", "un_polygons")}' n ON n.objectid = u.un_owner
         LEFT JOIN (SELECT DISTINCT code, name FROM new_entities) e
-          ON e.code = u.entity;
-        CREATE TABLE decisions AS
-        SELECT upper(un) AS un, upper(fieldmaps) AS fm FROM read_csv('{DECISIONS}')
-        WHERE action = 'remove';
+          ON e.code = u.entity
+        LEFT JOIN ({names()}) f ON f.code = coalesce(u.entity, n.iso3cd);
     """)
 
 
 def _patches(conn: DuckDBPyConnection) -> None:
     """Write land gained and lost along the coast, new islands and dropped parts."""
+    # Overlay on a 1e-9° grid: unsnapped, some pieces inside the land came out whole.
     _step(
         conn,
         "patches",
-        """--sql
+        f"""--sql
         CREATE TABLE un_in_chunk AS
-        SELECT chunk, ST_Union_Agg(geom) AS geom FROM touch GROUP BY chunk;
+        SELECT chunk, ST_ReducePrecision(ST_Union_Agg(geom), {GRID}) AS geom
+        FROM touch GROUP BY chunk;
         CREATE TABLE land_in_bit AS
-        SELECT bit, ST_Union_Agg(geom) AS geom FROM touch GROUP BY bit;
+        SELECT bit, ST_ReducePrecision(ST_Union_Agg(geom), {GRID}) AS geom
+        FROM touch GROUP BY bit;
         CREATE TABLE owned AS
         SELECT k.chunk, k.fid, f.only_unit AS unit_id, k.geom
         FROM chunks k JOIN fclass f USING (fid) WHERE f.n = 1
         UNION ALL SELECT chunk, fid, unit_id, geom FROM placed WHERE n >= 2;
         CREATE TABLE gained_raw AS
         SELECT o.unit_id, o.fid, CASE WHEN u.geom IS NULL THEN o.geom
-                   ELSE ST_CollectionExtract(ST_Difference(o.geom, u.geom), 3)
+                   ELSE ST_CollectionExtract(
+                       ST_Difference(ST_ReducePrecision(o.geom, {GRID}), u.geom), 3)
                    END AS geom
         FROM owned o LEFT JOIN un_in_chunk u USING (chunk);
         CREATE TABLE lost_raw AS
         SELECT b.unit_id, b.part_no, CASE WHEN l.geom IS NULL THEN b.geom
-                   ELSE ST_CollectionExtract(ST_Difference(b.geom, l.geom), 3)
+                   ELSE ST_CollectionExtract(
+                       ST_Difference(ST_ReducePrecision(b.geom, {GRID}), l.geom), 3)
                    END AS geom
         FROM bits b LEFT JOIN land_in_bit l USING (bit);
         """,
@@ -295,15 +347,10 @@ def _patches(conn: DuckDBPyConnection) -> None:
         FROM bits b WHERE (b.unit_id, b.part_no) NOT IN (
             SELECT DISTINCT unit_id, part_no FROM touch)
         GROUP BY b.unit_id, b.part_no;
-        CREATE TABLE straddle AS
-        SELECT fid FROM placed WHERE n = 0
-        GROUP BY fid HAVING count(DISTINCT unit_id) > 1;
         CREATE TABLE new_islands AS
-        SELECT w.fid, w.unit_id, w.override_change, w.override_reason, l.km2, l.geom,
-               w.fid IN (SELECT fid FROM straddle) AS straddle,
-               (SELECT min(c.fm_code) FROM fm_cells c
-                WHERE ST_Intersects(p.pt, c.geom)) AS fm_code
-        FROM whole w JOIN land l USING (fid) JOIN new_pts p USING (fid)
+        SELECT w.fid, w.unit_id, w.override_change, l.km2, l.geom,
+               coalesce(f.straddle, false) AS straddle, f.fm_code
+        FROM whole w JOIN land l USING (fid) LEFT JOIN fm_owner f USING (fid)
         WHERE w.n = 0 AND w.unit_id IS NOT NULL AND w.unit_id <> 'drop';
         CREATE TABLE moved AS
         SELECT t.unit_id AS un_unit, p.unit_id AS to_unit,
@@ -317,17 +364,30 @@ def _patches(conn: DuckDBPyConnection) -> None:
     """)
 
 
+def _parties(conn: DuckDBPyConnection) -> dict:
+    """Return the parties to each new island entity, from WP or the curated list."""
+    parties = dict(
+        conn.execute(f"""--sql
+        SELECT t.change_id, mode(string_split(w.Map_Disp, ','))
+        FROM new_tagged t JOIN (
+            SELECT Map_Disp, geometry FROM '{WP}' WHERE Map_Disp IS NOT NULL) w
+          ON ST_DWithin(w.geometry, t.geom, 0.05)
+        WHERE t.change_id = 'N-' || t.code GROUP BY 1
+    """).fetchall()
+    )
+    for code, claims in conn.execute(f"FROM '{PARTIES}'").fetchall():
+        parties.setdefault(f"N-{code}", claims.split(","))
+    return parties
+
+
 def _records(conn: DuckDBPyConnection) -> list[dict]:
     """Return one record per entity and kind of change, as in ``changes.json``."""
-    conn.execute("""--sql
+    conn.execute(f"""--sql
         CREATE TABLE new_tagged AS
         SELECT i.*, c.code, c.name,
                CASE WHEN i.override_change IS NOT NULL THEN i.override_change
-                    WHEN i.fm_code IS NOT NULL AND upper(i.fm_code) <> upper(c.code)
-                         AND (upper(c.code), upper(i.fm_code))
-                             NOT IN (SELECT un, fm FROM decisions)
-                    THEN 'N-' || c.code || '-' || i.fm_code
-                    WHEN i.straddle THEN 'N-' || c.code || '-straddle'
+                    WHEN i.unit_id NOT IN (SELECT unit_id FROM '{data("05", "units")}')
+                    THEN 'N-' || c.code
                     ELSE 'K-' || c.code END AS change_id
         FROM new_islands i JOIN codes c USING (unit_id);
         CREATE TABLE gained_tagged AS
@@ -390,27 +450,11 @@ def _records(conn: DuckDBPyConnection) -> list[dict]:
         bbox, big, n = rest
         if not n:
             continue
-        parts = [
-            f"gains {gain:,.1f} km² that UN Geodata 2023 draws as water",
-            f"loses {loss:,.1f} km² that OSM draws as water",
-        ]
-        if drop:
-            parts.append(f"drops {drop:,.1f} km² of UN Geodata land that OSM lacks")
-        if isles:
-            parts.append(f"adds {isles} OSM islands ({add:,.1f} km²) in its cell")
         records.append(
             {
                 "id": f"K-{code}",
                 "type": "coast",
-                "title": f"{name} coastline",
-                "description": (
-                    f"The coastline of {name} follows OSM land. It "
-                    f"{', '.join(parts[:-1])} and {parts[-1]}. No land changes owner."
-                ),
                 "keys": [],
-                "method": "OSM land clipped to the extended units",
-                "source": "OpenStreetMap land polygons",
-                "comment": "",
                 "km2": round(gain + loss + drop + add, 3),
                 "gained_km2": round(gain, 3),
                 "lost_km2": round(loss, 3),
@@ -428,33 +472,19 @@ def _records(conn: DuckDBPyConnection) -> list[dict]:
             }
         )
     islands = conn.execute(f"""--sql
-        SELECT change_id, code, any_value(name), any_value(fm_code), sum(km2),
-               count(*), count(*) FILTER (straddle), {box}, {largest},
-               string_agg(DISTINCT override_reason, ' ' ORDER BY override_reason)
+        SELECT change_id, code, any_value(name), sum(km2), count(*),
+               count(*) FILTER (straddle), {box}, {largest}
         FROM new_tagged WHERE change_id <> 'K-' || code
-        GROUP BY change_id, code ORDER BY 5 DESC
+        GROUP BY change_id, code ORDER BY 4 DESC
     """).fetchall()
-    for change_id, code, name, fm, km2, n, straddles, bbox, big, reason in islands:
-        review = change_id != f"N-{code}"
-        if reason:
-            note = reason
-        elif change_id.endswith("-straddle"):
-            note = "A line between two units' cells crosses each of them."
-        else:
-            note = f"FieldMaps' cell gives them to {fm}."
+    parties = _parties(conn)
+    for change_id, code, name, km2, n, straddles, bbox, big in islands:
         records.append(
             {
                 "id": change_id,
                 "type": "new_island",
-                "title": f"Islands UN Geodata lacks, given to {name}",
-                "description": (
-                    f"{n} OSM islands with no UN Geodata 2023 land go to {name}"
-                    f"{'' if reason else ', whose cell holds them'}. {note}"
-                ),
+                "parties": parties.get(change_id, []),
                 "keys": [],
-                "method": "Voronoi cell of the extended units",
-                "source": "OpenStreetMap land polygons",
-                "comment": "",
                 "km2": round(km2, 3),
                 "islands": n,
                 "straddle": straddles,
@@ -463,7 +493,7 @@ def _records(conn: DuckDBPyConnection) -> list[dict]:
                 "largest_patch_bbox": big,
                 "patches": n,
                 "values": [value(code, name, km2)],
-                "review": review,
+                "review": False,
             }
         )
     return records
@@ -559,6 +589,8 @@ def main() -> None:
         curated_dir / "changes.json",
         DECISIONS,
         OVERRIDES,
+        WP,
+        PARTIES,
     ]
     if not BBOX and all(unchanged("08", p) for p in inputs):
         logger.info("stage 08: inputs unchanged")

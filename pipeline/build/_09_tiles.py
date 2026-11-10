@@ -1,14 +1,11 @@
-"""Write the build page's tiles and tables into their own folder."""
+"""Tile the build page's map layers into their own folder."""
 
-import json
 from logging import getLogger
 from pathlib import Path
-from shutil import copy2
 
 from pipeline import tiles
-from pipeline.config import prepare_dir
 
-from .common import connect, curated_dir, data, finish, stage_dir, unchanged
+from .common import connect, data, finish, stage_dir, unchanged
 
 logger = getLogger(__name__)
 
@@ -26,13 +23,10 @@ LAYERS = {
     "build_gained": ("08", "gained"),
     "build_lost": ("08", "lost"),
 }
-REF = prepare_dir / "ref.parquet"
-# M49 has no row for Taiwan, which OSM border tiles name as TWN.
-EXTRA_NAMES = {"TWN": "Taiwan Province of China"}
 
 
 def main() -> None:
-    """Tile each layer whose source changed, and copy the page's tables."""
+    """Tile each layer whose source changed."""
     folder = stage_dir("09")
     sources = [Path(data(*src)) for src in LAYERS.values()]
     settings = Path(tiles.__file__)
@@ -47,18 +41,4 @@ def main() -> None:
             logger.info("%s: empty, not tiled", name)
         else:
             tiles.tile(src, dest, name)
-    lists = [stage_dir(s) / "changes.json" for s in ("05", "08")]
-    merged = [c for path in lists for c in json.loads(path.read_text())]
-    (folder / "changes.json").write_text(json.dumps(merged, ensure_ascii=False))
-    rows = conn.execute(
-        f"SELECT iso3, name_m49 FROM '{REF}' WHERE iso3 <> ''"
-    ).fetchall()
-    names = dict(rows) | EXTRA_NAMES
-    (folder / "names.json").write_text(json.dumps(names, ensure_ascii=False))
-    tables = [
-        stage_dir("05") / f for f in ("changes.csv", "crosswalk.csv", "labels.geojson")
-    ]
-    tables += [curated_dir / "stages.json", curated_dir / "path.json"]
-    for path in tables:
-        copy2(path, folder)
-    finish(conn, "09", [settings, *sources, *tables, *lists, REF])
+    finish(conn, "09", [settings, *sources])

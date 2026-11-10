@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from pipeline.config import write_parquet
 
 from .common import (
+    STEPS,
     changes,
     connect,
     curated_dir,
@@ -121,12 +122,11 @@ def _path_state(types: list[str]) -> str:
 
 def _path_outputs(conn: DuckDBPyConnection) -> None:
     """Write the state after each page step that neither export already shows."""
-    steps = json.loads((curated_dir / "path.json").read_text())
     types: list[str] = []
-    for step in steps:
-        types += step["types"]
-        if step["id"] in PATH_OUTPUTS:
-            name = PATH_OUTPUTS[step["id"]]
+    for step, step_types in STEPS.items():
+        types += step_types
+        if step in PATH_OUTPUTS:
+            name = PATH_OUTPUTS[step]
             write_parquet(conn, _path_state(types), Path(data("06", name)))
 
 
@@ -188,10 +188,6 @@ def _checks(conn: DuckDBPyConnection, un: str, gaul: str) -> dict:
             n := len({c for c in used if c.startswith("C")} - known),
             n == 0,
         ),
-        "undescribed_changes": (
-            n := sum(1 for c in changes() if not c["description"]),
-            n == 0,
-        ),
         "undescribed_stages": (n := len(stages()) - len(described), n == 0),
     }
 
@@ -202,7 +198,6 @@ def main() -> None:
         Path(__file__),
         Path(data("05", "units")),
         curated_dir / "changes.json",
-        curated_dir / "path.json",
     ]
     if all(unchanged("06", p) for p in inputs):
         logger.info("stage 06: inputs unchanged")

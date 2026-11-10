@@ -6,15 +6,24 @@ from typing import TYPE_CHECKING
 
 from pipeline.config import write_parquet
 
-from .common import KM2, changes, connect, curated_dir, data, finish, path, stage_dir
+from .common import (
+    KM2,
+    STEPS,
+    changes,
+    connect,
+    curated_dir,
+    data,
+    finish,
+    names,
+    stage_dir,
+)
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from duckdb import DuckDBPyConnection
 
 UN_ATTRS = (
-    "iso3cd AS un_iso3, romnam AS un_name, stscod AS un_status, isoclr AS un_sovereign"
+    "iso3cd AS un_iso3, coalesce(f.name, romnam) AS un_name, "
+    "stscod AS un_status, isoclr AS un_sovereign"
 )
 GAUL_ATTRS = "GAUL0_CODE, ISO3_CODE, MAP_CODE, GAUL0_NAME"
 # Smaller patches are digitising noise along shared lines.
@@ -39,7 +48,7 @@ def _units(conn: DuckDBPyConnection) -> None:
         [(c["id"], e["code"], e["name"]) for c in changes() if (e := c.get("entity"))],
     )
     # Every step but the disputed one applies to the UN export too.
-    shared = {t for s in path() if s["id"] != "disputed" for t in s["types"]}
+    shared = {t for s, types in STEPS.items() if s != "disputed" for t in types}
     conn.execute("CREATE TABLE moves (change_id VARCHAR, to_objectid BIGINT)")
     conn.executemany(
         "INSERT INTO moves VALUES (?, ?)",
@@ -47,7 +56,8 @@ def _units(conn: DuckDBPyConnection) -> None:
     )
     conn.execute(f"""--sql
         CREATE TABLE un AS
-            SELECT objectid, {UN_ATTRS} FROM '{data("01", "un_polygons")}';
+            SELECT objectid, {UN_ATTRS} FROM '{data("01", "un_polygons")}'
+            LEFT JOIN ({names()}) f ON f.code = iso3cd;
         CREATE TABLE gaul AS
             SELECT gaul_id, {GAUL_ATTRS} FROM '{data("01", "gaul_polygons")}';
         CREATE TABLE units AS
@@ -206,15 +216,8 @@ def _lines(conn: DuckDBPyConnection) -> list[dict]:
         {
             "id": f"L-{x}-{y}",
             "type": "line_update",
-            "title": f"{x} and {y} line",
-            "description": (
-                f"The {x}-{y} line follows UN Geodata 2023 in both exports. The area "
-                "shown is land that GAUL and UN Geodata give to different entities."
-            ),
+            "codes": [x, y],
             "keys": [],
-            "method": "UN line adopted",
-            "source": "UN Geodata 2023",
-            "comment": "",
             "km2": km2,
             "units": 0,
             "bbox": box,
@@ -225,9 +228,7 @@ def _lines(conn: DuckDBPyConnection) -> list[dict]:
     ]
 
 
-def _island_records(
-    conn: DuckDBPyConnection, prefix: str, describe: Callable[[str, str], dict]
-) -> list[dict]:
+def _island_records(conn: DuckDBPyConnection, prefix: str, fields: dict) -> list[dict]:
     """Summarize ``cell_islands`` rows of one id prefix, one record per pair."""
     rows = conn.execute(f"""--sql
         SELECT change_id, un_iso3, any_value(un_name), cell_code, any_value(cell_name),
@@ -242,9 +243,8 @@ def _island_records(
     return [
         {
             "id": c,
-            **describe(un_name, cell_name),
+            **fields,
             "keys": [],
-            "comment": "",
             "km2": km2,
             "units": 0,
             "bbox": box,
@@ -295,18 +295,7 @@ def _island_errors(conn: DuckDBPyConnection) -> list[dict]:
     return _island_records(
         conn,
         "E",
-        lambda un_name, cell_name: {
-            "type": "un_error",
-            "title": f"{un_name} parts that FieldMaps gives to {cell_name}",
-            "description": (
-                f"UN Geodata 2023 gives these parts to {un_name}, and FieldMaps "
-                f"gives them to {cell_name}. Both exports keep UN Geodata's owner "
-                "until a change is listed."
-            ),
-            "method": "not applied",
-            "source": "UN Geodata and FieldMaps",
-            "review": True,
-        },
+        {"type": "un_error", "review": True},
     )
 
 
@@ -379,11 +368,6 @@ def main() -> None:
     records += island_errors + _lines(conn)
     out = stage_dir("05") / "changes.json"
     out.write_text(json.dumps(records, ensure_ascii=False, indent=1) + "\n")
-    conn.execute(f"""--sql
-        COPY (SELECT id, type, title, km2, units, method, source, description,
-                     comment FROM read_json('{out}'))
-        TO '{stage_dir("05") / "changes.csv"}' (HEADER)
-    """)
     write_parquet(
         conn,
         """--sql
@@ -402,7 +386,6 @@ def main() -> None:
             Path(data("02", "un_parts")),
             OVERRIDES,
             LINKS,
-            curated_dir / "path.json",
             Path(data("01", "fieldmaps_voronoi")),
             Path(data("01", "line_overlaps")),
             DECISIONS,
