@@ -5,7 +5,7 @@ from importlib import import_module
 
 from .common import STAGES
 
-DEFAULT_STAGES = ("01", "02", "03", "04", "05", "06", "08", "09")
+DEFAULT_STAGES = ("01", "02", "03", "04", "05", "06", "08", "09", "10")
 
 
 def main() -> None:

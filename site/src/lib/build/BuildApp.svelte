@@ -11,6 +11,7 @@
     type: string;
     title: string;
     description?: string;
+    sources?: { title: string; url: string }[];
     km2: number | null;
     units: number;
     bbox: number[] | null;
@@ -21,6 +22,7 @@
     lost_km2?: number;
     dropped_km2?: number;
     added_km2?: number;
+    un_km2?: number;
     islands?: number;
   }
   interface Step {
@@ -52,9 +54,12 @@
   const step = $derived(steps[stepIndex]);
   const border = $derived(change?.type === "line_update" ? change.id.slice(2).split("-") : null);
   const byArea = (a: Change, b: Change) => (b.km2 ?? 0) - (a.km2 ?? 0);
+  const share = (c: Change) => (c.type === "coast" && c.un_km2 ? (c.km2 ?? 0) / c.un_km2 : null);
+  const byShare = (a: Change, b: Change) => (share(b) ?? -1) - (share(a) ?? -1) || byArea(a, b);
+  const pctFormat = (v: number) => (v < 0.001 ? "<0.1%" : new Intl.NumberFormat("en", { style: "percent", maximumFractionDigits: v < 0.1 ? 1 : 0 }).format(v));
   const stepChanges = (s: Step) => {
     const list = changes.filter((c) => s.types.includes(c.type) && !(c.type === "coast" && (c.km2 ?? 0) < MIN_KM2));
-    if (s.types.some((t) => COAST_TYPES.includes(t))) return list.sort((a, b) => Number(!!b.review) - Number(!!a.review) || byArea(a, b));
+    if (s.types.some((t) => COAST_TYPES.includes(t))) return list.sort((a, b) => Number(!!b.review) - Number(!!a.review) || byShare(a, b));
     return s.types.includes("un_error") ? list.sort(byArea) : list;
   };
   const unitChanges = $derived(step?.compare ? stepChanges(step).filter((c) => c.units > 0).map((c) => c.id) : []);
@@ -124,7 +129,7 @@
     </header>
     <div class="body">
       <aside>
-        <p class="intro">The UN and GAUL exports both start from the lines and coastlines of UN Geodata 2023 (260 entities). The GAUL export starts from GAUL's 272 entities, which GAUL draws on the 2018 lines. Some changes below add an entity to both exports.</p>
+        <p class="intro">The build starts from the lines and coastlines of UN Geodata 2023 (260 entities) and keeps GAUL's 272 entities, which GAUL draws on the 2018 lines. Some changes below add an entity.</p>
         {#if failed}
           <p>The change list could not be loaded.</p>
         {/if}
@@ -135,10 +140,12 @@
               <div class="drawer-body" inert={s !== step || collapsed}>
                 <p>{s.summary}</p>
                 {#if listedChanges(s).length}
-                  <ul>
+                  <ul class="rows">
                     {#each listedChanges(s) as c, i (c.id)}
-                      {#if isCoast(c) && (i === 0 || listedChanges(s)[i - 1].type !== c.type)}
-                        <li class="own-head"><span class="own"><span>Entity</span><span>{coastHead[c.type]}</span></span><span class="km2">Area</span></li>
+                      {#if c.type === "coast" && (i === 0 || listedChanges(s)[i - 1].type !== c.type)}
+                        <li class="own-head table"><span>Entity</span><span class="num">Gained km²</span><span class="num">Lost km²</span><span class="num">% of area</span></li>
+                      {:else if isCoast(c) && (i === 0 || listedChanges(s)[i - 1].type !== c.type)}
+                        <li class="own-head"><span class="own"><span>Entity</span><span>{coastHead[c.type]}</span></span><span class="km2">{c.type === "coast" ? "% of area" : "Area"}</span></li>
                       {:else if i === 0 && c.type !== "line_update" && !isCoast(c)}
                         <li class="own-head"><span class="own"><span>UN Geodata</span><span>{c.type === "un_error" ? "Corrected" : "GAUL"}</span></span><span class="km2">Area</span></li>
                       {/if}
@@ -147,16 +154,25 @@
                           <span class="head">
                             {#if c.type === "line_update"}
                               {c.id.slice(2).replace("-", " | ")}
+                            {:else if c.type === "coast"}
+                              {@const v = c.values?.[0]}
+                              <span class="table" title={c.description ?? c.title}><span>{#if v}{@render entities([entity(v.un, v.un_name)])}{/if}</span><span class="num">{km2.format((c.gained_km2 ?? 0) + (c.added_km2 ?? 0))}</span><span class="num">{km2.format((c.lost_km2 ?? 0) + (c.dropped_km2 ?? 0))}</span><span class="num">{pctFormat(share(c) ?? 0)}</span></span>
                             {:else if isCoast(c)}
                               {@const v = c.values?.[0]}
-                              <span class="own" title={c.description ?? c.title}><span>{#if v}{@render entities([entity(v.un, v.un_name)])}{/if}</span><span class:review={c.review}>{coastDetail(c)}</span></span>
+                              <span class="own"><span>{#if v}{@render entities([entity(v.un, v.un_name)])}{/if}</span><span class:review={c.review}>{coastDetail(c)}</span></span>
                             {:else}
                               {@const side = sides(c)}
                               <span class="own" title={c.values?.map((v) => `${v.un_name} → ${v.gaul_name}: ${km2.format(v.km2)} km²`).join("\n")}><span>{@render entities(side.before)}</span><span>{@render entities(side.after)}</span></span>
                             {/if}
-                            {#if c.km2 != null}<span class="km2">{km2.format(c.km2)} km²</span>{/if}
+                            {#if c.km2 != null && c.type !== "coast"}<span class="km2">{km2.format(c.km2)} km²</span>{/if}
                           </span>
                         </button>
+                        {#if change === c && s.id !== "lines" && s.id !== "coast" && c.description}
+                          <div class="desc">
+                            <p>{c.description}</p>
+                            {#if c.sources?.length}<p class="sources">Sources: {#each c.sources as src, j (src.url)}{#if j}{", "}{/if}<a href={src.url} target="_blank" rel="noopener">{src.title}</a>{/each}</p>{/if}
+                          </div>
+                        {/if}
                       </li>
                     {/each}
                   </ul>
@@ -314,13 +330,15 @@
     padding: 0;
     list-style: none;
   }
+  ul.rows {
+    font-size: 0.8125rem;
+  }
   li button {
     display: block;
     width: 100%;
-    margin-top: 0.25rem;
-    padding: 0.4rem 0.5rem;
-    border: 1px solid var(--cd-grey--400);
-    border-radius: var(--brand-radius--sm);
+    padding: 0.25rem 0.5rem;
+    border: 0;
+    border-bottom: 1px solid var(--cd-grey--400);
     background: none;
     color: inherit;
     text-align: left;
@@ -328,8 +346,20 @@
   }
   li button:hover,
   li button.active {
-    border-color: var(--brand-primary--text);
-    background: var(--cd-grey--300);
+    background: var(--cd-blue--lightest);
+  }
+  .desc {
+    margin: 0;
+    padding: 0.25rem 0.5rem 0.5rem;
+    border-bottom: 1px solid var(--cd-grey--400);
+    background: var(--cd-blue--lightest);
+    line-height: 1.4;
+  }
+  .desc p {
+    margin: 0;
+  }
+  .desc .sources {
+    margin-top: 0.25rem;
   }
   .head {
     display: flex;
@@ -348,21 +378,28 @@
     align-items: baseline;
   }
   .code {
-    flex: 0 0 auto;
-    padding: 0 0.25rem;
-    border: 1px solid var(--cd-grey--400);
-    border-radius: var(--brand-radius--sm);
-    background: var(--cd-white);
+    flex: 0 0 2.75em;
     font-size: 0.75rem;
     font-weight: 600;
+  }
+  .table,
+  .own-head.table {
+    display: grid;
+    flex: 1;
+    grid-template-columns: 1fr 4.5rem 4.5rem 4rem;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+  .num {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
   }
   .own-head {
     display: flex;
     gap: 0.5rem;
     margin-top: 0.5rem;
-    padding: 0 calc(0.5rem + 1px);
-    color: var(--brand-grey--text);
-    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-bottom: 1px solid var(--cd-grey--400);
     font-weight: 600;
   }
   .km2 {

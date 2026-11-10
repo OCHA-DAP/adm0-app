@@ -24,7 +24,7 @@ logger = getLogger(__name__)
 CATALOG = root / "catalog"
 DIFFERENCES = ("differences", "differences_dots")
 TABLES = ("attributes", "items")
-BUILD_SITE = root / "outputs/build/09_site"
+BUILD_SITE = (root / "outputs/build/09_tiles", root / "outputs/build/10_page")
 HOST = {
     "name": "OCHA Centre for Humanitarian Data",
     "roles": ["host"],
@@ -100,12 +100,14 @@ def _stage_build() -> None:
     """Mirror the build page's files into build/, synced as plain files."""
     target = CATALOG / "build"
     target.mkdir(exist_ok=True)
-    names = {f.name for f in BUILD_SITE.iterdir()}
+    files = {
+        f.name: f for d in BUILD_SITE for f in d.iterdir() if f.name != "README.md"
+    }
     for stale in target.iterdir():
-        if stale.name not in names:
+        if stale.name not in files:
             stale.unlink()
-    for name in names:
-        _link(BUILD_SITE / name, target / name)
+    for name, src in files.items():
+        _link(src, target / name)
 
 
 def _write_providers(collection: Path) -> None:

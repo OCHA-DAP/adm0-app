@@ -32,7 +32,8 @@ STAGES = {
     "06": "export",
     "07": "extend",
     "08": "coast",
-    "09": "site",
+    "09": "tiles",
+    "10": "page",
 }
 
 
@@ -48,6 +49,12 @@ def data(stage: str, name: str) -> str:
     return str(stage_dir(stage) / f"{name}.parquet")
 
 
+def names() -> str:
+    """Return a query naming each entity code by FieldMaps' name."""
+    fieldmaps = data("01", "fieldmaps_voronoi")
+    return f"SELECT DISTINCT iso_3 AS code, adm0_name1 AS name FROM '{fieldmaps}'"
+
+
 def connect() -> DuckDBPyConnection:
     """Open an in-memory database with spatial loaded and x/y axis order."""
     conn = open_db()
@@ -60,9 +67,14 @@ def changes() -> list[dict]:
     return json.loads((curated_dir / "changes.json").read_text())
 
 
-def path() -> list[dict]:
-    """Read the page's steps."""
-    return json.loads((curated_dir / "path.json").read_text())
+# The change types each page step applies, in page order.
+STEPS = {
+    "lines": ["line_update"],
+    "errors": ["un_error"],
+    "disputed": ["restore", "india_china", "split", "merge"],
+    "coast": ["coast"],
+    "islands": ["new_island"],
+}
 
 
 def stages() -> list[dict]:
