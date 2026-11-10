@@ -336,16 +336,11 @@ def _parts(conn: DuckDBPyConnection) -> None:
 
 
 def _patches(conn: DuckDBPyConnection) -> None:
-    """Unshared land per pair, and each source's islands another's cells reassign."""
+    """Unshared land per pair, and islands in zones where both sources draw islands."""
+    # A zone is where one source's cell overlaps another's cell of a different entity.
     conn.execute("""--sql
         CREATE OR REPLACE TABLE patches AS
-        SELECT pair, 'land' AS type, side, item, a_entity, b_entity, a_code, a_name,
-                b_code, b_name, km2, geom::GEOMETRY AS geometry
-        FROM land_review
-        UNION ALL
-        SELECT d.a || '|' || d.b, 'island', d.side, d.item, d.a_entity, d.b_entity,
-               ae.code, ae.name, be.code, be.name, d.km2, d.geom::GEOMETRY
-        FROM (
+        WITH island AS (
             SELECT least(p.source, o.source) AS a, greatest(p.source, o.source) AS b,
                 CASE WHEN p.source < o.source THEN 'a' ELSE 'b' END AS side,
                 CASE WHEN p.source < o.source THEN p.entity ELSE o.entity END
@@ -357,7 +352,17 @@ def _patches(conn: DuckDBPyConnection) -> None:
             JOIN part_placed o ON o.pid = p.pid AND o.source <> p.source
             JOIN clusters cp ON cp.source = p.source AND cp.entity = p.entity
             JOIN clusters co ON co.source = o.source AND co.entity = o.entity
-            WHERE cp.cluster <> co.cluster) d
+            WHERE cp.cluster <> co.cluster),
+        zones AS (
+            SELECT a, b, a_entity, b_entity FROM island
+            GROUP BY ALL HAVING count(DISTINCT side) = 2)
+        SELECT pair, 'land' AS type, side, item, a_entity, b_entity, a_code, a_name,
+                b_code, b_name, km2, geom::GEOMETRY AS geometry
+        FROM land_review
+        UNION ALL
+        SELECT d.a || '|' || d.b, 'island', d.side, d.item, d.a_entity, d.b_entity,
+               ae.code, ae.name, be.code, be.name, d.km2, d.geom::GEOMETRY
+        FROM island d SEMI JOIN zones z USING (a, b, a_entity, b_entity)
         LEFT JOIN entities ae ON ae.source = d.a AND ae.entity = d.a_entity
         LEFT JOIN entities be ON be.source = d.b AND be.entity = d.b_entity
     """)
