@@ -74,6 +74,7 @@ STEPS = {
     "disputed": ["restore", "india_china", "split", "merge"],
     "coast": ["coast"],
     "islands": ["new_island"],
+    "land": ["land_area"],
 }
 
 

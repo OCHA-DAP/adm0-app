@@ -184,6 +184,11 @@
             </div>
           </section>
         {/each}
+        <section class="downloads">
+          <h2>Download</h2>
+          <a class="btn" href={`${tilesBase}/build/build_un.parquet`} download>UN export (GeoParquet)</a>
+          <a class="btn" href={`${tilesBase}/build/build_gaul.parquet`} download>GAUL export (GeoParquet)</a>
+        </section>
       </aside>
       <div class="stage">
         <div class="panel">
@@ -324,6 +329,20 @@
   }
   .intro {
     margin: 0 0 0.75rem;
+  }
+  .downloads {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+  .downloads a {
+    text-decoration: none;
+  }
+  .downloads h2 {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: 1rem;
   }
   ul {
     margin: 0;

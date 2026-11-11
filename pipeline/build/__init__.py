@@ -5,11 +5,11 @@ from importlib import import_module
 
 from .common import STAGES
 
-DEFAULT_STAGES = ("01", "02", "03", "04", "05", "06", "08", "09", "10")
+DEFAULT_STAGES = tuple(f"{i:02d}" for i in range(1, 11))
 
 
 def main() -> None:
-    """Run every stage but 00 and 07, one ``--stage``, or all ``--from`` a stage."""
+    """Run every stage but 00, one ``--stage``, or all ``--from`` a stage."""
     parser = ArgumentParser()
     parser.add_argument("--stage", choices=STAGES)
     parser.add_argument("--from", dest="start", choices=DEFAULT_STAGES)

@@ -1,20 +1,33 @@
-"""Write the cut lines UN Geodata lacks, from GAUL, into ``inputs/build/``."""
+"""Write the cut lines UN Geodata lacks and the land area outlines to inputs/build."""
 
 from pipeline.config import prepare_dir, write_parquet
 
-from .common import connect, curated_dir
+from .common import STEPS, changes, connect, curated_dir
 
 GAUL = prepare_dir / "gaul_l0.parquet"
 GAUL_LINES = prepare_dir / "gaul_lines.parquet"
 UN = prepare_dir / "ungeodata_polygons.parquet"
+FIELDMAPS = prepare_dir / "fieldmaps_polygons.parquet"
 CHN, DISPUTED = 704, "238"
 # GAUL's India-China line between Nepal and Bhutan is the only one east of 88E.
 SIKKIM_XMIN = 88
 
 
 def main() -> None:
-    """Build the four Disputed Area rings and the Sikkim line."""
+    """Build the four Disputed Area rings, the Sikkim line and the land areas."""
     conn = connect()
+    conn.execute(
+        "CREATE TABLE areas (change_id VARCHAR, code VARCHAR, area_id VARCHAR)"
+    )
+    conn.executemany(
+        "INSERT INTO areas VALUES (?, ?, ?)",
+        [
+            (c["id"], c["entity"]["code"], area)
+            for c in changes()
+            if c["type"] in STEPS["land"]
+            for area in c.get("areas", [None])
+        ],
+    )
     curated_dir.mkdir(parents=True, exist_ok=True)
     query = f"""--sql
         WITH rings AS (
@@ -48,3 +61,16 @@ def main() -> None:
         FROM sikkim, mainland
     """
     write_parquet(conn, query, curated_dir / "cut_lines.parquet")
+    write_parquet(
+        conn,
+        f"""--sql
+        SELECT a.change_id, 'gaul_l0' AS source_layer, c.source_feature,
+               ST_Multi(ST_MakePolygon(c.geometry)) AS geometry
+        FROM areas a JOIN '{curated_dir / "cut_lines.parquet"}' c USING (area_id)
+        UNION ALL
+        SELECT a.change_id, 'fieldmaps_polygons', 'iso_3 ' || a.code,
+               ST_Multi(f.geometry)
+        FROM areas a JOIN '{FIELDMAPS}' f ON upper(f.iso_3) = a.code
+        WHERE a.area_id IS NULL""",
+        curated_dir / "land_areas.parquet",
+    )

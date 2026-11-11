@@ -59,19 +59,15 @@
   "title": "India-China disputed areas (XXX)",
   "method": "GAUL outline as cut line",
   "source": "GAUL 2025 entity 238",
-  "text": "China holds Aksai Chin, which India claims, and India administers Arunachal Pradesh, which China claims. Agreements in 1993 and 1996 keep both sides to the Line of Actual Control without settling the boundary.",
+  "text": "Demchok, Jadh-Nelang, Kaurik and Lapthal-Barahoti lie on the India-China boundary. In a 1993 agreement both countries undertook to respect the Line of Actual Control pending a boundary settlement.",
   "sources": [
    {
     "title": "India-China Agreement on the Line of Actual Control (1993), UN Peacemaker",
     "url": "https://peacemaker.un.org/sites/default/files/document/files/2024/05/cn20in930907agreement20on20india-china20border20areas.pdf"
    },
    {
-    "title": "India-China Agreement on Confidence-Building Measures along the Line of Actual Control (1996), UN Peacemaker",
-    "url": "https://peacemaker.un.org/sites/default/files/document/files/2024/05/cn20in961129agreement20between20china20and20india.pdf"
-   },
-   {
-    "title": "Al Jazeera, 2023",
-    "url": "https://www.aljazeera.com/news/2023/8/30/india-lodges-protest-with-china-over-map-claiming-border-territory"
+    "title": "Sino-Indian border dispute, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Sino-Indian_border_dispute"
    }
   ]
  },
@@ -644,6 +640,247 @@
    {
     "title": "ICJ, Sovereignty over the Sapodilla Cayes (Belize v. Honduras: Guatemala intervening)",
     "url": "https://www.icj-cij.org/case/185"
+   }
+  ]
+ },
+ "D-XDE": {
+  "text": "India administers Demchok west of the Charding Nullah and China administers Dêmqog east of it, and each claims the whole sector.",
+  "sources": [
+   {
+    "title": "India-China Agreement on the Line of Actual Control (1993), UN Peacemaker",
+    "url": "https://peacemaker.un.org/sites/default/files/document/files/2024/05/cn20in930907agreement20on20india-china20border20areas.pdf"
+   },
+   {
+    "title": "Demchok sector, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Demchok_sector"
+   }
+  ]
+ },
+ "D-XJN": {
+  "text": "India administers the Nelang valley in Uttarkashi district, Uttarakhand, and China claims it as part of Zanda County, Tibet.",
+  "sources": [
+   {
+    "title": "India-China Agreement on the Line of Actual Control (1993), UN Peacemaker",
+    "url": "https://peacemaker.un.org/sites/default/files/document/files/2024/05/cn20in930907agreement20on20india-china20border20areas.pdf"
+   },
+   {
+    "title": "Nelang, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Nelang"
+   },
+   {
+    "title": "Sino-Indian border dispute, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Sino-Indian_border_dispute"
+   }
+  ]
+ },
+ "D-XKU": {
+  "text": "India administers Kaurik in Lahaul and Spiti district, Himachal Pradesh, and China claims it as part of Zanda County, Tibet.",
+  "sources": [
+   {
+    "title": "Kaurik, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Kaurik"
+   },
+   {
+    "title": "Sino-Indian border dispute, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Sino-Indian_border_dispute"
+   }
+  ]
+ },
+ "D-XLB": {
+  "text": "India administers the Barahoti plain and the Lapthal and Sangchamalla pastures in Chamoli district, Uttarakhand, and China claims them as Wure. The two governments held talks on Barahoti in New Delhi in 1958.",
+  "sources": [
+   {
+    "title": "Barahoti, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Barahoti"
+   },
+   {
+    "title": "Sino-Indian border dispute, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Sino-Indian_border_dispute"
+   }
+  ]
+ },
+ "D-XSP": {
+  "text": "Shipki La is a pass on the Sutlej between Kinnaur district, Himachal Pradesh, and Tibet, and China claims an area on the Indian side near it. The 1954 India-China agreement on trade with Tibet names Shipki La as a pass open to traders and pilgrims.",
+  "sources": [
+   {
+    "title": "Agreement between India and China on trade and intercourse between the Tibet Region and India (1954), UN Treaty Series No. 4307",
+    "url": "https://treaties.un.org/doc/Publication/UNTS/Volume%20299/v299.pdf"
+   },
+   {
+    "title": "Sino-Indian border dispute, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Sino-Indian_border_dispute"
+   },
+   {
+    "title": "Shipki La, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Shipki_La"
+   }
+  ]
+ },
+ "D-XCH": {
+  "text": "India administers Chumar in southeastern Ladakh, and China claims land south and southeast of it. Troops from both countries faced each other there in September 2014.",
+  "sources": [
+   {
+    "title": "Dawn, 2014",
+    "url": "https://www.dawn.com/news/1133932"
+   },
+   {
+    "title": "Chumar, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Chumar"
+   }
+  ]
+ },
+ "D-XCE": {
+  "text": "Chumar East is part of the Chumar sector in southeastern Ladakh, on the Pare Chu near Chepzi, where India's and China's claim lines differ.",
+  "sources": [
+   {
+    "title": "Chepzi, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Chepzi"
+   },
+   {
+    "title": "Chumar, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Chumar"
+   }
+  ]
+ },
+ "D-XKO": {
+  "text": "Benin and Burkina Faso both claim Kourou/Koalou near their tripoint with Togo. In May 2009 the two governments declared it a neutral zone under a joint committee, pending referral to the International Court of Justice.",
+  "sources": [
+   {
+    "title": "leFaso.net, 2009",
+    "url": "https://lefaso.net/spip.php?article31781"
+   },
+   {
+    "title": "Koalou, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Koalou"
+   }
+  ]
+ },
+ "D-XCR": {
+  "text": "The Congo River between Brazzaville and Kinshasa is the boundary between the Republic of the Congo and the Democratic Republic of the Congo. A 1908 declaration delimited the line in Stanley Pool (Pool Malebo), and elsewhere in the channel it is not fixed.",
+  "sources": [
+   {
+    "title": "US Department of State, International Boundary Study No. 127, Congo-Democratic Republic of the Congo boundary (1972)",
+    "url": "https://library.law.fsu.edu/Digital-Collections/LimitsinSeas/pdf/ibs127.pdf"
+   }
+  ]
+ },
+ "D-XMO": {
+  "text": "Where the Moselle, Sûre and Our form the border between Germany and Luxembourg, the rivers are common territory under the joint sovereignty of both states, as set out in their border treaty of 19 December 1984.",
+  "sources": [
+   {
+    "title": "Germany-Luxembourg border treaty (1984), UN Treaty Series No. 45359",
+    "url": "https://treaties.un.org/doc/Publication/UNTS/Volume%202735/Part/volume-2735-I-45359.pdf"
+   }
+  ]
+ },
+ "D-XMB": {
+  "text": "France and Italy differ over about 65 hectares around the summit of Mont Blanc. Italy holds that the boundary follows the watershed across the summit, and France that the summit lies wholly in France.",
+  "sources": [
+   {
+    "title": "US Department of State, International Boundary Study No. 4, France-Italy boundary (1961)",
+    "url": "https://library.law.fsu.edu/Digital-Collections/LimitsinSeas/pdf/ibs004.pdf"
+   },
+   {
+    "title": "Mont Blanc, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Mont_Blanc"
+   }
+  ]
+ },
+ "D-XIB": {
+  "text": "Brazil administers Brazilian Island at the confluence of the Quaraí and Uruguay rivers, and Uruguay claims it. The 1851 boundary treaty gives the islands at the mouth of the Quaraí to Brazil, and Uruguay holds that the island lies in the Uruguay River.",
+  "sources": [
+   {
+    "title": "US Department of State, International Boundary Study No. 170, Brazil-Uruguay boundary (1979)",
+    "url": "https://library.law.fsu.edu/Digital-Collections/LimitsinSeas/pdf/ibs170.pdf"
+   },
+   {
+    "title": "Brazil-Uruguay border, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Brazil%E2%80%93Uruguay_border"
+   }
+  ]
+ },
+ "D-XKA": {
+  "text": "India administers Kalapani in Pithoragarh district, and Nepal claims the land east of the Mahakali River under the 1816 Treaty of Sugauli, including Kalapani, Lipulekh and Limpiyadhura. Nepal added the claim to its map and Constitution in 2020.",
+  "sources": [
+   {
+    "title": "Nepal, Ministry of Foreign Affairs: response on Lipulekh (2025, Nepali)",
+    "url": "https://mofa.gov.np/content/1652/nepali-bhumi-answer/"
+   },
+   {
+    "title": "India, Ministry of External Affairs: weekly media briefing on Lipulekh (7 May 2026)",
+    "url": "https://mea.gov.in/media-briefings.htm?dtl%2F41113%2FTranscript_of_Weekly_Media_Briefing_by_the_Official_Spokesperson_May_07_2026="
+   },
+   {
+    "title": "Kalapani territory, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Kalapani_territory"
+   }
+  ]
+ },
+ "D-XDS": {
+  "text": "The Dramana and Shakhatoe valleys in western Bhutan are part of the Bhutan-China boundary talks, held since 1984. The talks follow a 1998 agreement to keep the status quo and a 2021 memorandum on a three-step roadmap.",
+  "sources": [
+   {
+    "title": "Bhutan, Ministry of Foreign Affairs: press release on the three-step roadmap (2021)",
+    "url": "https://www.mfa.gov.bt/press-release-519/"
+   },
+   {
+    "title": "China, Ministry of Foreign Affairs: China and Bhutan sign MoU on a three-step roadmap",
+    "url": "https://www.mfa.gov.cn/eng/wjb/zygy/hd/202406/t20240603_11374887.html"
+   },
+   {
+    "title": "Bhutan-China border, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Bhutan%E2%80%93China_border"
+   }
+  ]
+ },
+ "D-XKT": {
+  "text": "This section of the Kyrgyzstan-Tajikistan border between Kok-Tash and Khoji A'lo, near a shared water intake, stayed undelimited after 1991, and clashes began there on 28 April 2021. The two countries signed a treaty on their whole border on 13 March 2025, in force since 31 March 2025.",
+  "sources": [
+   {
+    "title": "UN Secretary-General on the Kyrgyzstan-Tajikistan Treaty on the State Border (13 March 2025), UN Kyrgyzstan",
+    "url": "https://kyrgyzstan.un.org/en/290892-secretary-general-treaty-state-border-between-kyrgyz-republic-and-republic-tajikistan"
+   },
+   {
+    "title": "Fergana, Kyrgyzstan-Tajikistan border treaty comes into force (2025)",
+    "url": "https://en.fergana.agency/news/137236/"
+   },
+   {
+    "title": "2021 Kyrgyzstan-Tajikistan clashes, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/2021_Kyrgyzstan%E2%80%93Tajikistan_clashes"
+   }
+  ]
+ },
+ "D-XLE": {
+  "text": "This section of the Kyrgyzstan-Tajikistan border in Kyrgyzstan's Leilek district stayed undelimited after 1991, and the 2021 clashes reached villages there. The two countries signed a treaty on their whole border on 13 March 2025, in force since 31 March 2025.",
+  "sources": [
+   {
+    "title": "UN Secretary-General on the Kyrgyzstan-Tajikistan Treaty on the State Border (13 March 2025), UN Kyrgyzstan",
+    "url": "https://kyrgyzstan.un.org/en/290892-secretary-general-treaty-state-border-between-kyrgyz-republic-and-republic-tajikistan"
+   },
+   {
+    "title": "Fergana, Kyrgyzstan-Tajikistan border treaty comes into force (2025)",
+    "url": "https://en.fergana.agency/news/137236/"
+   },
+   {
+    "title": "2021 Kyrgyzstan-Tajikistan clashes, Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/2021_Kyrgyzstan%E2%80%93Tajikistan_clashes"
+   }
+  ]
+ },
+ "D-XVO": {
+  "text": "Land use and roads northwest of Vorukh, a Tajik exclave inside Kyrgyzstan's Batken region, were disputed after 1991 and figured in the 2021 clashes. The two countries signed a treaty on their whole border on 13 March 2025, in force since 31 March 2025.",
+  "sources": [
+   {
+    "title": "UN Secretary-General on the Kyrgyzstan-Tajikistan Treaty on the State Border (13 March 2025), UN Kyrgyzstan",
+    "url": "https://kyrgyzstan.un.org/en/290892-secretary-general-treaty-state-border-between-kyrgyz-republic-and-republic-tajikistan"
+   },
+   {
+    "title": "RFE/RL, Kyrgyzstan and Tajikistan's border agreement (2025)",
+    "url": "https://www.rferl.org/a/kyrgyzstan-tajikistan-border-deal-historic-peace-agreement/33345668.html"
+   },
+   {
+    "title": "Fergana, Kyrgyzstan-Tajikistan border treaty comes into force (2025)",
+    "url": "https://en.fergana.agency/news/137236/"
    }
   ]
  }
