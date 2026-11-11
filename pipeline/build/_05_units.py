@@ -31,6 +31,9 @@ MIN_PATCH_KM2 = 0.01
 DECISIONS = curated_dir / "review_decisions.csv"
 OVERRIDES = curated_dir / "island_overrides.csv"
 LINKS = curated_dir / "gaul_links.csv"
+LAND = curated_dir / "land_areas.parquet"
+# Smaller shares are where an outline and UN Geodata's lines differ.
+MIN_LAND_SHARE = 0.05
 
 
 def _units(conn: DuckDBPyConnection) -> None:
@@ -299,6 +302,55 @@ def _island_errors(conn: DuckDBPyConnection) -> list[dict]:
     )
 
 
+def _land(conn: DuckDBPyConnection) -> list[dict]:
+    """Write each land area's pieces per UN entity, and return one record per area."""
+    land = [c for c in changes() if c["type"] in STEPS["land"]]
+    conn.execute("CREATE TABLE land (change_id VARCHAR, code VARCHAR, name VARCHAR)")
+    conn.executemany(
+        "INSERT INTO land VALUES (?, ?, ?)",
+        [(c["id"], c["entity"]["code"], c["entity"]["name"]) for c in land],
+    )
+    conn.execute(f"""--sql
+        CREATE TABLE land_pieces AS
+        SELECT * EXCLUDE (total) FROM (
+            SELECT *, sum(km2) OVER (PARTITION BY change_id) AS total FROM (
+                SELECT a.change_id, l.code, n.objectid AS un_objectid, n.un_iso3,
+                       round({KM2.format("i.geometry")}, 3) AS km2, i.geometry
+                FROM '{LAND}' a JOIN land l USING (change_id)
+                JOIN '{data("01", "un_polygons")}' u
+                  ON ST_Intersects(a.geometry, u.geometry)
+                JOIN un n ON n.objectid = u.objectid,
+                LATERAL (SELECT ST_Multi(ST_CollectionExtract(
+                    ST_Intersection(a.geometry, u.geometry), 3)) AS geometry) i))
+        WHERE km2 >= {MIN_LAND_SHARE} * total
+    """)
+    write_parquet(conn, "FROM land_pieces", Path(data("05", "land_areas")))
+    records = []
+    for c in land:
+        rows = conn.execute(
+            """--sql
+            SELECT p.un_objectid, n.un_iso3, coalesce(n.un_name, n.un_iso3), p.km2,
+                   ST_XMin(p.geometry), ST_YMin(p.geometry), ST_XMax(p.geometry),
+                   ST_YMax(p.geometry)
+            FROM land_pieces p JOIN un n ON n.objectid = p.un_objectid
+            WHERE change_id = ? ORDER BY km2 DESC""",
+            [c["id"]],
+        ).fetchall()
+        e = c["entity"]
+        values = [
+            dict(zip(("un_objectid", "un", "un_name", "km2"), r[:4], strict=True))
+            | {"gaul": e["code"], "gaul_name": e["name"]}
+            for r in rows
+        ]
+        box = [min(r[4] for r in rows), min(r[5] for r in rows)]
+        box += [max(r[6] for r in rows), max(r[7] for r in rows)]
+        km2 = round(sum(r[3] for r in rows), 3)
+        records.append(
+            c | {"km2": km2, "units": len(rows), "bbox": box, "values": values}
+        )
+    return records
+
+
 def _labels(conn: DuckDBPyConnection) -> None:
     """Write a label point per polygon, or per change where names replace codes."""
     rows = conn.execute(f"""--sql
@@ -329,6 +381,11 @@ def _labels(conn: DuckDBPyConnection) -> None:
                ST_X(ST_MaximumInscribedCircle(geometry).center),
                ST_Y(ST_MaximumInscribedCircle(geometry).center)
         FROM cell_islands
+        UNION ALL
+        SELECT change_id, concat(un_iso3, ' → ', code), km2,
+               ST_X(ST_MaximumInscribedCircle(geometry).center),
+               ST_Y(ST_MaximumInscribedCircle(geometry).center)
+        FROM land_pieces
     """).fetchall()
     features = [
         {
@@ -363,8 +420,10 @@ def main() -> None:
         "SELECT change_id, km2, geometry FROM cell_islands",
         Path(data("05", "cell_islands")),
     )
+    land = _land(conn)
     _labels(conn)
-    records = [_record(c, conn) for c in changes()]
+    records = [_record(c, conn) for c in changes() if c["type"] not in STEPS["land"]]
+    records += land
     records += island_errors + _lines(conn)
     out = stage_dir("05") / "changes.json"
     out.write_text(json.dumps(records, ensure_ascii=False, indent=1) + "\n")
@@ -389,5 +448,6 @@ def main() -> None:
             Path(data("01", "fieldmaps_voronoi")),
             Path(data("01", "line_overlaps")),
             DECISIONS,
+            LAND,
         ],
     )

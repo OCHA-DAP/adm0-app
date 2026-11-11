@@ -52,6 +52,12 @@ def _generated(c: dict) -> dict:
             "method": "OSM land clipped to the extended units",
             "source": "OpenStreetMap land polygons",
         }
+    if c["type"] == "land_area":
+        return {
+            "title": v["gaul_name"],
+            "method": "information only, not applied",
+            "source": "Disputed area outlines",
+        }
     if c["type"] == "new_island":
         return {
             "title": f"{v['un_name']}, a new entity",
@@ -65,7 +71,9 @@ def _described(records: list[dict]) -> list[dict]:
     """Give each record its title and text, curated text first, with sources."""
     curated = json.loads(DESCRIPTIONS.read_text())
     required = [
-        c["id"] for c in records if c["id"][0] == "C" or c["type"] == "new_island"
+        c["id"]
+        for c in records
+        if c["id"][0] == "C" or c["type"] in ("new_island", "land_area")
     ]
     untitled = [
         i for i in required if i[0] == "C" and not curated.get(i, {}).get("title")

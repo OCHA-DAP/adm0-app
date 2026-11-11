@@ -62,6 +62,7 @@
     build_un: `${tilesBase}/build/build_un.pmtiles`,
     build_path_errors: `${tilesBase}/build/build_path_errors.pmtiles`,
     build_path_disputed: `${tilesBase}/build/build_path_disputed.pmtiles`,
+    build_land_areas: `${tilesBase}/build/build_land_areas.pmtiles`,
     build_gaul: `${tilesBase}/build/build_gaul.pmtiles`,
     build_coast_un: `${tilesBase}/build/build_coast_un.pmtiles`,
   });
@@ -101,6 +102,9 @@
       m.addLayer({ id: "parents", type: "fill", source: "build_un", "source-layer": "build_un", filter: NOTHING, paint: { "fill-color": SLOT_COLORS.a, "fill-opacity": PARENT_OPACITY } });
       m.addLayer({ ...units, id: "step-changes", type: "fill", paint: { "fill-color": SLOT_COLORS.b } });
       m.addLayer({ ...units, id: "focus", type: "line", paint: { "line-color": SLOT_COLORS.b, "line-width": 3 } });
+      const land = { source: "build_land_areas", "source-layer": "build_land_areas", filter: NOTHING } as const;
+      m.addLayer({ ...land, id: "land-changes", type: "fill", paint: { "fill-color": SLOT_COLORS.b } });
+      m.addLayer({ ...land, id: "land-focus", type: "line", paint: { "line-color": SLOT_COLORS.b, "line-width": 3 } });
       m.addSource("build_line_patches", { type: "vector", url: `pmtiles://${tilesBase}/build/build_line_patches.pmtiles` });
       for (const slot of SLOTS) {
         m.addLayer({ id: `patch-${slot}`, type: "fill", source: "build_line_patches", "source-layer": "build_line_patches", filter: NOTHING, paint: { "fill-color": SLOT_COLORS[slot] } });
@@ -158,6 +162,8 @@
     map.setFilter("focus", change ? hasChange(change) : NOTHING);
     map.setFilter("parents", parents.length ? ["in", ["get", "objectid"], ["literal", parents]] : NOTHING);
     map.setFilter("step-changes", stepChanges.length ? ["any", ...stepChanges.map(hasChange)] : NOTHING);
+    map.setFilter("land-changes", ["in", ["get", "change_id"], ["literal", stepChanges]]);
+    map.setFilter("land-focus", ["==", ["get", "change_id"], change ?? ""]);
     if (hasCoast) {
       for (const id of COAST_PATCHES) {
         map.setFilter(`${id}-fill`, ["in", ["get", "change_id"], ["literal", coastPatches]]);
@@ -198,6 +204,8 @@
     if (!map || !loaded) return;
     map.setPaintProperty("step-changes", "fill-opacity", CHANGE_OPACITY * sweep);
     map.setPaintProperty("focus", "line-opacity", sweep);
+    map.setPaintProperty("land-changes", "fill-opacity", CHANGE_OPACITY * sweep);
+    map.setPaintProperty("land-focus", "line-opacity", sweep);
     SLOTS.forEach((slot, i) => {
       const opacity = slot === "a" ? 1 - sweep : sweep;
       if (compare) map!.setPaintProperty(`output-${compare[i]}`, "line-opacity", opacity);

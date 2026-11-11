@@ -17,4 +17,4 @@ Pushing needs `PORTOLAN_REMOTE` and the source.coop keys in `.env` (see `.env.ex
 
 ## Build layer
 
-`uv run python -m pipeline --step build` builds the build layer in numbered stages under `outputs/build/`. Stage 07 (`--stage 07`) extends it into water and runs only by name. See `docs/reference/build-data.md`.
+`uv run python -m pipeline --step build` builds the build layer in numbered stages under `outputs/build/`. Stage 07 extends it into water. See `docs/reference/build-data.md`.

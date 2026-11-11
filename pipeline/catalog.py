@@ -25,6 +25,10 @@ CATALOG = root / "catalog"
 DIFFERENCES = ("differences", "differences_dots")
 TABLES = ("attributes", "items")
 BUILD_SITE = (root / "outputs/build/09_tiles", root / "outputs/build/10_page")
+BUILD_EXPORTS = {
+    f"build_{x}.parquet": root / f"outputs/build/08_coast/{x}.parquet"
+    for x in ("un", "gaul")
+}
 HOST = {
     "name": "OCHA Centre for Humanitarian Data",
     "roles": ["host"],
@@ -102,7 +106,7 @@ def _stage_build() -> None:
     target.mkdir(exist_ok=True)
     files = {
         f.name: f for d in BUILD_SITE for f in d.iterdir() if f.name != "README.md"
-    }
+    } | BUILD_EXPORTS
     for stale in target.iterdir():
         if stale.name not in files:
             stale.unlink()

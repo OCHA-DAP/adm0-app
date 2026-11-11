@@ -17,6 +17,7 @@ LAYERS = {
     "build_gaul": ("06", "gaul"),
     "build_path_errors": ("06", "path_errors"),
     "build_path_disputed": ("06", "path_disputed"),
+    "build_land_areas": ("05", "land_areas"),
     "build_coast_un": ("08", "un"),
     "build_new_islands": ("08", "new_islands"),
     "build_dropped": ("08", "dropped"),

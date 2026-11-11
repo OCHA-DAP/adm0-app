@@ -95,7 +95,13 @@
     766,
     909
    ]
-  }
+  },
+  "areas": [
+   "xxx-1",
+   "xxx-2",
+   "xxx-3",
+   "xxx-4"
+  ]
  },
  {
   "id": "C05",
@@ -394,5 +400,221 @@
    "code": "XHM",
    "name": "Hunter and Matthew Islands"
   }
+ },
+ {
+  "id": "D-XDE",
+  "type": "land_area",
+  "entity": {
+   "code": "XDE",
+   "name": "Demchok"
+  },
+  "parties": [
+   "CHN",
+   "IND"
+  ],
+  "areas": [
+   "xxx-1"
+  ]
+ },
+ {
+  "id": "D-XJN",
+  "type": "land_area",
+  "entity": {
+   "code": "XJN",
+   "name": "Jadh-Nelang"
+  },
+  "parties": [
+   "CHN",
+   "IND"
+  ],
+  "areas": [
+   "xxx-2"
+  ]
+ },
+ {
+  "id": "D-XKU",
+  "type": "land_area",
+  "entity": {
+   "code": "XKU",
+   "name": "Kaurik"
+  },
+  "parties": [
+   "CHN",
+   "IND"
+  ],
+  "areas": [
+   "xxx-3"
+  ]
+ },
+ {
+  "id": "D-XLB",
+  "type": "land_area",
+  "entity": {
+   "code": "XLB",
+   "name": "Lapthal-Barahoti"
+  },
+  "parties": [
+   "CHN",
+   "IND"
+  ],
+  "areas": [
+   "xxx-4"
+  ]
+ },
+ {
+  "id": "D-XSP",
+  "type": "land_area",
+  "entity": {
+   "code": "XSP",
+   "name": "Shipki Pass"
+  },
+  "parties": [
+   "CHN",
+   "IND"
+  ]
+ },
+ {
+  "id": "D-XCH",
+  "type": "land_area",
+  "entity": {
+   "code": "XCH",
+   "name": "Chumar"
+  },
+  "parties": [
+   "CHN",
+   "IND"
+  ]
+ },
+ {
+  "id": "D-XCE",
+  "type": "land_area",
+  "entity": {
+   "code": "XCE",
+   "name": "Chumar East"
+  },
+  "parties": [
+   "CHN",
+   "IND"
+  ]
+ },
+ {
+  "id": "D-XKA",
+  "type": "land_area",
+  "entity": {
+   "code": "XKA",
+   "name": "Kalapani"
+  },
+  "parties": [
+   "IND",
+   "NPL"
+  ]
+ },
+ {
+  "id": "D-XDS",
+  "type": "land_area",
+  "entity": {
+   "code": "XDS",
+   "name": "Dramana-Shakatoe"
+  },
+  "parties": [
+   "BTN",
+   "CHN"
+  ]
+ },
+ {
+  "id": "D-XKT",
+  "type": "land_area",
+  "entity": {
+   "code": "XKT",
+   "name": "Koktash-Khoji Alo"
+  },
+  "parties": [
+   "KGZ",
+   "TJK"
+  ]
+ },
+ {
+  "id": "D-XLE",
+  "type": "land_area",
+  "entity": {
+   "code": "XLE",
+   "name": "Leilek"
+  },
+  "parties": [
+   "KGZ",
+   "TJK"
+  ]
+ },
+ {
+  "id": "D-XVO",
+  "type": "land_area",
+  "entity": {
+   "code": "XVO",
+   "name": "Vorukh NW-Ak Sai"
+  },
+  "parties": [
+   "KGZ",
+   "TJK"
+  ]
+ },
+ {
+  "id": "D-XKO",
+  "type": "land_area",
+  "entity": {
+   "code": "XKO",
+   "name": "Koalou"
+  },
+  "parties": [
+   "BEN",
+   "BFA"
+  ]
+ },
+ {
+  "id": "D-XCR",
+  "type": "land_area",
+  "entity": {
+   "code": "XCR",
+   "name": "Congo River"
+  },
+  "parties": [
+   "COD",
+   "COG"
+  ]
+ },
+ {
+  "id": "D-XMO",
+  "type": "land_area",
+  "entity": {
+   "code": "XMO",
+   "name": "Moselle River"
+  },
+  "parties": [
+   "DEU",
+   "LUX"
+  ]
+ },
+ {
+  "id": "D-XMB",
+  "type": "land_area",
+  "entity": {
+   "code": "XMB",
+   "name": "Mont Blanc"
+  },
+  "parties": [
+   "FRA",
+   "ITA"
+  ]
+ },
+ {
+  "id": "D-XIB",
+  "type": "land_area",
+  "entity": {
+   "code": "XIB",
+   "name": "Brazilian Island"
+  },
+  "parties": [
+   "BRA",
+   "URY"
+  ]
  }
 ]
