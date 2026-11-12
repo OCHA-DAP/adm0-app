@@ -32,8 +32,9 @@ STAGES = {
     "06": "export",
     "07": "extend",
     "08": "coast",
-    "09": "tiles",
-    "10": "page",
+    "09": "names",
+    "10": "tiles",
+    "11": "page",
 }
 
 
@@ -71,7 +72,7 @@ def changes() -> list[dict]:
 STEPS = {
     "lines": ["line_update"],
     "errors": ["un_error"],
-    "disputed": ["restore", "india_china", "split", "merge"],
+    "split": ["restore", "india_china", "split", "merge", "group_split"],
     "coast": ["coast"],
     "islands": ["new_island"],
     "land": ["land_area"],

@@ -38,7 +38,13 @@ MIN_LAND_SHARE = 0.05
 
 def _units(conn: DuckDBPyConnection) -> None:
     """Dissolve pieces per UN entity, GAUL entity and area into table ``units``."""
-    keys = [(un, gaul, c["id"]) for c in changes() for un, gaul in c.get("keys", [])]
+    # Stage 04 already tags area changes per area; joining their keys here duplicates.
+    keys = [
+        (un, gaul, c["id"])
+        for c in changes()
+        if not c.get("areas")
+        for un, gaul in c.get("keys", [])
+    ]
     conn.execute(
         "CREATE TABLE keyed (un_objectid BIGINT, gaul_id VARCHAR, change_id VARCHAR)"
     )
@@ -50,8 +56,8 @@ def _units(conn: DuckDBPyConnection) -> None:
         "INSERT INTO entities VALUES (?, ?, ?)",
         [(c["id"], e["code"], e["name"]) for c in changes() if (e := c.get("entity"))],
     )
-    # Every step but the disputed one applies to the UN export too.
-    shared = {t for s, types in STEPS.items() if s != "disputed" for t in types}
+    # Every step but the split one applies to the UN layer too.
+    shared = {t for s, types in STEPS.items() if s != "split" for t in types}
     conn.execute("CREATE TABLE moves (change_id VARCHAR, to_objectid BIGINT)")
     conn.executemany(
         "INSERT INTO moves VALUES (?, ?)",
@@ -65,8 +71,9 @@ def _units(conn: DuckDBPyConnection) -> None:
             SELECT gaul_id, {GAUL_ATTRS} FROM '{data("01", "gaul_polygons")}';
         CREATE TABLE units AS
             SELECT substr(md5(concat_ws(
-                       '|', p.un_objectid, p.gaul_id, p.area_id)), 1, 12) AS unit_id,
-                   p.un_objectid, p.gaul_id, p.area_id,
+                       '|', p.un_objectid, p.gaul_id, p.area_id, p.piece)), 1, 12)
+                       AS unit_id,
+                   p.un_objectid, p.gaul_id, p.area_id, p.piece,
                    count(*) AS parts,
                    list(DISTINCT p.change_id) FILTER (p.change_id IS NOT NULL)
                        AS override_changes,
@@ -118,10 +125,56 @@ def _units(conn: DuckDBPyConnection) -> None:
     """)
 
 
+def _adm0(conn: DuckDBPyConnection) -> None:
+    """Give each unit its output row: code, number within the code and name."""
+    conn.execute("CREATE TABLE area_codes (area_id VARCHAR, code VARCHAR)")
+    conn.executemany(
+        "INSERT INTO area_codes VALUES (?, ?)",
+        [(a, code) for c in changes() for a, code in c.get("area_codes", {}).items()],
+    )
+    fieldmaps = data("01", "fieldmaps_voronoi")
+    conn.execute(f"""--sql
+        CREATE TABLE grouped AS
+        SELECT t.unit_id, t.piece,
+               coalesce('P ' || t.piece, 'A ' || a.code, 'N ' || t.entity,
+                        'G ' || t.gaul_id) AS grp,
+               coalesce(t.entity, a.code, f.iso_3, g.ISO3_CODE) AS iso3,
+               coalesce(f.adm0_name, n.name, e.name, g.GAUL0_NAME) AS name,
+               {KM2.format("t.geometry")} AS km2,
+               len(list_filter(t.change_ids, lambda x: x LIKE 'C%')) > 0 AS curated,
+               -- UN stscod 2 to 4: Occupied Palestinian Territory, NSGT, Territory
+               u.un_status IN (2, 3, 4) AS territory
+        FROM tagged t
+        LEFT JOIN un u ON u.objectid = t.un_objectid
+        LEFT JOIN area_codes a USING (area_id)
+        LEFT JOIN (SELECT DISTINCT adm0_id, iso_3, adm0_name FROM '{fieldmaps}') f
+          ON f.adm0_id = t.piece
+        LEFT JOIN ({names()}) n ON n.code = a.code
+        LEFT JOIN (SELECT DISTINCT code, name FROM entities) e ON e.code = t.entity
+        LEFT JOIN gaul g USING (gaul_id);
+        CREATE TABLE numbered AS
+        SELECT *, row_number() OVER (PARTITION BY iso3 ORDER BY km2 DESC) AS rank,
+               CASE WHEN count(*) OVER (PARTITION BY iso3) > 1
+                    THEN iso3 || '_' || rank ELSE iso3 END AS adm0_id
+        FROM (SELECT grp, any_value(iso3) AS iso3, any_value(name) AS name,
+                     sum(km2) AS km2, bool_or(piece IS NOT NULL) AS pieced,
+                     bool_or(curated) AS curated, bool_or(territory) AS territory
+              FROM grouped GROUP BY grp);
+        CREATE TABLE unit_adm0 AS
+        SELECT g.unit_id, n.adm0_id, n.iso3, n.name AS adm0_name
+        FROM grouped g JOIN numbered n USING (grp);
+        UPDATE tagged t SET change_ids = list_append(t.change_ids, 'S-' || n.adm0_id)
+        FROM grouped g JOIN numbered n USING (grp)
+        WHERE g.unit_id = t.unit_id AND n.pieced AND NOT n.curated
+          AND (n.rank > 1 OR n.territory);
+    """)
+
+
 def _crosswalk(conn: DuckDBPyConnection) -> None:
     """Write the crosswalk beside the units, with every source attribute."""
     query = f"""--sql
-        SELECT t.unit_id, t.area_id, t.un_objectid, n.* EXCLUDE objectid,
+        SELECT t.unit_id, a.adm0_id, a.iso3, t.area_id, t.un_objectid,
+               n.* EXCLUDE objectid,
                t.gaul_id, g.* EXCLUDE gaul_id, t.entity, e.name AS entity_name,
                t.un_owner,
                t.parts,
@@ -131,6 +184,7 @@ def _crosswalk(conn: DuckDBPyConnection) -> None:
         JOIN un n ON n.objectid = t.un_objectid
         LEFT JOIN gaul g USING (gaul_id)
         LEFT JOIN (SELECT DISTINCT code, name FROM entities) e ON e.code = t.entity
+        JOIN unit_adm0 a USING (unit_id)
         ORDER BY n.un_iso3, t.un_objectid, t.gaul_id, t.area_id
     """
     write_parquet(conn, query, Path(data("05", "crosswalk")), geo=False)
@@ -147,13 +201,18 @@ def _record(change: dict, conn: DuckDBPyConnection) -> dict:
         FROM tagged WHERE list_contains(change_ids, '{change["id"]}')
     """).fetchall()[0]
     columns = ("un_objectid", "un", "un_name", "gaul", "gaul_name", "km2")
+    after = (
+        "a.iso3, a.adm0_name"
+        if change["type"] in STEPS["split"]
+        else "coalesce(t.entity, g.MAP_CODE), coalesce(e.name, g.GAUL0_NAME)"
+    )
     values = conn.execute(f"""--sql
-        SELECT t.un_objectid, n.un_iso3, coalesce(n.un_name, n.un_iso3),
-               coalesce(t.entity, g.MAP_CODE), coalesce(e.name, g.GAUL0_NAME),
+        SELECT t.un_objectid, n.un_iso3, coalesce(n.un_name, n.un_iso3), {after},
                round(sum({KM2.format("t.geometry")}), 3) AS km2
         FROM tagged t
         JOIN un n ON n.objectid = t.un_objectid LEFT JOIN gaul g USING (gaul_id)
         LEFT JOIN entities e ON e.code = t.entity
+        JOIN unit_adm0 a USING (unit_id)
         WHERE list_contains(t.change_ids, '{change["id"]}')
         GROUP BY ALL ORDER BY km2 DESC
     """).fetchall()
@@ -353,9 +412,12 @@ def _land(conn: DuckDBPyConnection) -> list[dict]:
 
 def _labels(conn: DuckDBPyConnection) -> None:
     """Write a label point per polygon, or per change where names replace codes."""
+    split = [c["id"] for c in changes() if c["type"] in STEPS["split"]]
     rows = conn.execute(f"""--sql
         SELECT p.c,
-               CASE WHEN p.c = r.change_id THEN concat(n.un_iso3, ' → ', to_un.un_iso3)
+               CASE WHEN p.c LIKE 'S-%' OR list_contains({split}, p.c)
+                    THEN concat(n.un_iso3, ' → ', a.iso3)
+                    WHEN p.c = r.change_id THEN concat(n.un_iso3, ' → ', to_un.un_iso3)
                     WHEN r.change_id IS NOT NULL
                     THEN concat(to_un.un_iso3, ' → ', g.MAP_CODE)
                     WHEN p.entity IS NOT NULL THEN concat(n.un_iso3, ' → ', p.entity)
@@ -365,15 +427,17 @@ def _labels(conn: DuckDBPyConnection) -> None:
                round({KM2.format("p.part")}, 3),
                ST_X(ST_MaximumInscribedCircle(p.part).center),
                ST_Y(ST_MaximumInscribedCircle(p.part).center)
-        FROM (SELECT t.c, t.un_objectid, t.gaul_id, t.entity,
+        FROM (SELECT t.c, t.unit_id, t.un_objectid, t.gaul_id, t.entity,
                      unnest(ST_Dump(t.geometry)).geom AS part
-              FROM (SELECT unnest(change_ids) AS c, un_objectid, gaul_id, entity,
-                           geometry
+              FROM (SELECT unnest(change_ids) AS c, unit_id, un_objectid, gaul_id,
+                           entity, geometry
                     FROM tagged) t) p
         JOIN un n ON n.objectid = p.un_objectid LEFT JOIN gaul g USING (gaul_id)
+        JOIN unit_adm0 a USING (unit_id)
         LEFT JOIN relabels r USING (un_objectid, gaul_id)
         LEFT JOIN un to_un ON to_un.objectid = r.to_objectid
         QUALIFY n.un_iso3 IS DISTINCT FROM coalesce(p.entity, g.MAP_CODE)
+             OR p.c LIKE 'S-%'
              OR row_number() OVER (
                  PARTITION BY p.c ORDER BY {KM2.format("p.part")} DESC) = 1
         UNION ALL
@@ -404,13 +468,14 @@ def main() -> None:
     """Write units, crosswalk, the change list and each change's geometry."""
     conn = connect()
     _units(conn)
+    _adm0(conn)
     write_parquet(
         conn,
         """--sql
         SELECT t.unit_id, t.un_objectid, t.un_owner, t.gaul_id, t.entity, t.area_id,
-               t.parts,
+               a.adm0_id, a.iso3, t.parts,
                array_to_string(t.change_ids, ';') AS change_ids, t.geometry
-        FROM tagged t""",
+        FROM tagged t JOIN unit_adm0 a USING (unit_id)""",
         Path(data("05", "units")),
     )
     _crosswalk(conn)
@@ -423,6 +488,12 @@ def main() -> None:
     land = _land(conn)
     _labels(conn)
     records = [_record(c, conn) for c in changes() if c["type"] not in STEPS["land"]]
+    splits = conn.execute("""--sql
+        SELECT DISTINCT c FROM (SELECT unnest(change_ids) AS c FROM tagged)
+        WHERE c LIKE 'S-%' ORDER BY c""").fetchall()
+    records += [
+        _record({"id": c, "type": "group_split", "keys": []}, conn) for (c,) in splits
+    ]
     records += land
     records += island_errors + _lines(conn)
     out = stage_dir("05") / "changes.json"

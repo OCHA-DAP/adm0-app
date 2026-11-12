@@ -73,10 +73,10 @@ def _described(records: list[dict]) -> list[dict]:
     required = [
         c["id"]
         for c in records
-        if c["id"][0] == "C" or c["type"] in ("new_island", "land_area")
+        if c["id"][0] == "C" or c["type"] in ("new_island", "land_area", "group_split")
     ]
     untitled = [
-        i for i in required if i[0] == "C" and not curated.get(i, {}).get("title")
+        i for i in required if i[0] in "CS" and not curated.get(i, {}).get("title")
     ]
     if (
         missing := [i for i in required if not curated.get(i, {}).get("sources")]
@@ -89,7 +89,7 @@ def _described(records: list[dict]) -> list[dict]:
         raise ValueError(msg)
     for c in records:
         entry = curated.get(c["id"], {})
-        auto = {} if c["id"][0] == "C" else _generated(c)
+        auto = {} if c["id"][0] in "CS" else _generated(c)
         texts = [entry.get("text"), auto.get("text")]
         c["title"] = entry.get("title") or auto["title"]
         c["description"] = " ".join(t.strip() for t in texts if t)
@@ -110,7 +110,7 @@ def _steps() -> list[dict]:
 
 def main() -> None:
     """Write the described change list, the page's steps and the tables it loads."""
-    folder = stage_dir("10")
+    folder = stage_dir("11")
     conn = connect()
     lists = [stage_dir(s) / "changes.json" for s in ("05", "08")]
     merged = _described([c for path in lists for c in json.loads(path.read_text())])
@@ -131,4 +131,4 @@ def main() -> None:
     for path in tables:
         copy2(path, folder)
     (folder / "path.json").write_text(json.dumps(_steps(), ensure_ascii=False))
-    finish(conn, "10", [*tables, *lists, PATH, DESCRIPTIONS, REF])
+    finish(conn, "11", [*tables, *lists, PATH, DESCRIPTIONS, REF])

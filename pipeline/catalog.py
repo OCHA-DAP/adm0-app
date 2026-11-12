@@ -24,11 +24,8 @@ logger = getLogger(__name__)
 CATALOG = root / "catalog"
 DIFFERENCES = ("differences", "differences_dots")
 TABLES = ("attributes", "items")
-BUILD_SITE = (root / "outputs/build/09_tiles", root / "outputs/build/10_page")
-BUILD_EXPORTS = {
-    f"build_{x}.parquet": root / f"outputs/build/08_coast/{x}.parquet"
-    for x in ("un", "gaul")
-}
+BUILD_SITE = (root / "outputs/build/10_tiles", root / "outputs/build/11_page")
+BUILD_EXPORTS = {"build_adm0.parquet": root / "outputs/build/09_names/adm0.parquet"}
 HOST = {
     "name": "OCHA Centre for Humanitarian Data",
     "roles": ["host"],

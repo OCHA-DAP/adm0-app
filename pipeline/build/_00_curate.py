@@ -48,7 +48,7 @@ def main() -> None:
                   WHERE iso3_1 = 'CHN' AND iso3_2 = 'IND')
             WHERE ST_XMin(d.geom) > {SIKKIM_XMIN}
         )
-        SELECT 'C04' AS change_id, 'xxx-' || n AS area_id,
+        SELECT 'C04' || chr(96 + n::INTEGER) AS change_id, 'xxx-' || n AS area_id,
                'gaul_l0' AS source_layer,
                'gaul_id {DISPUTED}, part ' || n AS source_feature,
                geometry

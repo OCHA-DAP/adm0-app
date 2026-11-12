@@ -55,19 +55,51 @@
    }
   ]
  },
- "C04": {
-  "title": "India-China disputed areas (XXX)",
+ "C04a": {
+  "title": "Demchok",
   "method": "GAUL outline as cut line",
   "source": "GAUL 2025 entity 238",
-  "text": "Demchok, Jadh-Nelang, Kaurik and Lapthal-Barahoti lie on the India-China boundary. In a 1993 agreement both countries undertook to respect the Line of Actual Control pending a boundary settlement.",
+  "text": "Demchok lies on the India-China boundary between Ladakh and Tibet. In a 1993 agreement India and China undertook to respect the Line of Actual Control pending a boundary settlement.",
   "sources": [
    {
     "title": "India-China Agreement on the Line of Actual Control (1993), UN Peacemaker",
     "url": "https://peacemaker.un.org/sites/default/files/document/files/2024/05/cn20in930907agreement20on20india-china20border20areas.pdf"
-   },
+   }
+  ]
+ },
+ "C04b": {
+  "title": "Jadh-Nelang",
+  "method": "GAUL outline as cut line",
+  "source": "GAUL 2025 entity 238",
+  "text": "Jadh-Nelang lies on the India-China boundary between Uttarakhand and Tibet. In a 1993 agreement India and China undertook to respect the Line of Actual Control pending a boundary settlement.",
+  "sources": [
    {
-    "title": "Sino-Indian border dispute, Wikipedia",
-    "url": "https://en.wikipedia.org/wiki/Sino-Indian_border_dispute"
+    "title": "India-China Agreement on the Line of Actual Control (1993), UN Peacemaker",
+    "url": "https://peacemaker.un.org/sites/default/files/document/files/2024/05/cn20in930907agreement20on20india-china20border20areas.pdf"
+   }
+  ]
+ },
+ "C04c": {
+  "title": "Kaurik",
+  "method": "GAUL outline as cut line",
+  "source": "GAUL 2025 entity 238",
+  "text": "Kaurik lies on the India-China boundary between Himachal Pradesh and Tibet. In a 1993 agreement India and China undertook to respect the Line of Actual Control pending a boundary settlement.",
+  "sources": [
+   {
+    "title": "India-China Agreement on the Line of Actual Control (1993), UN Peacemaker",
+    "url": "https://peacemaker.un.org/sites/default/files/document/files/2024/05/cn20in930907agreement20on20india-china20border20areas.pdf"
+   }
+  ]
+ },
+ "C04d": {
+  "title": "Lapthal-Barahoti",
+  "method": "GAUL outline as cut line",
+  "source": "GAUL 2025 entity 238",
+  "text": "Lapthal-Barahoti lies on the India-China boundary between Uttarakhand and Tibet. In a 1993 agreement India and China undertook to respect the Line of Actual Control pending a boundary settlement.",
+  "sources": [
+   {
+    "title": "India-China Agreement on the Line of Actual Control (1993), UN Peacemaker",
+    "url": "https://peacemaker.un.org/sites/default/files/document/files/2024/05/cn20in930907agreement20on20india-china20border20areas.pdf"
    }
   ]
  },
@@ -103,15 +135,15 @@
   "title": "Bassas da India",
   "method": "island attribution",
   "source": "UN Geodata and GAUL polygons",
-  "text": "Bassas da India is one of France's Scattered Islands in the Mozambique Channel, a district of the French Southern and Antarctic Lands, and Madagascar claims it.",
+  "text": "Bassas da India is one of France's Scattered Islands in the Mozambique Channel, part of the French Southern and Antarctic Lands, and Madagascar claims it.",
   "sources": [
    {
     "title": "UN General Assembly resolution 34/91 (1979)",
     "url": "https://documents.un.org/doc/resolution/gen/nr0/377/18/pdf/nr037718.pdf"
    },
    {
-    "title": "IEDOM, Portrait des TAAF",
-    "url": "https://www.iedom.fr/IMG/pdf/portrait_des_taaf_vf-2.pdf"
+    "title": "Administration des TAAF, Les îles Éparses",
+    "url": "https://taaf.fr/collectivites/presentation-des-territoires/les-iles-eparses/"
    }
   ]
  },
@@ -119,15 +151,15 @@
   "title": "Europa Island",
   "method": "island attribution",
   "source": "UN Geodata and GAUL polygons",
-  "text": "Europa Island is one of France's Scattered Islands in the Mozambique Channel, a district of the French Southern and Antarctic Lands, and Madagascar claims it.",
+  "text": "Europa Island is one of France's Scattered Islands in the Mozambique Channel, part of the French Southern and Antarctic Lands, and Madagascar claims it.",
   "sources": [
    {
     "title": "UN General Assembly resolution 34/91 (1979)",
     "url": "https://documents.un.org/doc/resolution/gen/nr0/377/18/pdf/nr037718.pdf"
    },
    {
-    "title": "IEDOM, Portrait des TAAF",
-    "url": "https://www.iedom.fr/IMG/pdf/portrait_des_taaf_vf-2.pdf"
+    "title": "Administration des TAAF, Les îles Éparses",
+    "url": "https://taaf.fr/collectivites/presentation-des-territoires/les-iles-eparses/"
    }
   ]
  },
@@ -135,15 +167,15 @@
   "title": "Glorioso Islands",
   "method": "island attribution",
   "source": "UN Geodata and GAUL polygons",
-  "text": "The Glorioso Islands are one of France's Scattered Islands in the Mozambique Channel, a district of the French Southern and Antarctic Lands, and Madagascar claims them.",
+  "text": "The Glorioso Islands are one of France's Scattered Islands in the Mozambique Channel, part of the French Southern and Antarctic Lands, and Madagascar claims them.",
   "sources": [
    {
     "title": "UN General Assembly resolution 34/91 (1979)",
     "url": "https://documents.un.org/doc/resolution/gen/nr0/377/18/pdf/nr037718.pdf"
    },
    {
-    "title": "IEDOM, Portrait des TAAF",
-    "url": "https://www.iedom.fr/IMG/pdf/portrait_des_taaf_vf-2.pdf"
+    "title": "Administration des TAAF, Les îles Éparses",
+    "url": "https://taaf.fr/collectivites/presentation-des-territoires/les-iles-eparses/"
    }
   ]
  },
@@ -151,15 +183,15 @@
   "title": "Juan de Nova Island",
   "method": "island attribution",
   "source": "UN Geodata and GAUL polygons",
-  "text": "Juan de Nova is one of France's Scattered Islands in the Mozambique Channel, a district of the French Southern and Antarctic Lands, and Madagascar claims it.",
+  "text": "Juan de Nova is one of France's Scattered Islands in the Mozambique Channel, part of the French Southern and Antarctic Lands, and Madagascar claims it.",
   "sources": [
    {
     "title": "UN General Assembly resolution 34/91 (1979)",
     "url": "https://documents.un.org/doc/resolution/gen/nr0/377/18/pdf/nr037718.pdf"
    },
    {
-    "title": "IEDOM, Portrait des TAAF",
-    "url": "https://www.iedom.fr/IMG/pdf/portrait_des_taaf_vf-2.pdf"
+    "title": "Administration des TAAF, Les îles Éparses",
+    "url": "https://taaf.fr/collectivites/presentation-des-territoires/les-iles-eparses/"
    }
   ]
  },
@@ -167,7 +199,7 @@
   "title": "Tromelin Island",
   "method": "island attribution",
   "source": "UN Geodata and GAUL polygons",
-  "text": "Tromelin, east of Madagascar, is one of France's Scattered Islands, a district of the French Southern and Antarctic Lands, and Mauritius claims it.",
+  "text": "Tromelin, east of Madagascar, is one of France's Scattered Islands, part of the French Southern and Antarctic Lands, and Mauritius claims it.",
   "sources": [
    {
     "title": "Note from France to the UN Secretary-General on Tromelin (2009), UN DOALOS",
@@ -178,8 +210,8 @@
     "url": "https://www.un.org/depts/los/LEGISLATIONANDTREATIES/PDFFILES/DEPOSIT/communicationsredeposit/mzn63_2008_mus2.pdf"
    },
    {
-    "title": "IEDOM, Portrait des TAAF",
-    "url": "https://www.iedom.fr/IMG/pdf/portrait_des_taaf_vf-2.pdf"
+    "title": "Administration des TAAF, Les îles Éparses",
+    "url": "https://taaf.fr/collectivites/presentation-des-territoires/les-iles-eparses/"
    }
   ]
  },
@@ -881,6 +913,338 @@
    {
     "title": "Fergana, Kyrgyzstan-Tajikistan border treaty comes into force (2025)",
     "url": "https://en.fergana.agency/news/137236/"
+   }
+  ]
+ },
+ "S-ATF_2": {
+  "title": "Crozet Archipelago",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "Crozet is a district of the French Southern and Antarctic Lands.",
+  "sources": [
+   {
+    "title": "Administration des TAAF, Les îles Australes",
+    "url": "https://taaf.fr/collectivites/presentation-des-territoires/les-iles-australes/"
+   }
+  ]
+ },
+ "S-ATF_3": {
+  "title": "Saint Paul and Amsterdam Islands",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "Saint Paul and Amsterdam form a district of the French Southern and Antarctic Lands.",
+  "sources": [
+   {
+    "title": "Administration des TAAF, Les îles Australes",
+    "url": "https://taaf.fr/collectivites/presentation-des-territoires/les-iles-australes/"
+   }
+  ]
+ },
+ "S-ZAF_2": {
+  "title": "Prince Edward Islands",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "The Prince Edward Islands are part of South Africa.",
+  "sources": [
+   {
+    "title": "Prince Edward Islands Act 43 of 1948",
+    "url": "https://www.gov.za/documents/prince-edward-islands-act-7-oct-1948-0000"
+   }
+  ]
+ },
+ "S-SJM_2": {
+  "title": "Jan Mayen",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "Jan Mayen is part of Norway under the Jan Mayen Act.",
+  "sources": [
+   {
+    "title": "Lov om Jan Mayen (LOV-1930-02-27-2)",
+    "url": "https://lovdata.no/dokument/NL/lov/1930-02-27-2"
+   }
+  ]
+ },
+ "S-SHN_2": {
+  "title": "Saint Helena",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "Saint Helena is one of the three parts of Saint Helena, Ascension and Tristan da Cunha, a Non-Self-Governing Territory administered by the United Kingdom.",
+  "sources": [
+   {
+    "title": "UN Special Committee on Decolonization, Saint Helena: working paper (A/AC.109/2025/13)",
+    "url": "https://documents.un.org/doc/undoc/gen/n25/017/11/pdf/n2501711.pdf"
+   }
+  ]
+ },
+ "S-SHN_3": {
+  "title": "Ascension",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "Ascension is one of the three parts of Saint Helena, Ascension and Tristan da Cunha, a Non-Self-Governing Territory administered by the United Kingdom.",
+  "sources": [
+   {
+    "title": "UN Special Committee on Decolonization, Saint Helena: working paper (A/AC.109/2025/13)",
+    "url": "https://documents.un.org/doc/undoc/gen/n25/017/11/pdf/n2501711.pdf"
+   }
+  ]
+ },
+ "S-BES_2": {
+  "title": "Sint Eustatius",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "Sint Eustatius is a special municipality of the Netherlands.",
+  "sources": [
+   {
+    "title": "Government of the Netherlands, Caribbean Parts of the Kingdom",
+    "url": "https://www.government.nl/themes/government-and-democracy/caribbean-parts-of-the-kingdom"
+   }
+  ]
+ },
+ "S-BES_3": {
+  "title": "Saba",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "Saba is a special municipality of the Netherlands.",
+  "sources": [
+   {
+    "title": "Government of the Netherlands, Caribbean Parts of the Kingdom",
+    "url": "https://www.government.nl/themes/government-and-democracy/caribbean-parts-of-the-kingdom"
+   }
+  ]
+ },
+ "S-ESP_2": {
+  "title": "Canary Islands",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "The Canary Islands are an autonomous community of Spain.",
+  "sources": [
+   {
+    "title": "Ley Orgánica 1/2018, reforma del Estatuto de Autonomía de Canarias, article 1 (BOE-A-2018-15138)",
+    "url": "https://www.boe.es/buscar/act.php?id=BOE-A-2018-15138"
+   }
+  ]
+ },
+ "S-ESP_3": {
+  "title": "Plazas de soberanía",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "Spain holds the Peñón de Vélez de la Gomera, the Peñón de Alhucemas and the Chafarinas Islands, and Morocco claims them.",
+  "sources": [
+   {
+    "title": "UN Convention on the Law of the Sea, declaration of Morocco (2007) and communication of Spain (2008), UN Treaty Collection",
+    "url": "https://treaties.un.org/Pages/ViewDetailsIII.aspx?src=TREATY&mtdsg_no=XXI-6&chapter=21&Temp=mtdsg3&clang=_en"
+   }
+  ]
+ },
+ "S-PRT_2": {
+  "title": "Azores",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "The Azores are an autonomous region of Portugal.",
+  "sources": [
+   {
+    "title": "Constituição da República Portuguesa, article 6, Assembleia da República",
+    "url": "https://www.parlamento.pt/Legislacao/Paginas/ConstituicaoRepublicaPortuguesa.aspx"
+   }
+  ]
+ },
+ "S-PRT_3": {
+  "title": "Madeira",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "Madeira is an autonomous region of Portugal.",
+  "sources": [
+   {
+    "title": "Constituição da República Portuguesa, article 6, Assembleia da República",
+    "url": "https://www.parlamento.pt/Legislacao/Paginas/ConstituicaoRepublicaPortuguesa.aspx"
+   }
+  ]
+ },
+ "S-PSE_2": {
+  "title": "Gaza",
+  "method": "separate area split",
+  "source": "UN Geodata polygons",
+  "text": "Gaza is part of the Occupied Palestinian Territory.",
+  "sources": [
+   {
+    "title": "UN Security Council resolution 1860 (2009)",
+    "url": "https://documents.un.org/api/symbol/access?s=S/RES/1860(2009)&l=en&t=pdf"
+   }
+  ]
+ },
+ "S-UMI_2": {
+  "title": "Wake Island",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "Wake Island is an unincorporated US territory, and the Marshall Islands claims it as Enenkio.",
+  "sources": [
+   {
+    "title": "Office of Insular Affairs, Definitions of Insular Area Political Organizations",
+    "url": "https://www.doi.gov/oia/islands/politicatypes"
+   },
+   {
+    "title": "Marshall Islands, Declaration of Baselines and Maritime Zones (M.Z.N.120.2016.LOS), UN DOALOS",
+    "url": "https://www.un.org/depts/los/LEGISLATIONANDTREATIES/PDFFILES/DEPOSIT/mhl_mzn120_2016_2.pdf"
+   }
+  ]
+ },
+ "S-UMI_3": {
+  "title": "Palmyra Atoll",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "Palmyra Atoll is the only incorporated US territory.",
+  "sources": [
+   {
+    "title": "Office of Insular Affairs, Definitions of Insular Area Political Organizations",
+    "url": "https://www.doi.gov/oia/islands/politicatypes"
+   }
+  ]
+ },
+ "S-UMI_4": {
+  "title": "Midway Islands",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "Midway Atoll is an unincorporated US territory.",
+  "sources": [
+   {
+    "title": "Office of Insular Affairs, Definitions of Insular Area Political Organizations",
+    "url": "https://www.doi.gov/oia/islands/politicatypes"
+   }
+  ]
+ },
+ "S-UMI_5": {
+  "title": "Jarvis Island",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "Jarvis Island is an unincorporated US territory.",
+  "sources": [
+   {
+    "title": "Office of Insular Affairs, Definitions of Insular Area Political Organizations",
+    "url": "https://www.doi.gov/oia/islands/politicatypes"
+   }
+  ]
+ },
+ "S-UMI_6": {
+  "title": "Navassa Island",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "Navassa Island is an unincorporated US territory, and Haiti claims it.",
+  "sources": [
+   {
+    "title": "Office of Insular Affairs, Definitions of Insular Area Political Organizations",
+    "url": "https://www.doi.gov/oia/islands/politicatypes"
+   },
+   {
+    "title": "Constitution of Haiti (1987, rev. 2012), article 8, Constitute Project",
+    "url": "https://www.constituteproject.org/constitution/Haiti_2012"
+   }
+  ]
+ },
+ "S-UMI_7": {
+  "title": "Johnston Atoll",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "Johnston Atoll is an unincorporated US territory.",
+  "sources": [
+   {
+    "title": "Office of Insular Affairs, Definitions of Insular Area Political Organizations",
+    "url": "https://www.doi.gov/oia/islands/politicatypes"
+   }
+  ]
+ },
+ "S-UMI_8": {
+  "title": "Howland Island",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "Howland Island is an unincorporated US territory.",
+  "sources": [
+   {
+    "title": "Office of Insular Affairs, Definitions of Insular Area Political Organizations",
+    "url": "https://www.doi.gov/oia/islands/politicatypes"
+   }
+  ]
+ },
+ "S-UMI_9": {
+  "title": "Baker Island",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "Baker Island is an unincorporated US territory.",
+  "sources": [
+   {
+    "title": "Office of Insular Affairs, Definitions of Insular Area Political Organizations",
+    "url": "https://www.doi.gov/oia/islands/politicatypes"
+   }
+  ]
+ },
+ "S-ATF_1": {
+  "title": "Kerguelen Islands",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "Kerguelen is a district of the French Southern and Antarctic Lands.",
+  "sources": [
+   {
+    "title": "Administration des TAAF, Les îles Australes",
+    "url": "https://taaf.fr/collectivites/presentation-des-territoires/les-iles-australes/"
+   }
+  ]
+ },
+ "S-BES_1": {
+  "title": "Bonaire",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "Bonaire is a special municipality of the Netherlands.",
+  "sources": [
+   {
+    "title": "Government of the Netherlands, Caribbean Parts of the Kingdom",
+    "url": "https://www.government.nl/themes/government-and-democracy/caribbean-parts-of-the-kingdom"
+   }
+  ]
+ },
+ "S-PSE_1": {
+  "title": "West Bank",
+  "method": "separate area split",
+  "source": "UN Geodata polygons",
+  "text": "The West Bank, including East Jerusalem, is part of the Occupied Palestinian Territory.",
+  "sources": [
+   {
+    "title": "UN Security Council resolution 2334 (2016)",
+    "url": "https://documents.un.org/api/symbol/access?s=S/RES/2334(2016)&l=en&t=pdf"
+   }
+  ]
+ },
+ "S-SHN_1": {
+  "title": "Tristan da Cunha",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "Tristan da Cunha is one of the three parts of Saint Helena, Ascension and Tristan da Cunha, a Non-Self-Governing Territory administered by the United Kingdom.",
+  "sources": [
+   {
+    "title": "UN Special Committee on Decolonization, Saint Helena: working paper (A/AC.109/2025/13)",
+    "url": "https://documents.un.org/doc/undoc/gen/n25/017/11/pdf/n2501711.pdf"
+   }
+  ]
+ },
+ "S-SJM_1": {
+  "title": "Svalbard",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "Svalbard is part of Norway under the Svalbard Act.",
+  "sources": [
+   {
+    "title": "Lov om Svalbard (LOV-1925-07-17-11)",
+    "url": "https://lovdata.no/dokument/NL/lov/1925-07-17-11"
+   }
+  ]
+ },
+ "S-UMI_1": {
+  "title": "Kingman Reef",
+  "method": "island group split",
+  "source": "UN Geodata polygons",
+  "text": "Kingman Reef is an unincorporated US territory.",
+  "sources": [
+   {
+    "title": "Office of Insular Affairs, Definitions of Insular Area Political Organizations",
+    "url": "https://www.doi.gov/oia/islands/politicatypes"
    }
   ]
  }

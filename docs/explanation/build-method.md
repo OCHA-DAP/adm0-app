@@ -1,6 +1,6 @@
 # Why the build layer is built this way
 
-The build layer lets one set of polygons serve two views of the world. Dissolved by UN key, it returns UN Geodata 2023. Dissolved by GAUL key, it returns the GAUL entities and codes on UN 2023 lines.
+The build layer is one set of polygons that carries a UN key and a GAUL key on every unit. Dissolved by UN key, it returns UN Geodata 2023 for the checks and the page. Dissolved by ADM0 row, it gives the one output.
 
 ## UN Geodata is the base
 

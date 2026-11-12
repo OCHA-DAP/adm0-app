@@ -73,7 +73,7 @@
   }
  },
  {
-  "id": "C04",
+  "id": "C04a",
   "type": "india_china",
   "keys": [
    [
@@ -97,11 +97,104 @@
    ]
   },
   "areas": [
-   "xxx-1",
-   "xxx-2",
-   "xxx-3",
+   "xxx-1"
+  ],
+  "area_codes": {
+   "xxx-1": "XDE"
+  }
+ },
+ {
+  "id": "C04b",
+  "type": "india_china",
+  "keys": [
+   [
+    704,
+    "238"
+   ],
+   [
+    766,
+    "238"
+   ],
+   [
+    909,
+    "238"
+   ]
+  ],
+  "cut": {
+   "un_objectids": [
+    704,
+    766,
+    909
+   ]
+  },
+  "areas": [
+   "xxx-2"
+  ],
+  "area_codes": {
+   "xxx-2": "XJN"
+  }
+ },
+ {
+  "id": "C04c",
+  "type": "india_china",
+  "keys": [
+   [
+    704,
+    "238"
+   ],
+   [
+    766,
+    "238"
+   ],
+   [
+    909,
+    "238"
+   ]
+  ],
+  "cut": {
+   "un_objectids": [
+    704,
+    766,
+    909
+   ]
+  },
+  "areas": [
+   "xxx-3"
+  ],
+  "area_codes": {
+   "xxx-3": "XKU"
+  }
+ },
+ {
+  "id": "C04d",
+  "type": "india_china",
+  "keys": [
+   [
+    704,
+    "238"
+   ],
+   [
+    766,
+    "238"
+   ],
+   [
+    909,
+    "238"
+   ]
+  ],
+  "cut": {
+   "un_objectids": [
+    704,
+    766,
+    909
+   ]
+  },
+  "areas": [
    "xxx-4"
-  ]
+  ],
+  "area_codes": {
+   "xxx-4": "XLB"
+  }
  },
  {
   "id": "C05",

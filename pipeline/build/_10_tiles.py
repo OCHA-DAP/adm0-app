@@ -14,32 +14,32 @@ LAYERS = {
     "build_line_patches": ("05", "line_patches"),
     "build_cell_islands": ("05", "cell_islands"),
     "build_un": ("06", "un"),
-    "build_gaul": ("06", "gaul"),
     "build_path_errors": ("06", "path_errors"),
-    "build_path_disputed": ("06", "path_disputed"),
+    "build_path_split": ("06", "path_split"),
     "build_land_areas": ("05", "land_areas"),
     "build_coast_un": ("08", "un"),
     "build_new_islands": ("08", "new_islands"),
     "build_dropped": ("08", "dropped"),
     "build_gained": ("08", "gained"),
     "build_lost": ("08", "lost"),
+    "build_adm0": ("09", "adm0"),
 }
 
 
 def main() -> None:
     """Tile each layer whose source changed."""
-    folder = stage_dir("09")
+    folder = stage_dir("10")
     sources = [Path(data(*src)) for src in LAYERS.values()]
     settings = Path(tiles.__file__)
-    same_settings = unchanged("09", settings)
+    same_settings = unchanged("10", settings)
     conn = connect()
     for name, src in zip(LAYERS, sources, strict=True):
         dest = folder / f"{name}.pmtiles"
-        if same_settings and dest.exists() and unchanged("09", src):
+        if same_settings and dest.exists() and unchanged("10", src):
             logger.info("%s: unchanged", name)
         elif not conn.execute(f"SELECT count(*) FROM '{src}'").fetchall()[0][0]:
             dest.unlink(missing_ok=True)
             logger.info("%s: empty, not tiled", name)
         else:
             tiles.tile(src, dest, name)
-    finish(conn, "09", [settings, *sources])
+    finish(conn, "10", [settings, *sources])
