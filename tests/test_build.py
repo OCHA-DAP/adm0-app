@@ -83,7 +83,7 @@ def test_disputed_areas_stay_separate(conn: DuckDBPyConnection) -> None:
     assert n == DISPUTED_UNITS
 
 
-@pytest.mark.parametrize("name", ["path_errors", "path_disputed"])
+@pytest.mark.parametrize("name", ["path_errors", "path_split"])
 def test_path_outputs_keep_the_build_area(conn: DuckDBPyConnection, name: str) -> None:
     """Each page step's output covers exactly the build's land."""
     area = "SELECT sum(ST_Area(geometry)) FROM '{}'"
@@ -93,16 +93,27 @@ def test_path_outputs_keep_the_build_area(conn: DuckDBPyConnection, name: str) -
 
 
 def test_viet_nam_has_no_south_china_sea_islands(conn: DuckDBPyConnection) -> None:
-    """The Viet Nam export stops at the mainland coast and its near islands."""
-    gaul = data("06", "gaul")
+    """Viet Nam's row stops at the mainland coast and its near islands."""
+    adm0 = data("06", "adm0")
     assert (
         one(
             conn,
             f"""--sql
-        SELECT ST_XMax(geometry) FROM '{gaul}' WHERE gaul_id = '{VIET_NAM}'""",
+        SELECT ST_XMax(geometry) FROM '{adm0}' WHERE gaul_id = '{VIET_NAM}'""",
         )
         < VIET_NAM_XMAX
     )
+
+
+def test_split_codes_number_every_row(conn: DuckDBPyConnection) -> None:
+    """A code with several rows numbers each from _1, and no row keeps the bare code."""
+    adm0 = data("06", "adm0")
+    rows = conn.execute(f"""--sql
+        SELECT iso3, list(adm0_id ORDER BY adm0_id) FROM '{adm0}'
+        GROUP BY iso3 HAVING count(*) > 1""").fetchall()
+    assert rows
+    for iso3, ids in rows:
+        assert sorted(ids) == sorted(f"{iso3}_{i}" for i in range(1, len(ids) + 1))
 
 
 def test_line_patches_cover_the_borders(conn: DuckDBPyConnection) -> None:

@@ -1,11 +1,11 @@
-"""Build the build layer: UN Geodata cut into units that dissolve to UN or GAUL."""
+"""Build the build layer: UN Geodata cut into units that dissolve to ADM0."""
 
 from argparse import ArgumentParser
 from importlib import import_module
 
 from .common import STAGES
 
-DEFAULT_STAGES = tuple(f"{i:02d}" for i in range(1, 11))
+DEFAULT_STAGES = tuple(f"{i:02d}" for i in range(1, 12))
 
 
 def main() -> None:

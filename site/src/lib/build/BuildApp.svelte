@@ -50,16 +50,19 @@
   let collapsed = $state(true);
   const compare = new CompareState();
   compare.mode = "polygon";
+  const splitTypes = ["restore", "india_china", "split", "merge", "group_split"];
 
   const step = $derived(steps[stepIndex]);
   const border = $derived(change?.type === "line_update" ? change.id.slice(2).split("-") : null);
   const byArea = (a: Change, b: Change) => (b.km2 ?? 0) - (a.km2 ?? 0);
+  const outCode = (c: Change) => c.values?.[0]?.gaul.split("_")[0] ?? "";
   const share = (c: Change) => (c.type === "coast" && c.un_km2 ? (c.km2 ?? 0) / c.un_km2 : null);
   const byShare = (a: Change, b: Change) => (share(b) ?? -1) - (share(a) ?? -1) || byArea(a, b);
   const pctFormat = (v: number) => (v < 0.001 ? "<0.1%" : new Intl.NumberFormat("en", { style: "percent", maximumFractionDigits: v < 0.1 ? 1 : 0 }).format(v));
   const stepChanges = (s: Step) => {
     const list = changes.filter((c) => s.types.includes(c.type) && !(c.type === "coast" && (c.km2 ?? 0) < MIN_KM2));
     if (s.types.some((t) => COAST_TYPES.includes(t))) return list.sort((a, b) => Number(!!b.review) - Number(!!a.review) || byShare(a, b));
+    if (s.types.includes("group_split")) return list.sort((a, b) => outCode(a).localeCompare(outCode(b)) || byArea(a, b));
     return s.types.includes("un_error") ? list.sort(byArea) : list;
   };
   const unitChanges = $derived(step?.compare ? stepChanges(step).filter((c) => c.units > 0).map((c) => c.id) : []);
@@ -69,7 +72,8 @@
     const values = c.values ?? [];
     const sources = [...new Map(values.map((v) => [v.un, entity(v.un, v.un_name)])).values()];
     if (!values.length) return { before: [], after: [] };
-    return { before: sources, after: [entity(values[0].gaul, values[0].gaul_name)] };
+    const after = [...new Map(values.map((v) => [v.gaul, entity(v.gaul, v.gaul_name)])).values()];
+    return { before: sources, after };
   }
   const COAST_TYPES = ["coast", "new_island"];
   const isCoast = (c: Change) => COAST_TYPES.includes(c.type);
@@ -125,11 +129,11 @@
 {:else}
   <div class="app">
     <header class="bar">
-      <div class="heading"><span class="title">Rebuilding GAUL on UN Geodata 2023</span><PageSwitch current="build" /></div>
+      <div class="heading"><span class="title">Building ADM0 on UN Geodata 2023</span><PageSwitch current="build" /></div>
     </header>
     <div class="body">
       <aside>
-        <p class="intro">The build starts from the lines and coastlines of UN Geodata 2023 (260 entities) and keeps GAUL's 272 entities, which GAUL draws on the 2018 lines. Some changes below add an entity.</p>
+        <p class="intro">The build starts from the lines and coastlines of UN Geodata 2023 (260 entities). The steps below split out disputed and dependent areas and island groups.</p>
         {#if failed}
           <p>The change list could not be loaded.</p>
         {/if}
@@ -147,7 +151,7 @@
                       {:else if isCoast(c) && (i === 0 || listedChanges(s)[i - 1].type !== c.type)}
                         <li class="own-head"><span class="own"><span>Entity</span><span>{coastHead[c.type]}</span></span><span class="km2">{c.type === "coast" ? "% of area" : "Area"}</span></li>
                       {:else if i === 0 && c.type !== "line_update" && !isCoast(c)}
-                        <li class="own-head"><span class="own"><span>UN Geodata</span><span>{c.type === "un_error" ? "Corrected" : "GAUL"}</span></span><span class="km2">Area</span></li>
+                        <li class="own-head"><span class="own"><span>UN Geodata</span><span>{c.type === "un_error" ? "Corrected" : splitTypes.includes(c.type) ? "Output" : "GAUL"}</span></span><span class="km2">Area</span></li>
                       {/if}
                       <li>
                         <button class:active={change === c} onclick={() => (change = c)}>
@@ -185,9 +189,8 @@
           </section>
         {/each}
         <section class="downloads">
-          <h2>Download</h2>
-          <a class="btn" href={`${tilesBase}/build/build_un.parquet`} download>UN export (GeoParquet)</a>
-          <a class="btn" href={`${tilesBase}/build/build_gaul.parquet`} download>GAUL export (GeoParquet)</a>
+          <a class="download" href={`${tilesBase}/build/build_adm0.parquet`} download>Download final boundaries</a>
+          <p class="format">GeoParquet, with all the steps above applied.</p>
         </section>
       </aside>
       <div class="stage">
@@ -331,18 +334,25 @@
     margin: 0 0 0.75rem;
   }
   .downloads {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 1rem;
+    margin-top: 1.5rem;
   }
-  .downloads a {
+  .download {
+    display: block;
+    padding: 0.75rem 1rem;
+    border-radius: var(--brand-radius--sm);
+    background: var(--brand-primary--text);
+    color: var(--cd-white);
+    font-size: 1rem;
+    font-weight: 700;
+    text-align: center;
     text-decoration: none;
   }
-  .downloads h2 {
-    flex-basis: 100%;
-    margin: 0;
-    font-size: 1rem;
+  .download:hover {
+    background: var(--brand-primary--dark);
+  }
+  .format {
+    margin: 0.5rem 0 0;
+    color: var(--brand-grey--text);
   }
   ul {
     margin: 0;

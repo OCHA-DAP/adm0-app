@@ -1,4 +1,4 @@
-"""Dissolve the units to both exports and check them against the sources."""
+"""Dissolve the units to the ADM0 output and the UN layer, and check them."""
 
 import json
 from logging import getLogger
@@ -25,8 +25,9 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 TOLERANCE = 1e-9
-UN_ROWS, GAUL_ROWS = 264, 276
-PATH_OUTPUTS = {"errors": "path_errors", "disputed": "path_disputed"}
+UN_ROWS = 264
+PATH_OUTPUTS = {"errors": "path_errors", "split": "path_split"}
+ADM0_KEY = "coalesce(adm0_id, entity)"
 
 
 def _dissolve(key: str, units: str | None = None) -> str:
@@ -54,30 +55,33 @@ def _sources(conn: DuckDBPyConnection, units: str, extra: tuple) -> None:
         SELECT 'NEW ' || code AS key, code AS iso3cd, name AS romnam, name AS maplab,
                stscod, status_label
         FROM entities;
-        CREATE TABLE gaul_src AS
-        SELECT 'GAUL ' || gaul_id AS key, * EXCLUDE geometry
-        FROM '{data("01", "gaul_polygons")}'
-        UNION ALL BY NAME
-        SELECT 'NEW ' || code AS key, code AS ISO3_CODE, code AS MAP_CODE,
-               name AS GAUL0_NAME
-        FROM entities
-        WHERE code IN (SELECT entity FROM '{units}' WHERE gaul_id IS NULL);
+        CREATE TABLE adm0_src AS
+        SELECT {ADM0_KEY} AS key, any_value(coalesce(u.iso3, u.entity)) AS iso3,
+               string_agg(DISTINCT n.iso3cd, ';' ORDER BY n.iso3cd) AS un_iso3,
+               string_agg(DISTINCT u.un_owner::VARCHAR, ';'
+                          ORDER BY u.un_owner::VARCHAR) AS un_objectid,
+               string_agg(DISTINCT u.gaul_id, ';' ORDER BY u.gaul_id) AS gaul_id,
+               string_agg(DISTINCT g.ISO3_CODE, ';' ORDER BY g.ISO3_CODE) AS gaul_code
+        FROM '{units}' u
+        LEFT JOIN '{data("01", "un_polygons")}' n ON n.objectid = u.un_owner
+        LEFT JOIN '{data("01", "gaul_polygons")}' g USING (gaul_id)
+        GROUP BY 1;
     """)
 
 
 def exports(
-    conn: DuckDBPyConnection, units: str, un: str, gaul: str, extra: tuple = ()
+    conn: DuckDBPyConnection, units: str, un: str, adm0: str, extra: tuple = ()
 ) -> None:
     """Dissolve ``units`` by key, adding (code, name, stscod, status) ``extra``."""
     _sources(conn, units, extra)
-    for path, src, key in (
-        (un, "un_src", "coalesce('NEW ' || entity, 'UN ' || un_owner)"),
-        (gaul, "gaul_src", "coalesce('GAUL ' || gaul_id, 'NEW ' || entity)"),
+    for path, src, key, columns in (
+        (un, "un_src", "coalesce('NEW ' || entity, 'UN ' || un_owner)", "s.*"),
+        (adm0, "adm0_src", ADM0_KEY, "s.key AS adm0_id, s.*"),
     ):
         write_parquet(
             conn,
             f"""--sql
-            SELECT s.* EXCLUDE key, d.geometry
+            SELECT {columns} EXCLUDE key, d.geometry
             FROM ({_dissolve(f"{key} AS key", units)}) d
             JOIN {src} s USING (key)""",
             Path(path),
@@ -88,6 +92,11 @@ def _path_state(types: list[str]) -> str:
     """Return a dissolve showing the units once changes of ``types`` are applied."""
     picked = [c for c in changes() if c["type"] in types]
     applied = [c["id"] for c in picked if "relabel" not in c]
+    generated = (
+        " OR len(list_filter(ids, lambda x: x LIKE 'S-%')) > 0"
+        if "group_split" in types
+        else ""
+    )
     relabels = "".join(
         f"""WHEN un_objectid = {r["un_objectid"]} AND gaul_id = '{r["gaul_id"]}'
                         THEN 'UN {r["to"]}' """
@@ -96,15 +105,15 @@ def _path_state(types: list[str]) -> str:
     )
     return f"""--sql
         WITH flagged AS (
-            SELECT *, list_has_any(string_split(coalesce(change_ids, ''), ';'),
-                                   {applied}) AS applied
-            FROM '{data("05", "units")}'
+            SELECT *, list_has_any(ids, {applied}){generated} AS applied
+            FROM (SELECT *, string_split(coalesce(change_ids, ''), ';') AS ids
+                  FROM '{data("05", "units")}')
         ),
         keyed AS (
             SELECT CASE WHEN gaul_id IS NULL THEN 'NEW ' || entity
                         WHEN applied OR (coalesce(change_ids, '') = '' AND gaul_id IN
                              (SELECT gaul_id FROM flagged WHERE applied))
-                        THEN 'GAUL ' || gaul_id {relabels}
+                        THEN 'ADM0 ' || adm0_id {relabels}
                         ELSE 'UN ' || un_objectid END AS key,
                    geometry
             FROM flagged
@@ -114,9 +123,9 @@ def _path_state(types: list[str]) -> str:
                 AS geometry
             FROM keyed GROUP BY key
         )
-        SELECT d.key, g.* EXCLUDE key, u.* EXCLUDE key, d.geometry
+        SELECT d.key, a.* EXCLUDE key, u.* EXCLUDE key, d.geometry
         FROM dissolved d
-        LEFT JOIN gaul_src g ON d.key = g.key
+        LEFT JOIN adm0_src a ON d.key = 'ADM0 ' || a.key
         LEFT JOIN un_src u ON d.key = u.key"""
 
 
@@ -130,7 +139,7 @@ def _path_outputs(conn: DuckDBPyConnection) -> None:
             write_parquet(conn, _path_state(types), Path(data("06", name)))
 
 
-def _checks(conn: DuckDBPyConnection, un: str, gaul: str) -> dict:
+def _checks(conn: DuckDBPyConnection, un: str, adm0: str) -> dict:
     """Return each check's name, measured value and whether it passed."""
     units, parts = data("05", "units"), data("04", "parts")
     src_un, src_gaul = data("01", "un_polygons"), data("01", "gaul_polygons")
@@ -155,16 +164,25 @@ def _checks(conn: DuckDBPyConnection, un: str, gaul: str) -> dict:
     return {
         "un_rows": (n := one(f"SELECT count(*) FROM '{un}'"), n == UN_ROWS),
         "un_max_difference": (difference, difference <= TOLERANCE),
-        "gaul_rows": (n := one(f"SELECT count(*) FROM '{gaul}'"), n == GAUL_ROWS),
-        "gaul_attributes_differ": (
-            n := one(f"""--sql
-                SELECT count(*) FROM '{src_gaul}' s
-                LEFT JOIN '{gaul}' e USING (gaul_id)
-                WHERE e.gaul_id IS NULL
-                   OR (s.GAUL0_CODE, s.ISO3_CODE, s.MAP_CODE, s.GAUL0_NAME,
-                       s.CONTINENT) IS DISTINCT FROM (e.GAUL0_CODE, e.ISO3_CODE,
-                       e.MAP_CODE, e.GAUL0_NAME, e.CONTINENT)"""),
+        "adm0_ids_duplicated": (
+            n := one(f"SELECT count(*) - count(DISTINCT adm0_id) FROM '{adm0}'"),
             n == 0,
+        ),
+        "gaul_entities_missing": (
+            n := one(f"""--sql
+                SELECT count(*) FROM '{src_gaul}'
+                WHERE gaul_id NOT IN (SELECT gaul_id FROM '{units}'
+                                      WHERE gaul_id IS NOT NULL)"""),
+            n == 0,
+        ),
+        "fieldmaps_pieces_missing": (
+            one(f"""--sql
+                SELECT list(adm0_name ORDER BY adm0_name)
+                FROM '{data("01", "fieldmaps_voronoi")}'
+                WHERE adm0_id NOT IN (SELECT piece FROM '{parts}'
+                                      WHERE piece IS NOT NULL)
+                  AND iso_3 IN (SELECT split_part(piece, '_', 1) FROM '{parts}')"""),
+            True,
         ),
         "units_invalid": (
             n := one(f"SELECT count(*) FROM '{units}' WHERE NOT ST_IsValid(geometry)"),
@@ -193,7 +211,7 @@ def _checks(conn: DuckDBPyConnection, un: str, gaul: str) -> dict:
 
 
 def main() -> None:
-    """Write the UN and GAUL exports, then fail on any check that does not pass."""
+    """Write the ADM0 output and UN layer, then fail on any check that fails."""
     inputs = [
         Path(__file__),
         Path(data("05", "units")),
@@ -203,10 +221,10 @@ def main() -> None:
         logger.info("stage 06: inputs unchanged")
         return
     conn = connect()
-    un, gaul = data("06", "un"), data("06", "gaul")
-    exports(conn, data("05", "units"), un, gaul)
+    un, adm0 = data("06", "un"), data("06", "adm0")
+    exports(conn, data("05", "units"), un, adm0)
     _path_outputs(conn)
-    checks = _checks(conn, un, gaul)
+    checks = _checks(conn, un, adm0)
     (stage_dir("06") / "checks.json").write_text(
         json.dumps(
             {k: {"value": v, "passed": p} for k, (v, p) in checks.items()}, indent=2

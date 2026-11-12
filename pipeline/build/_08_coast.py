@@ -126,7 +126,7 @@ def _place(conn: DuckDBPyConnection) -> None:
         SELECT upper(un) AS un, upper(fieldmaps) AS fm FROM read_csv('{DECISIONS}')
         WHERE action = 'remove';
         CREATE TABLE unit_codes AS
-        SELECT u.unit_id, upper(coalesce(u.entity, n.iso3cd)) AS code
+        SELECT u.unit_id, upper(coalesce(u.iso3, u.entity, n.iso3cd)) AS code
         FROM '{data("05", "units")}' u
         LEFT JOIN '{data("01", "un_polygons")}' n ON n.objectid = u.un_owner;
     """)
@@ -512,7 +512,7 @@ def _layers(conn: DuckDBPyConnection) -> None:
         write_parquet(conn, query, _out(f"{name}.parquet"))
 
 
-def _checks(conn: DuckDBPyConnection, un: Path, gaul: Path) -> dict:
+def _checks(conn: DuckDBPyConnection, un: Path, adm0: Path) -> dict:
     """Return each check's name, measured value and whether it passed."""
 
     def one(sql: str) -> object:
@@ -554,9 +554,9 @@ def _checks(conn: DuckDBPyConnection, un: Path, gaul: Path) -> dict:
                 n := one(f"SELECT count(*) FROM '{un}'"),
                 n == export.UN_ROWS + added,
             ),
-            "gaul_rows": (
-                n := one(f"SELECT count(*) FROM '{gaul}'"),
-                n == export.GAUL_ROWS + added,
+            "adm0_rows": (
+                n := one(f"SELECT count(*) FROM '{adm0}'"),
+                n == one(f"SELECT count(*) FROM '{data('06', 'adm0')}'") + added,
             ),
         }
     return checks
@@ -574,7 +574,7 @@ def _cells_current() -> bool:
 
 
 def main() -> None:
-    """Write the units on OSM land, both exports, the patches and the change list."""
+    """Write the units on OSM land, the ADM0 output, the patches and the changes."""
     if not _cells_current():
         logger.warning("stage 08: skipped, run --stage 07 for the current units")
         return
@@ -586,6 +586,7 @@ def main() -> None:
         Path(data("01", "fieldmaps_voronoi")),
         Path(data("01", "un_polygons")),
         Path(data("01", "gaul_polygons")),
+        Path(data("06", "adm0")),
         curated_dir / "changes.json",
         DECISIONS,
         OVERRIDES,
@@ -605,7 +606,7 @@ def main() -> None:
     out = _out("changes.json")
     out.write_text(json.dumps(records, ensure_ascii=False, indent=1) + "\n")
     _layers(conn)
-    un, gaul = _out("un.parquet"), _out("gaul.parquet")
+    un, adm0 = _out("un.parquet"), _out("adm0.parquet")
     if not BBOX:
         added = conn.execute("""--sql
             SELECT DISTINCT e.code, e.name FROM new_entities e
@@ -615,10 +616,10 @@ def main() -> None:
             conn,
             str(_out("coast_units.parquet")),
             str(un),
-            str(gaul),
+            str(adm0),
             tuple((code, name, *DISPUTED) for code, name in added),
         )
-    checks = _checks(conn, un, gaul)
+    checks = _checks(conn, un, adm0)
     _out("checks.json").write_text(
         json.dumps(
             {k: {"value": v, "passed": p} for k, (v, p) in checks.items()}, indent=2

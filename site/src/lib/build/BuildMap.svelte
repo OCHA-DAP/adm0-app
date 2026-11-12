@@ -61,9 +61,9 @@
     gaul_voronoi: `${tilesBase}/${catalogPath("gaul_voronoi")}`,
     build_un: `${tilesBase}/build/build_un.pmtiles`,
     build_path_errors: `${tilesBase}/build/build_path_errors.pmtiles`,
-    build_path_disputed: `${tilesBase}/build/build_path_disputed.pmtiles`,
+    build_path_split: `${tilesBase}/build/build_path_split.pmtiles`,
     build_land_areas: `${tilesBase}/build/build_land_areas.pmtiles`,
-    build_gaul: `${tilesBase}/build/build_gaul.pmtiles`,
+    build_adm0: `${tilesBase}/build/build_adm0.pmtiles`,
     build_coast_un: `${tilesBase}/build/build_coast_un.pmtiles`,
   });
   const COAST_PATCHES = ["build_new_islands", "build_dropped"] as const;
@@ -113,7 +113,7 @@
         m.addLayer({ id: `pick-${id}`, type: "fill", source: id, "source-layer": id, layout: { visibility: "none" }, paint: { "fill-opacity": 0 } });
         m.addLayer({ id: `output-${id}`, type: "line", source: id, "source-layer": id, layout: { visibility: "none" }, paint: { "line-width": LINE_WIDTHS, "line-dasharray": LINE_DASH } });
       }
-      // Stage 09 writes no island tiles when the automatic check finds nothing.
+      // Stage 10 writes no island tiles when the automatic check finds nothing.
       if (hasCells) {
         m.addSource("build_cell_islands", { type: "vector", url: `pmtiles://${tilesBase}/build/build_cell_islands.pmtiles` });
         const islands = { source: "build_cell_islands", "source-layer": "build_cell_islands", filter: NOTHING } as const;
@@ -179,6 +179,10 @@
   $effect(() => {
     if (!map || !loaded) return;
     applyBorderNames(map, names);
+  });
+
+  $effect(() => {
+    if (!map || !loaded) return;
   });
 
   $effect(() => {
