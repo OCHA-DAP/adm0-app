@@ -129,11 +129,11 @@
 {:else}
   <div class="app">
     <header class="bar">
-      <div class="heading"><span class="title">Building ADM0 on UN Geodata 2023</span><PageSwitch current="build" /></div>
+      <div class="heading"><span class="title">Building ADM0 on UN Geodata 2025</span><PageSwitch current="build" /></div>
     </header>
     <div class="body">
       <aside>
-        <p class="intro">The build starts from the lines and coastlines of UN Geodata 2023 (260 entities). The steps below split out disputed and dependent areas and island groups.</p>
+        <p class="intro">The build starts from the lines and coastlines of UN Geodata 2025 (260 entities). The steps below split out disputed and dependent areas and island groups.</p>
         {#if failed}
           <p>The change list could not be loaded.</p>
         {/if}

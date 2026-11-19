@@ -1,5 +1,6 @@
 """Download every source into ``tmp/download/{source}/`` with a ``.date`` file."""
 
+import json
 import re
 from argparse import ArgumentParser
 from concurrent.futures import ThreadPoolExecutor
@@ -8,11 +9,13 @@ from email.utils import parsedate_to_datetime
 from fnmatch import filter as fnfilter
 from functools import partial
 from logging import getLogger
+from os import getenv
 from shutil import rmtree
 from typing import TYPE_CHECKING
 from xml.etree import ElementTree as ET
 from zipfile import ZipFile
 
+from dotenv import load_dotenv
 from httpx2 import Client, HTTPStatusError, Timeout, TransportError
 from tenacity import (
     retry,
@@ -21,7 +24,7 @@ from tenacity import (
     wait_exponential,
 )
 
-from .config import download_dir
+from .config import download_dir, root
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -49,6 +52,10 @@ UNTERM_URL = "https://conferences.unite.un.org/untermapi/api/term/downloadCountr
 FIELDMAPS_LICENSE = "odbl"
 FIELDMAPS_URL = "https://data.source.coop/fieldmaps/international/{license}/humanitarian/adm0-{geom}/adm0_{geom}.parquet"
 M49_URL = "https://unstats.un.org/unsd/methodology/m49/overview/"
+UNGEODATA_URL = "https://pro-ags2.dfs.un.org/arcgis/rest/services/Hosted/UNgeodata_1Million/FeatureServer"
+UNGEODATA_ITEM_URL = "https://geoportal.un.org/arcgis/sharing/rest/content/items/52bf5f875877459dae265c8cff69338f"
+# Output name: (layer id, page size). Country polygons are large, so small pages.
+UNGEODATA_LAYERS = {"bnda_cty": (4, 10), "bndl": (1, 2000)}
 WB_URL = (
     "https://datacatalogfiles.worldbank.org/ddh-published/0038272/3/DR0096331/"
     "World%20Bank%20Official%20Boundaries%20%28Parquet%29/"
@@ -196,6 +203,63 @@ def _wb(out: Path) -> str:
     return _stream(WB_URL, out / "adm0_all_layers.parquet")
 
 
+@_retry
+def _ags(client: Client, url: str, data: dict) -> dict:
+    """POST to an ArcGIS endpoint; errors it reports in a 200 body raise."""
+    r = client.post(url, data=data, timeout=Timeout(300, connect=30))
+    r.raise_for_status()
+    body = r.json()
+    if "error" in body:
+        err = body["error"]
+        msg = f"{url}: {err.get('code')} {err.get('message')} (check AGS_TOKEN in .env)"
+        raise ValueError(msg)
+    return body
+
+
+def _ungeodata(out: Path) -> str:
+    """Page each UN Geodata 1M layer into one GeoJSON with features as served."""
+    load_dotenv(root / ".env")
+    token = getenv("AGS_TOKEN")
+    if not token:
+        msg = "AGS_TOKEN missing; add a geoportal.un.org token to .env"
+        raise ValueError(msg)
+    with _client() as client:
+        item = _ags(client, UNGEODATA_ITEM_URL, {"f": "json", "token": token})
+        for name, (layer, page) in UNGEODATA_LAYERS.items():
+            url = f"{UNGEODATA_URL}/{layer}/query"
+            base = {"where": "1=1", "f": "json", "token": token}
+            total = _ags(client, url, {**base, "returnCountOnly": "true"})["count"]
+            offset = 0
+            with (out / f"{name}.geojson").open("w") as f:
+                f.write('{"type": "FeatureCollection", "features": [')
+                while offset < total:
+                    features = _ags(
+                        client,
+                        url,
+                        {
+                            **base,
+                            "outFields": "*",
+                            "outSR": 4326,
+                            "f": "geojson",
+                            "orderByFields": "objectid",
+                            "resultOffset": offset,
+                            "resultRecordCount": page,
+                        },
+                    )["features"]
+                    if not features:
+                        break
+                    for feature in features:
+                        f.write(", " if offset else "")
+                        json.dump(feature, f)
+                        offset += 1
+                    logger.info("ungeodata %s: %d of %d", name, offset, total)
+                f.write("]}")
+            if offset != total:
+                msg = f"ungeodata {name}: {offset} features, service reports {total}"
+                raise ValueError(msg)
+    return datetime.fromtimestamp(item["modified"] / 1000, UTC).date().isoformat()
+
+
 def _fetch(source: str, fn: Callable[[Path], str]) -> None:
     out = download_dir / source
     rmtree(out, ignore_errors=True)
@@ -218,7 +282,10 @@ def main() -> None:
         "fieldmaps": _fieldmaps,
         "wb": _wb,
     }
+    # Needs AGS_TOKEN, so only downloaded when named.
+    named_only = {"ungeodata": _ungeodata}
     if args.only:
+        jobs |= named_only
         if unknown := set(args.only) - set(jobs):
             msg = f"unknown sources: {sorted(unknown)}"
             raise ValueError(msg)

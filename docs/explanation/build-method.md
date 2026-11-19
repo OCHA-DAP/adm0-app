@@ -1,10 +1,10 @@
 # Why the build layer is built this way
 
-The build layer is one set of polygons that carries a UN key and a GAUL key on every unit. Dissolved by UN key, it returns UN Geodata 2023 for the checks and the page. Dissolved by ADM0 row, it gives the one output.
+The build layer is one set of polygons that carries a UN key and a GAUL key on every unit. Dissolved by UN key, it returns UN Geodata 2025 for the checks and the page. Dissolved by ADM0 row, it gives the one output.
 
 ## UN Geodata is the base
 
-GAUL's lines come from the 2018 UN Geodata, and the 2023 lines improve on them. Starting from UN keeps those improvements, and every step away from UN is listed as a change.
+GAUL's lines come from the 2018 UN Geodata, and the 2025 lines improve on them. Starting from UN keeps those improvements, and every step away from UN is listed as a change.
 
 ## Units and a crosswalk
 
@@ -14,7 +14,7 @@ A unit is land with one UN entity and one GAUL entity. Keeping both keys on each
 
 UN's own lines make the cuts wherever they exist. UN lines stop at the coast, so a cut divides a mainland and leaves its islands untouched. Islands are attributed afterwards as whole polygons: each takes the GAUL entity linked to its UN entity, unless a listed override gives it another.
 
-The India-China areas have no UN lines, so GAUL's outlines and line are used. The cut lines are stored with their source so each can be reviewed.
+The India-China areas have no UN lines, so GAUL's outlines are used. The cut lines are stored with their source so each can be reviewed.
 
 ## Extending last, then the OSM coastline
 

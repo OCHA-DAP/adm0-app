@@ -33,7 +33,6 @@ un_objectid,un_part,face,gaul_id,change_id,reason
 853,55,,133,C01,Hala'ib Triangle
 727,1,2,110,C02,Bir Tawil
 866,1,2,135,C03,Ilemi Triangle
-704,1,2,240,C05,India-China line between Nepal and Bhutan
 673,102,,104,C07a,Bassas da India
 673,103,,104,C07a,Bassas da India
 673,104,,104,C07a,Bassas da India
@@ -65,23 +64,20 @@ un_objectid,un_part,face,gaul_id,change_id,reason
 846,345,,345,C10,Clipperton Island
 916,2,,283,C11a,Akrotiri
 850,19,,249,C14,Kuril Islands in the Russian Federation
-704,27,,273,C15,China parts that likely belong to Taiwan Province of China
-704,155,,273,C15,China parts that likely belong to Taiwan Province of China
-704,157,,273,C15,China parts that likely belong to Taiwan Province of China
-704,159,,273,C15,China parts that likely belong to Taiwan Province of China
-704,167,,273,C15,China parts that likely belong to Taiwan Province of China
-704,201,,273,C15,China parts that likely belong to Taiwan Province of China
-704,202,,273,C15,China parts that likely belong to Taiwan Province of China
-704,203,,273,C15,China parts that likely belong to Taiwan Province of China
-704,206,,273,C15,China parts that likely belong to Taiwan Province of China
-704,208,,273,C15,China parts that likely belong to Taiwan Province of China
-704,209,,273,C15,China parts that likely belong to Taiwan Province of China
-704,210,,273,C15,China parts that likely belong to Taiwan Province of China
-704,212,,273,C15,China parts that likely belong to Taiwan Province of China
-704,213,,273,C15,China parts that likely belong to Taiwan Province of China
-704,537,,237,C16,China parts that likely belong to Democratic People's Republic of Korea
-704,538,,237,C16,China parts that likely belong to Democratic People's Republic of Korea
-704,539,,237,C16,China parts that likely belong to Democratic People's Republic of Korea
+924,27,,273,C15,China parts that likely belong to Taiwan Province of China
+924,155,,273,C15,China parts that likely belong to Taiwan Province of China
+924,157,,273,C15,China parts that likely belong to Taiwan Province of China
+924,159,,273,C15,China parts that likely belong to Taiwan Province of China
+924,167,,273,C15,China parts that likely belong to Taiwan Province of China
+924,201,,273,C15,China parts that likely belong to Taiwan Province of China
+924,202,,273,C15,China parts that likely belong to Taiwan Province of China
+924,203,,273,C15,China parts that likely belong to Taiwan Province of China
+924,206,,273,C15,China parts that likely belong to Taiwan Province of China
+924,208,,273,C15,China parts that likely belong to Taiwan Province of China
+924,209,,273,C15,China parts that likely belong to Taiwan Province of China
+924,210,,273,C15,China parts that likely belong to Taiwan Province of China
+924,212,,273,C15,China parts that likely belong to Taiwan Province of China
+924,213,,273,C15,China parts that likely belong to Taiwan Province of China
 733,93,,340,C17,Finland parts that likely belong to Åland Islands
 733,94,,340,C17,Finland parts that likely belong to Åland Islands
 733,100,,340,C17,Finland parts that likely belong to Åland Islands

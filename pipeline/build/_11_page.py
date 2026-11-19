@@ -35,7 +35,7 @@ def _generated(c: dict) -> dict:
         return {
             "title": f"{x} and {y} line",
             "method": "UN line adopted",
-            "source": "UN Geodata 2023",
+            "source": "UN Geodata 2025",
         }
     if c["type"] == "un_error":
         un, cell = v["un_name"], v["gaul_name"]

@@ -13,7 +13,6 @@ from .config import (
     THREADS,
     download_dir,
     fresh,
-    input_dir,
     open_db,
     prepare_dir,
     record,
@@ -50,6 +49,8 @@ UNGEODATA_LINE_TYPE = {
     8: "autonomous",
     9: "sovereign",
 }
+# GDAL's row id, service bookkeeping and geometry (renamed), from the GeoJSON.
+UNGEODATA_DROP = "'OGC_FID', 'globalid', 'SHAPE__Length', 'SHAPE__Area', 'geom'"
 LSIB_LINE_TYPE = """CASE WHEN label LIKE '%Line of Control%' THEN 'separation'
     WHEN status = 'Special Line' THEN 'special'
     WHEN status = 'Other Line of International Separation' THEN 'armistice'
@@ -333,7 +334,7 @@ def ref(conn: DuckDBPyConnection) -> None:
 
 
 def ungeodata(conn: DuckDBPyConnection) -> None:
-    """Copy UN Geodata 1M country polygons and international lines from ``inputs/``."""
+    """Copy UN Geodata 2025 1M country polygons and international lines."""
     status = " ".join(f"WHEN {k} THEN '{v}'" for k, v in UNGEODATA_STATUS.items())
     line_type = " ".join(f"WHEN {k} THEN '{v}'" for k, v in UNGEODATA_LINE_TYPE.items())
     # bdytyp 0 is coastline, 6 and 7 subnational, 99 other.
@@ -351,14 +352,14 @@ def ungeodata(conn: DuckDBPyConnection) -> None:
             "bdytyp IN (1, 2, 3, 4, 8, 9)",
         ),
     ):
-        path = input_dir / f"ungeodata/{layer}.parquet"
+        path = download_dir / f"ungeodata/{layer}.geojson"
         if not path.exists():
-            msg = f"{path} missing; import it from the UN Geodata 1M FileGDB"
+            msg = f"{path} missing; run download --only ungeodata (AGS_TOKEN in .env)"
             raise FileNotFoundError(msg)
         _copy(
             conn,
-            f"SELECT * EXCLUDE globalid{extra} "
-            f"FROM read_parquet('{path}') WHERE {where}",
+            f"SELECT COLUMNS(lambda c: c NOT IN ({UNGEODATA_DROP})){extra}, "
+            f"ST_Multi(geom) AS geometry FROM ST_Read('{path}') WHERE {where}",
             name,
         )
 
@@ -386,7 +387,7 @@ SOURCES: tuple[tuple[Callable, Path, tuple[str, ...]], ...] = (
     (lsib, download_dir / "lsib", ("lsib_lines",)),
     (wp, download_dir / "wp", ("wp_polygons",)),
     (osm, download_dir / "osm", ("osm_land",)),
-    (ungeodata, input_dir / "ungeodata", ("ungeodata_polygons", "ungeodata_lines")),
+    (ungeodata, download_dir / "ungeodata", ("ungeodata_polygons", "ungeodata_lines")),
     (fieldmaps, download_dir / "fieldmaps", ("fieldmaps_polygons", "fieldmaps_lines")),
     (wb, download_dir / "wb", ("wb_polygons", "wb_lines")),
 )
