@@ -13,7 +13,7 @@ The site's tiles and tables are published as a Portolan catalog in `catalog/`, w
 uv run python -m pipeline --step catalog --push
 ```
 
-Pushing needs `PORTOLAN_REMOTE` and the source.coop keys in `.env` (see `.env.example`). `--only <id> ...` stages a subset of layers or tables. `uv run pytest` checks the portolan wrapper against a scratch catalog (about a minute).
+Pushing runs as a source.coop service account: save its `sck_` API key to a file only your user can read, then set `AWS_ROLE_ARN` (`arn:aws:iam::<service-account-id>:role/FullAccess`), `AWS_WEB_IDENTITY_TOKEN_FILE` (absolute path to the key file) and `PORTOLAN_REMOTE` in `.env`, from `.env.example`. Needs AWS CLI 2.13 or later. `--only <id> ...` stages a subset of layers or tables. `uv run pytest` checks the portolan wrapper against a scratch catalog (about a minute).
 
 ## Build layer
 
