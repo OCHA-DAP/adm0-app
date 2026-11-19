@@ -103,22 +103,10 @@
    }
   ]
  },
- "C05": {
-  "title": "India-China line between Nepal and Bhutan",
-  "method": "GAUL line as cut line, ends joined to the UN boundary",
-  "source": "GAUL 2025 boundary between entities 234 and 240",
-  "text": "The 1890 Anglo-Chinese Convention set this Sikkim section of the India-China border on the watershed between the Teesta and the Mochu.",
-  "sources": [
-   {
-    "title": "Convention between Great Britain and China relating to Sikkim and Tibet (1890), UK Treaty Series 1894 No. 11",
-    "url": "https://web.archive.org/web/20170709135501/http://treaties.fco.gov.uk/docs/pdf/1894/TS0011.pdf"
-   }
-  ]
- },
  "C14": {
   "title": "Kuril Islands in the Russian Federation",
   "method": "UN disputed code",
-  "source": "UN Geodata 2023",
+  "source": "UN Geodata 2025",
   "text": "The Soviet Union took the southern Kurils in 1945. Russia administers them, and Japan claims them.",
   "sources": [
    {
@@ -324,26 +312,6 @@
    {
     "title": "Matsu Islands, Wikipedia",
     "url": "https://en.wikipedia.org/wiki/Matsu_Islands"
-   }
-  ]
- },
- "C16": {
-  "title": "China parts that likely belong to Democratic People's Republic of Korea",
-  "method": "island attribution",
-  "source": "UN Geodata",
-  "text": "The 1962 China-DPRK border treaty gave each river island to the side whose people lived on or farmed it, otherwise to the nearer bank, and most Yalu islands went to the DPRK.",
-  "sources": [
-   {
-    "title": "China-DPRK boundary treaty (1962), Chinese Wikisource",
-    "url": "https://zh.wikisource.org/wiki/%E4%B8%AD%E5%8D%8E%E4%BA%BA%E6%B0%91%E5%85%B1%E5%92%8C%E5%9B%BD%E5%92%8C%E6%9C%9D%E9%B2%9C%E6%B0%91%E4%B8%BB%E4%B8%BB%E4%B9%89%E4%BA%BA%E6%B0%91%E5%85%B1%E5%92%8C%E5%9B%BD%E8%BE%B9%E7%95%8C%E6%9D%A1%E7%BA%A6"
-   },
-   {
-    "title": "China-North Korea border, Wikipedia",
-    "url": "https://en.wikipedia.org/wiki/China%E2%80%93North_Korea_border"
-   },
-   {
-    "title": "Hwanggumpyong Island, Wikipedia",
-    "url": "https://en.wikipedia.org/wiki/Hwanggumpyong_Island"
    }
   ]
  },
