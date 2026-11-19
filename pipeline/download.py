@@ -63,12 +63,24 @@ WB_URL = (
 )
 
 
+class AgsError(ValueError):
+    """An error ArcGIS reports in a 200 body, with its code."""
+
+    def __init__(self, msg: str, code: int | None) -> None:
+        """Keep the ArcGIS error code for the retry check."""
+        super().__init__(msg)
+        self.code = code
+
+
 def _transient(e: BaseException) -> bool:
     """Retry network failures, rate limits and server errors, not 4xx."""
     if isinstance(e, HTTPStatusError):
         code = e.response.status_code
-        return code == 429 or code >= 500  # noqa: PLR2004
-    return isinstance(e, TransportError)
+    elif isinstance(e, AgsError):
+        code = e.code or 0
+    else:
+        return isinstance(e, TransportError)
+    return code == 429 or code >= 500  # noqa: PLR2004
 
 
 _retry = retry(
@@ -212,17 +224,22 @@ def _ags(client: Client, url: str, data: dict) -> dict:
     if "error" in body:
         err = body["error"]
         msg = f"{url}: {err.get('code')} {err.get('message')} (check AGS_TOKEN in .env)"
-        raise ValueError(msg)
+        raise AgsError(msg, err.get("code"))
     return body
 
 
-def _ungeodata(out: Path) -> str:
-    """Page each UN Geodata 1M layer into one GeoJSON with features as served."""
+def _ags_token() -> str:
     load_dotenv(root / ".env")
     token = getenv("AGS_TOKEN")
     if not token:
         msg = "AGS_TOKEN missing; add a geoportal.un.org token to .env"
         raise ValueError(msg)
+    return token
+
+
+def _ungeodata(out: Path) -> str:
+    """Page each UN Geodata 1M layer into one GeoJSON with features as served."""
+    token = _ags_token()
     with _client() as client:
         item = _ags(client, UNGEODATA_ITEM_URL, {"f": "json", "token": token})
         for name, (layer, page) in UNGEODATA_LAYERS.items():
@@ -290,6 +307,8 @@ def main() -> None:
             msg = f"unknown sources: {sorted(unknown)}"
             raise ValueError(msg)
         jobs = {s: fn for s, fn in jobs.items() if s in args.only}
+    if "ungeodata" in jobs:
+        _ags_token()  # fail before _fetch clears the existing download
     with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
         futures = [pool.submit(_fetch, s, fn) for s, fn in jobs.items()]
     for f in futures:
