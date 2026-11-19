@@ -12,7 +12,7 @@ A unit is land with one UN entity and one GAUL entity. Keeping both keys on each
 
 ## Cuts and islands
 
-UN's own lines make the cuts wherever they exist. UN lines stop at the coast, so a cut divides a mainland and leaves its islands untouched. Islands are attributed afterwards as whole polygons: the GAUL entity with the largest overlap, then any listed override. An island with no GAUL overlap takes its GAUL cell only when GAUL already links its UN entity to that cell's entity, or that entity has no other land (as with Hong Kong and Macao). Otherwise it stays with the main GAUL entity of its UN entity, because the nearest cell says nothing about ownership.
+UN's own lines make the cuts wherever they exist. UN lines stop at the coast, so a cut divides a mainland and leaves its islands untouched. Islands are attributed afterwards as whole polygons: each takes the GAUL entity linked to its UN entity, unless a listed override gives it another.
 
 The India-China areas have no UN lines, so GAUL's outlines and line are used. The cut lines are stored with their source so each can be reviewed.
 
