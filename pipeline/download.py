@@ -308,7 +308,9 @@ def main() -> None:
             raise ValueError(msg)
         jobs = {s: fn for s, fn in jobs.items() if s in args.only}
     if "ungeodata" in jobs:
-        _ags_token()  # fail before _fetch clears the existing download
+        # A missing or expired token fails here, before _fetch clears the download.
+        with _client() as client:
+            _ags(client, UNGEODATA_URL, {"f": "json", "token": _ags_token()})
     with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
         futures = [pool.submit(_fetch, s, fn) for s, fn in jobs.items()]
     for f in futures:
