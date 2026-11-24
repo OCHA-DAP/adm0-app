@@ -410,54 +410,76 @@ def _land(conn: DuckDBPyConnection) -> list[dict]:
     return records
 
 
+LABEL_GAPS_KM = (20, 50, 100)
+
+
 def _labels(conn: DuckDBPyConnection) -> None:
-    """Write a label point per polygon, or per change where names replace codes."""
+    """Write a label per change and UN to output entity pair, on its largest polygon."""
     split = [c["id"] for c in changes() if c["type"] in STEPS["split"]]
-    rows = conn.execute(f"""--sql
-        SELECT p.c,
-               CASE WHEN p.c LIKE 'S-%' OR list_contains({split}, p.c)
-                    THEN concat(n.un_iso3, ' → ', a.iso3)
-                    WHEN p.c = r.change_id THEN concat(n.un_iso3, ' → ', to_un.un_iso3)
-                    WHEN r.change_id IS NOT NULL
-                    THEN concat(to_un.un_iso3, ' → ', g.MAP_CODE)
-                    WHEN p.entity IS NOT NULL THEN concat(n.un_iso3, ' → ', p.entity)
-                    WHEN n.un_iso3 = g.MAP_CODE
-                    THEN concat(coalesce(n.un_name, 'None'), ' → ', g.GAUL0_NAME)
-                    ELSE concat(n.un_iso3, ' → ', g.MAP_CODE) END,
-               round({KM2.format("p.part")}, 3),
-               ST_X(ST_MaximumInscribedCircle(p.part).center),
-               ST_Y(ST_MaximumInscribedCircle(p.part).center)
-        FROM (SELECT t.c, t.unit_id, t.un_objectid, t.gaul_id, t.entity,
-                     unnest(ST_Dump(t.geometry)).geom AS part
-              FROM (SELECT unnest(change_ids) AS c, unit_id, un_objectid, gaul_id,
-                           entity, geometry
-                    FROM tagged) t) p
-        JOIN un n ON n.objectid = p.un_objectid LEFT JOIN gaul g USING (gaul_id)
-        JOIN unit_adm0 a USING (unit_id)
-        LEFT JOIN relabels r USING (un_objectid, gaul_id)
-        LEFT JOIN un to_un ON to_un.objectid = r.to_objectid
-        QUALIFY n.un_iso3 IS DISTINCT FROM coalesce(p.entity, g.MAP_CODE)
-             OR p.c LIKE 'S-%'
-             OR row_number() OVER (
-                 PARTITION BY p.c ORDER BY {KM2.format("p.part")} DESC) = 1
-        UNION ALL
-        SELECT change_id, concat(un_iso3, ' → ', cell_code), round(km2, 3),
-               ST_X(ST_MaximumInscribedCircle(geometry).center),
-               ST_Y(ST_MaximumInscribedCircle(geometry).center)
-        FROM cell_islands
-        UNION ALL
-        SELECT change_id, concat(un_iso3, ' → ', code), km2,
-               ST_X(ST_MaximumInscribedCircle(geometry).center),
-               ST_Y(ST_MaximumInscribedCircle(geometry).center)
-        FROM land_pieces
-    """).fetchall()
+    named = [
+        (c["id"], r["name"])
+        for c in changes()
+        if (r := c.get("relabel")) and "name" in r
+    ]
+    conn.execute("CREATE TEMP TABLE relabel_names (change_id VARCHAR, name VARCHAR)")
+    if named:
+        conn.executemany("INSERT INTO relabel_names VALUES (?, ?)", named)
+    conn.execute(f"""--sql
+        CREATE TEMP TABLE label_parts AS
+            SELECT p.c,
+                   CASE WHEN r.change_id IS NOT NULL AND p.c <> r.change_id
+                        THEN coalesce(to_un.un_name, to_un.un_iso3)
+                        ELSE coalesce(n.un_name, n.un_iso3) END AS src,
+                   CASE WHEN p.c LIKE 'S-%' OR list_contains({split}, p.c)
+                        THEN a.adm0_name
+                        WHEN p.c = r.change_id
+                        THEN coalesce(rn.name, to_un.un_name, to_un.un_iso3)
+                        ELSE coalesce(e.name, g.GAUL0_NAME, a.adm0_name) END AS name,
+                   round({KM2.format("p.part")}, 3) AS km2, p.part AS geometry
+            FROM (SELECT t.c, t.unit_id, t.un_objectid, t.gaul_id, t.entity,
+                         unnest(ST_Dump(t.geometry)).geom AS part
+                  FROM (SELECT unnest(change_ids) AS c, unit_id, un_objectid, gaul_id,
+                               entity, geometry
+                        FROM tagged) t) p
+            JOIN un n ON n.objectid = p.un_objectid LEFT JOIN gaul g USING (gaul_id)
+            LEFT JOIN (SELECT DISTINCT code, name FROM entities) e ON e.code = p.entity
+            JOIN unit_adm0 a USING (unit_id)
+            LEFT JOIN relabels r USING (un_objectid, gaul_id)
+            LEFT JOIN un to_un ON to_un.objectid = r.to_objectid
+            LEFT JOIN relabel_names rn ON rn.change_id = r.change_id
+            UNION ALL
+            SELECT change_id, un_name, cell_name, round(km2, 3), geometry
+            FROM cell_islands
+            UNION ALL
+            SELECT change_id, coalesce(n.un_name, n.un_iso3), l.name, km2, geometry
+            FROM land_pieces JOIN land l USING (change_id, code)
+            JOIN un n ON n.objectid = un_objectid
+    """)
+    rows = []
+    for gap in LABEL_GAPS_KM:
+        rows += conn.execute(f"""--sql
+            WITH blobs AS (
+                SELECT row_number() OVER () AS id, * FROM (
+                SELECT c, src, name, unnest(ST_Dump(blob)).geom AS blob
+                FROM (SELECT c, src, name,
+                             ST_Union_Agg(ST_Buffer(geometry, {gap / 222})) AS blob
+                      FROM label_parts GROUP BY ALL)))
+            SELECT c, name, nullif(src, name), km2, {gap}, ST_X(center), ST_Y(center)
+            FROM (SELECT *, (ST_MaximumInscribedCircle(geometry)).center AS center
+                  FROM (SELECT p.* FROM label_parts p
+                        JOIN blobs b USING (c, src, name)
+                        WHERE ST_Intersects(b.blob, p.geometry)
+                        QUALIFY row_number() OVER (
+                            PARTITION BY b.id ORDER BY km2 DESC) = 1))
+        """).fetchall()
     features = [
         {
             "type": "Feature",
-            "properties": {"change": change, "text": text, "km2": km2},
+            "properties": {"change": change, "text": text, "km2": km2, "gap": gap}
+            | ({"from": src} if src else {}),
             "geometry": {"type": "Point", "coordinates": [x, y]},
         }
-        for change, text, km2, x, y in rows
+        for change, text, src, km2, gap, x, y in rows
     ]
     collection = {"type": "FeatureCollection", "features": features}
     path = stage_dir("05") / "labels.geojson"
