@@ -410,7 +410,8 @@ def _land(conn: DuckDBPyConnection) -> list[dict]:
     return records
 
 
-LABEL_GAPS_KM = (20, 50, 100)
+# Parts closer than this share one label.
+LABEL_GAP_M = 50_000
 
 
 def _labels(conn: DuckDBPyConnection) -> None:
@@ -455,31 +456,37 @@ def _labels(conn: DuckDBPyConnection) -> None:
             FROM land_pieces JOIN land l USING (change_id, code)
             JOIN un n ON n.objectid = un_objectid
     """)
-    rows = []
-    for gap in LABEL_GAPS_KM:
-        rows += conn.execute(f"""--sql
-            WITH blobs AS (
-                SELECT row_number() OVER () AS id, * FROM (
+    rows = conn.execute(f"""--sql
+        WITH centres AS (
+            SELECT c, src, name,
+                   concat('+proj=aeqd +lat_0=', ST_Y(pt), ' +lon_0=', ST_X(pt)) AS proj
+            FROM (SELECT c, src, name, ST_Centroid(ST_Collect(list(geometry))) AS pt
+                  FROM label_parts GROUP BY ALL)),
+        metric AS (
+            SELECT p.*, ST_Transform(p.geometry, 'OGC:CRS84', proj, true) AS m
+            FROM label_parts p JOIN centres USING (c, src, name)),
+        blobs AS (
+            SELECT row_number() OVER () AS id, * FROM (
                 SELECT c, src, name, unnest(ST_Dump(blob)).geom AS blob
-                FROM (SELECT c, src, name,
-                             ST_Union_Agg(ST_Buffer(geometry, {gap / 222})) AS blob
-                      FROM label_parts GROUP BY ALL)))
-            SELECT c, name, nullif(src, name), km2, {gap}, ST_X(center), ST_Y(center)
-            FROM (SELECT *, (ST_MaximumInscribedCircle(geometry)).center AS center
-                  FROM (SELECT p.* FROM label_parts p
-                        JOIN blobs b USING (c, src, name)
-                        WHERE ST_Intersects(b.blob, p.geometry)
-                        QUALIFY row_number() OVER (
-                            PARTITION BY b.id ORDER BY km2 DESC) = 1))
-        """).fetchall()
+                FROM (SELECT c, src, name, ST_Union_Agg(
+                                 ST_Buffer(ST_ConvexHull(m), {LABEL_GAP_M / 2})) AS blob
+                      FROM metric GROUP BY ALL)))
+        SELECT c, name, nullif(src, name), km2, ST_X(center), ST_Y(center)
+        FROM (SELECT *, (ST_MaximumInscribedCircle(geometry)).center AS center
+              FROM (SELECT p.* EXCLUDE (m) FROM metric p
+                    JOIN blobs b USING (c, src, name)
+                    WHERE ST_Intersects(b.blob, p.m)
+                    QUALIFY row_number() OVER (
+                        PARTITION BY b.id ORDER BY km2 DESC) = 1))
+    """).fetchall()
     features = [
         {
             "type": "Feature",
-            "properties": {"change": change, "text": text, "km2": km2, "gap": gap}
+            "properties": {"change": change, "text": text, "km2": km2}
             | ({"from": src} if src else {}),
             "geometry": {"type": "Point", "coordinates": [x, y]},
         }
-        for change, text, src, km2, gap, x, y in rows
+        for change, text, src, km2, x, y in rows
     ]
     collection = {"type": "FeatureCollection", "features": features}
     path = stage_dir("05") / "labels.geojson"

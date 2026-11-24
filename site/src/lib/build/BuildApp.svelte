@@ -49,37 +49,14 @@
   let allLines = $state(false);
   let collapsed = $state(true);
   const compare = new CompareState();
-  const COLOR_VARIANTS = [
-    { id: "neutral", label: "Neutral base" },
-    { id: "static", label: "Static" },
-    { id: "flip", label: "Flip" },
-  ];
-  type Colors = "neutral" | "static" | "flip";
-  const colorsByStep = $state<Record<string, Colors>>({ lines: "flip", errors: "static", split: "static" });
-  const LEGEND_VARIANTS = [
-    { id: "moves", label: "Stays / moves" },
-    { id: "part", label: "Unit / part" },
-    { id: "fixed", label: "Unchanged / fixed" },
-  ];
-  const LEGEND_TEXT: Record<string, string[]> = {
-    moves: ["Stays in its UN Geodata unit", "Moves to the corrected unit"],
-    part: ["UN Geodata unit", "Part moved by the fix"],
-    fixed: ["Unchanged", "Fixed"],
-  };
-  let legendWording = $state("part");
-  const GAP_VARIANTS = [
-    { id: "50", label: "50 km" },
-    { id: "20", label: "20 km" },
-    { id: "100", label: "100 km" },
-  ];
-  let labelGap = $state("50");
-  const FILL_STEPS = ["errors", "split"];
+  const STATIC_STEPS = ["errors", "split"];
+  const STATIC_LEGEND = ["UN Geodata unit", "Part moved by the fix"];
   compare.mode = "polygon";
   const splitTypes = ["restore", "india_china", "split", "merge", "group_split"];
 
   const step = $derived(steps[stepIndex]);
-  const colors = $derived<Colors>(colorsByStep[step?.id ?? ""] ?? "flip");
-  const legend = $derived(FILL_STEPS.includes(step?.id ?? "") && colors === "static" ? LEGEND_TEXT[legendWording] : (step?.legend ?? []));
+  const still = $derived(STATIC_STEPS.includes(step?.id ?? ""));
+  const legend = $derived(still ? STATIC_LEGEND : (step?.legend ?? []));
   const border = $derived(change?.type === "line_update" ? change.id.slice(2).split("-") : null);
   const byArea = (a: Change, b: Change) => (b.km2 ?? 0) - (a.km2 ?? 0);
   const outCode = (c: Change) => c.values?.[0]?.gaul.split("_")[0] ?? "";
@@ -157,13 +134,6 @@
   <div class="app">
     <header class="bar">
       <div class="heading"><span class="title">Building ADM0 on UN Geodata 2025</span><PageSwitch current="build" /></div>
-      {#if import.meta.env.DEV}
-        <div class="variants">
-          {#if step}<Segmented label="Colours" options={COLOR_VARIANTS} current={colors} pick={(id) => (colorsByStep[step.id] = id as Colors)} />{/if}
-          {#if step?.labels}<Segmented label="Label gap" options={GAP_VARIANTS} current={labelGap} pick={(id) => (labelGap = id)} />{/if}
-          {#if FILL_STEPS.includes(step?.id ?? "") && colors === "static"}<Segmented label="Legend" options={LEGEND_VARIANTS} current={legendWording} pick={(id) => (legendWording = id)} />{/if}
-        </div>
-      {/if}
     </header>
     <div class="body">
       <aside>
@@ -237,12 +207,12 @@
               {#each [SLOT_COLORS.a, SLOT_COLORS.b] as color, i (i)}
                 <li><span class="chip" style:background={color}></span>{legend[i] ?? ""}</li>
               {/each}
-              {#if colors !== "flip"}<li><span class="chip line"></span>Boundaries</li>{/if}
+              {#if still}<li><span class="chip line"></span>Boundaries</li>{/if}
             </ul>
           {/if}
         </div>
         {#if changes.length}
-          <BuildMap change={change?.id ?? null} bbox={change?.largest_patch_bbox ?? change?.bbox ?? null} overview={change?.largest_patch_bbox ? change.bbox : null} {tilesBase} compare={step?.compare ?? null} stepChanges={unitChanges} parents={[...new Set(change?.values?.flatMap((v) => v.un_objectid ?? []) ?? [])]} labels={step?.labels ? stepChanges(step).map((c) => c.id) : []} cells={step ? stepChanges(step).filter((c) => c.type === "cell_island" || (c.review && !isCoast(c))).map((c) => c.id) : []} {legend} {border} sweep={compare.sweep} {colors} labelGap={Number(labelGap)} satellite={compare.basemap === "satellite"} hasCells={changes.some((c) => c.review && !isCoast(c))} hasCoast={changes.some(isCoast)} {coastPatches} {names} onpick={(hits: Hit[]) => (compare.hits = hits)} />
+          <BuildMap change={change?.id ?? null} bbox={change?.largest_patch_bbox ?? change?.bbox ?? null} overview={change?.largest_patch_bbox ? change.bbox : null} {tilesBase} compare={step?.compare ?? null} stepChanges={unitChanges} parents={[...new Set(change?.values?.flatMap((v) => v.un_objectid ?? []) ?? [])]} labels={step?.labels ? stepChanges(step).map((c) => c.id) : []} cells={step ? stepChanges(step).filter((c) => c.type === "cell_island" || (c.review && !isCoast(c))).map((c) => c.id) : []} legend={step?.legend ?? []} {border} sweep={compare.sweep} {still} satellite={compare.basemap === "satellite"} hasCells={changes.some((c) => c.review && !isCoast(c))} hasCoast={changes.some(isCoast)} {coastPatches} {names} onpick={(hits: Hit[]) => (compare.hits = hits)} />
         {/if}
         <HitsPanel {compare} inset={0} />
       </div>
@@ -501,9 +471,5 @@
   }
   .chip.line {
     border: 2px solid #666666;
-  }
-  .variants {
-    display: flex;
-    gap: 0.5rem;
   }
 </style>

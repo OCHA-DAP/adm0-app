@@ -23,8 +23,7 @@
     legend,
     border,
     sweep,
-    colors,
-    labelGap,
+    still,
     satellite,
     hasCells,
     hasCoast,
@@ -44,8 +43,7 @@
     legend: string[];
     border: string[] | null;
     sweep: number;
-    colors: "neutral" | "static" | "flip";
-    labelGap: number;
+    still: boolean;
     satellite: boolean;
     hasCells: boolean;
     hasCoast: boolean;
@@ -77,7 +75,7 @@
   const PARENT_OPACITY = 0.3;
   const CHANGE_OPACITY = 0.7;
   const NEUTRAL_LINE = "#666666";
-  const shown = $derived(colors === "static" ? 1 : sweep);
+  const shown = $derived(still ? 1 : sweep);
   const mix = (t: number) => {
     const [a, b] = [SLOT_COLORS.a, SLOT_COLORS.b].map((c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)));
     return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(",")})`;
@@ -198,7 +196,7 @@
 
   $effect(() => {
     if (!map || !loaded) return;
-    map.setFilter("unit-labels", ["all", ["in", ["get", "change"], ["literal", labels]], ["any", ["!", ["has", "gap"]], ["==", ["get", "gap"], labelGap]]]);
+    map.setFilter("unit-labels", ["in", ["get", "change"], ["literal", labels]]);
     map.setLayoutProperty("unit-labels", "symbol-sort-key", ["case", ["==", ["get", "change"], change ?? ""], SELECTED_FIRST, ["-", 0, ["get", "km2"]]]);
   });
 
@@ -210,14 +208,14 @@
       map.setLayoutProperty(`pick-${id}`, "visibility", visibility);
     }
     SLOTS.forEach((slot, i) => {
-      if (compare) map!.setPaintProperty(`output-${compare[i]}`, "line-color", colors === "flip" ? SLOT_COLORS[slot] : NEUTRAL_LINE);
+      if (compare) map!.setPaintProperty(`output-${compare[i]}`, "line-color", still ? NEUTRAL_LINE : SLOT_COLORS[slot]);
       map!.setFilter(`patch-${slot}`, border ? borderPatches(border) : NOTHING);
     });
   });
 
   $effect(() => {
     if (!map || !loaded) return;
-    map.setPaintProperty("parents", "fill-opacity", PARENT_OPACITY * (colors === "static" ? 1 : 1 - sweep));
+    map.setPaintProperty("parents", "fill-opacity", PARENT_OPACITY * (still ? 1 : 1 - sweep));
     for (const [id, type] of [["step-changes", "fill"], ["focus", "line"], ["land-changes", "fill"], ["land-focus", "line"]] as const) {
       map.setPaintProperty(id, `${type}-color`, mix(shown));
       map.setPaintProperty(id, `${type}-opacity`, type === "fill" ? CHANGE_OPACITY : 1);
