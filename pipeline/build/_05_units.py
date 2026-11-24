@@ -415,7 +415,7 @@ LABEL_GAP_M = 50_000
 
 
 def _labels(conn: DuckDBPyConnection) -> None:
-    """Write a label per change and UN to output entity pair, on its largest polygon."""
+    """Write a label per cluster of a change's nearby parts, on its largest part."""
     split = [c["id"] for c in changes() if c["type"] in STEPS["split"]]
     named = [
         (c["id"], r["name"])
