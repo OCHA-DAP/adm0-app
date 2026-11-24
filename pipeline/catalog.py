@@ -54,6 +54,7 @@ PRODUCERS = {
     "ungeodata": ("United Nations Geospatial", UN_TERMS),
     "fieldmaps": ("FieldMaps (OpenStreetMap)", ODBL),
     "wp": ("U.S. Department of State", CC0),
+    "overture": ("Overture Maps Foundation (OpenStreetMap)", ODBL),
     "wb": ("World Bank", CC_BY),
 }
 
