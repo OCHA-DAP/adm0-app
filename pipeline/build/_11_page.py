@@ -2,14 +2,20 @@
 
 import json
 from shutil import copy2
+from typing import TYPE_CHECKING
 
 from pipeline.config import prepare_dir
 
 from .common import STEPS, connect, curated_dir, finish, stage_dir
 
+if TYPE_CHECKING:
+    from duckdb import DuckDBPyConnection
+
 REF = prepare_dir / "ref.parquet"
 DESCRIPTIONS = curated_dir / "descriptions.json"
 PATH = curated_dir / "path.json"
+LABELS = stage_dir("05") / "labels.geojson"
+ISLANDS = stage_dir("08") / "new_islands.parquet"
 # M49 has no row for Taiwan, which OSM border tiles name as TWN.
 EXTRA_NAMES = {"TWN": "Taiwan Province of China"}
 
@@ -99,6 +105,32 @@ def _described(records: list[dict]) -> list[dict]:
     return records
 
 
+def _labels(conn: DuckDBPyConnection, changes: list[dict]) -> dict:
+    """Add a label on the largest part of each new island to stage 05's labels."""
+    labels = json.loads(LABELS.read_text())
+    names = {
+        c["id"]: c["values"][0]["gaul_name"]
+        for c in changes
+        if c["type"] in STEPS["islands"]
+    }
+    rows = conn.execute(f"""--sql
+        SELECT change_id, round(km2, 3), ST_X(center), ST_Y(center) FROM (
+            SELECT *, (ST_MaximumInscribedCircle(geometry)).center AS center
+            FROM (FROM '{ISLANDS}' WHERE list_contains({list(names)}, change_id)
+                  QUALIFY row_number() OVER (
+                      PARTITION BY change_id ORDER BY km2 DESC) = 1))
+    """).fetchall()
+    labels["features"] += [
+        {
+            "type": "Feature",
+            "properties": {"change": change, "text": names[change], "km2": km2},
+            "geometry": {"type": "Point", "coordinates": [x, y]},
+        }
+        for change, km2, x, y in rows
+    ]
+    return labels
+
+
 def _steps() -> list[dict]:
     """Return the page's steps with the change types each applies."""
     steps = json.loads(PATH.read_text())
@@ -126,9 +158,10 @@ def main() -> None:
     ).fetchall()
     names = dict(rows) | EXTRA_NAMES
     (folder / "names.json").write_text(json.dumps(names, ensure_ascii=False))
-    tables = [stage_dir("05") / f for f in ("crosswalk.csv", "labels.geojson")]
-    tables.append(curated_dir / "stages.json")
+    tables = [stage_dir("05") / "crosswalk.csv", curated_dir / "stages.json"]
     for path in tables:
         copy2(path, folder)
+    labels = _labels(conn, merged)
+    (folder / "labels.geojson").write_text(json.dumps(labels, ensure_ascii=False))
     (folder / "path.json").write_text(json.dumps(_steps(), ensure_ascii=False))
-    finish(conn, "11", [*tables, *lists, PATH, DESCRIPTIONS, REF])
+    finish(conn, "11", [*tables, *lists, LABELS, ISLANDS, PATH, DESCRIPTIONS, REF])

@@ -50,6 +50,12 @@ export const SLOT_COLORS: Record<Slot, string> = { a: "#CF3F0B", b: "#009EDB" };
 
 const VIEW_PARAM = "ui";
 const FADE_CYCLE_MS = 3000;
+const ease = (x: number) => {
+  const c = Math.min(1, Math.max(0, x));
+  return c * c * (3 - 2 * c);
+};
+// Each source holds alone for 1.2 s of the cycle, then a 0.3 s crossfade, so blended lines show only briefly.
+const fadeB = (t: number) => (t < 0.5 ? ease((t - 0.4) / 0.1) : 1 - ease((t - 0.9) / 0.1));
 const KEY_STEP: Record<string, number> = { "[": -1, "]": 1 };
 
 function fromUrl() {
@@ -135,7 +141,7 @@ export class CompareState {
     if (!on) return;
     const start = performance.now();
     const tick = (now: number) => {
-      this.sweep = (1 - Math.cos((2 * Math.PI * (now - start)) / FADE_CYCLE_MS)) / 2;
+      this.sweep = fadeB(((now - start) % FADE_CYCLE_MS) / FADE_CYCLE_MS);
       this.#frame = requestAnimationFrame(tick);
     };
     this.#frame = requestAnimationFrame(tick);

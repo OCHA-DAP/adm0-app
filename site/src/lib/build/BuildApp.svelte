@@ -49,10 +49,14 @@
   let allLines = $state(false);
   let collapsed = $state(true);
   const compare = new CompareState();
+  const STATIC_STEPS = ["errors", "split"];
+  const STATIC_LEGEND = ["UN Geodata unit", "Part moved by the fix"];
   compare.mode = "polygon";
   const splitTypes = ["restore", "india_china", "split", "merge", "group_split"];
 
   const step = $derived(steps[stepIndex]);
+  const still = $derived(STATIC_STEPS.includes(step?.id ?? ""));
+  const legend = $derived(still ? STATIC_LEGEND : (step?.legend ?? []));
   const border = $derived(change?.type === "line_update" ? change.id.slice(2).split("-") : null);
   const byArea = (a: Change, b: Change) => (b.km2 ?? 0) - (a.km2 ?? 0);
   const outCode = (c: Change) => c.values?.[0]?.gaul.split("_")[0] ?? "";
@@ -201,13 +205,14 @@
             <h2>Legend</h2>
             <ul class="legend">
               {#each [SLOT_COLORS.a, SLOT_COLORS.b] as color, i (i)}
-                <li><span class="chip" style:background={color}></span>{step.legend?.[i] ?? ""}</li>
+                <li><span class="chip" style:background={color}></span>{legend[i] ?? ""}</li>
               {/each}
+              {#if still}<li><span class="chip line"></span>Boundaries</li>{/if}
             </ul>
           {/if}
         </div>
         {#if changes.length}
-          <BuildMap change={change?.id ?? null} bbox={change?.largest_patch_bbox ?? change?.bbox ?? null} overview={change?.largest_patch_bbox ? change.bbox : null} {tilesBase} compare={step?.compare ?? null} stepChanges={unitChanges} parents={[...new Set(change?.values?.flatMap((v) => v.un_objectid ?? []) ?? [])]} labels={step?.labels ? stepChanges(step).map((c) => c.id) : []} cells={step ? stepChanges(step).filter((c) => c.type === "cell_island" || (c.review && !isCoast(c))).map((c) => c.id) : []} legend={step?.legend ?? []} {border} sweep={compare.sweep} satellite={compare.basemap === "satellite"} hasCells={changes.some((c) => c.review && !isCoast(c))} hasCoast={changes.some(isCoast)} {coastPatches} {names} onpick={(hits: Hit[]) => (compare.hits = hits)} />
+          <BuildMap change={change?.id ?? null} bbox={change?.largest_patch_bbox ?? change?.bbox ?? null} overview={change?.largest_patch_bbox ? change.bbox : null} {tilesBase} compare={step?.compare ?? null} stepChanges={unitChanges} parents={[...new Set(change?.values?.flatMap((v) => v.un_objectid ?? []) ?? [])]} labels={step?.labels ? stepChanges(step).map((c) => c.id) : []} cells={step ? stepChanges(step).filter((c) => c.type === "cell_island" || (c.review && !isCoast(c))).map((c) => c.id) : []} legend={step?.legend ?? []} {border} sweep={compare.sweep} {still} satellite={compare.basemap === "satellite"} hasCells={changes.some((c) => c.review && !isCoast(c))} hasCoast={changes.some(isCoast)} {coastPatches} {names} onpick={(hits: Hit[]) => (compare.hits = hits)} />
         {/if}
         <HitsPanel {compare} inset={0} />
       </div>
@@ -463,5 +468,8 @@
     width: 1rem;
     height: 1rem;
     border-radius: 2px;
+  }
+  .chip.line {
+    border: 2px solid #666666;
   }
 </style>

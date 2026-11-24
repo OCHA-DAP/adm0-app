@@ -23,6 +23,7 @@
     legend,
     border,
     sweep,
+    still,
     satellite,
     hasCells,
     hasCoast,
@@ -42,6 +43,7 @@
     legend: string[];
     border: string[] | null;
     sweep: number;
+    still: boolean;
     satellite: boolean;
     hasCells: boolean;
     hasCoast: boolean;
@@ -54,6 +56,7 @@
   const ROW_MAX_ZOOM = 14;
   const OVERVIEW_ZOOM_MS = 2000;
   const SELECTED_FIRST = -1e9;
+  const LABEL_TEXT: ExpressionSpecification = ["case", ["has", "from"], ["format", ["get", "text"], {}, "\n", {}, ["concat", "from ", ["get", "from"]], { "text-font": ["literal", ["Noto Sans Regular"]], "font-scale": 0.85 }], ["get", "text"]];
   const NOTHING: ExpressionSpecification = ["literal", false];
   const SLOTS = ["a", "b"] as const;
   const STEP_OUTPUTS: Record<string, string> = $derived({
@@ -71,6 +74,12 @@
   const PATCH_OPACITY = 0.45;
   const PARENT_OPACITY = 0.3;
   const CHANGE_OPACITY = 0.7;
+  const NEUTRAL_LINE = "#666666";
+  const shown = $derived(still ? 1 : sweep);
+  const mix = (t: number) => {
+    const [a, b] = [SLOT_COLORS.a, SLOT_COLORS.b].map((c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)));
+    return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(",")})`;
+  };
 
   function hasChange(id: string): ExpressionSpecification {
     return ["in", ["literal", `;${id};`], ["concat", ";", ["coalesce", ["get", "change_ids"], ""], ";"]];
@@ -134,7 +143,7 @@
         }
       }
       m.addSource("labels", { type: "geojson", data: `${tilesBase}/build/labels.geojson` });
-      m.addLayer({ id: "unit-labels", type: "symbol", source: "labels", filter: NOTHING, layout: { "text-field": ["get", "text"], "text-font": ["Noto Sans Bold"], "text-size": 13, "text-padding": 24 }, paint: { "text-color": "#333333", "text-halo-color": "#FFFFFF", "text-halo-width": 2 } });
+      m.addLayer({ id: "unit-labels", type: "symbol", source: "labels", filter: NOTHING, layout: { "text-field": LABEL_TEXT, "text-font": ["Noto Sans Bold"], "text-size": 13, "text-padding": 24 }, paint: { "text-color": "#333333", "text-halo-color": "#FFFFFF", "text-halo-width": 2 } });
       loaded = true;
     });
     m.on("click", (e) => {
@@ -199,19 +208,20 @@
       map.setLayoutProperty(`pick-${id}`, "visibility", visibility);
     }
     SLOTS.forEach((slot, i) => {
-      if (compare) map!.setPaintProperty(`output-${compare[i]}`, "line-color", SLOT_COLORS[slot]);
+      if (compare) map!.setPaintProperty(`output-${compare[i]}`, "line-color", still ? NEUTRAL_LINE : SLOT_COLORS[slot]);
       map!.setFilter(`patch-${slot}`, border ? borderPatches(border) : NOTHING);
     });
   });
 
   $effect(() => {
     if (!map || !loaded) return;
-    map.setPaintProperty("step-changes", "fill-opacity", CHANGE_OPACITY * sweep);
-    map.setPaintProperty("focus", "line-opacity", sweep);
-    map.setPaintProperty("land-changes", "fill-opacity", CHANGE_OPACITY * sweep);
-    map.setPaintProperty("land-focus", "line-opacity", sweep);
+    map.setPaintProperty("parents", "fill-opacity", PARENT_OPACITY * (still ? 1 : 1 - sweep));
+    for (const [id, type] of [["step-changes", "fill"], ["focus", "line"], ["land-changes", "fill"], ["land-focus", "line"]] as const) {
+      map.setPaintProperty(id, `${type}-color`, mix(shown));
+      map.setPaintProperty(id, `${type}-opacity`, type === "fill" ? CHANGE_OPACITY : 1);
+    }
     SLOTS.forEach((slot, i) => {
-      const opacity = slot === "a" ? 1 - sweep : sweep;
+      const opacity = slot === "a" ? 1 - shown : shown;
       if (compare) map!.setPaintProperty(`output-${compare[i]}`, "line-opacity", opacity);
       map!.setPaintProperty(`patch-${slot}`, "fill-opacity", PATCH_OPACITY * opacity);
       if (hasCoast) map!.setPaintProperty(`${COAST_SLOTS[slot]}-fill`, "fill-opacity", PATCH_OPACITY * opacity);
