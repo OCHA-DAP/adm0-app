@@ -373,10 +373,9 @@ def fieldmaps(conn: DuckDBPyConnection) -> None:
         merge = (
             " REPLACE (ST_Multi(ST_LineMerge(geometry)) AS geometry)" if lines else ""
         )
-        line_type = f", {LSIB_LINE_TYPE}" if lines else ""
         _copy(
             conn,
-            f"SELECT *{merge}{line_type} FROM read_parquet('{path}')",
+            f"SELECT *{merge} FROM read_parquet('{path}')",
             f"fieldmaps_{path.stem}",
         )
 
