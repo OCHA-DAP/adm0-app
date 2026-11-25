@@ -75,6 +75,7 @@ SOURCE_COLUMNS = {
         "mapname": "Map_Label",
         "status": "US_Recog",
     },
+    "overture": {"id": "id", "code": "iso3", "name": "name", "status": "subtype"},
     "wb": {
         "id": "wb_id",
         "code": "ISO_A3",

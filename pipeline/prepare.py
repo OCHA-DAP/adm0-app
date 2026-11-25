@@ -51,6 +51,7 @@ UNGEODATA_LINE_TYPE = {
 }
 # GDAL's row id, service bookkeeping and geometry (renamed), from the GeoJSON.
 UNGEODATA_DROP = "'OGC_FID', 'globalid', 'SHAPE__Length', 'SHAPE__Area', 'geom'"
+OVERTURE_DROP = "'sources', 'perspectives', 'bbox', 'division_ids'"
 LSIB_LINE_TYPE = """CASE WHEN label LIKE '%Line of Control%' THEN 'separation'
     WHEN status = 'Special Line' THEN 'special'
     WHEN status = 'Other Line of International Separation' THEN 'armistice'
@@ -372,12 +373,27 @@ def fieldmaps(conn: DuckDBPyConnection) -> None:
         merge = (
             " REPLACE (ST_Multi(ST_LineMerge(geometry)) AS geometry)" if lines else ""
         )
-        line_type = f", {LSIB_LINE_TYPE}" if lines else ""
         _copy(
             conn,
-            f"SELECT *{merge}{line_type} FROM read_parquet('{path}')",
+            f"SELECT *{merge} FROM read_parquet('{path}')",
             f"fieldmaps_{path.stem}",
         )
+
+
+def overture(conn: DuckDBPyConnection) -> None:
+    """Copy the published Overture country and dependency polygons and lines."""
+    folder = download_dir / "overture"
+    _copy(
+        conn,
+        f"SELECT * FROM read_parquet('{folder / 'polygons.parquet'}')",
+        "overture_polygons",
+    )
+    _copy(
+        conn,
+        f"SELECT COLUMNS(lambda c: c NOT IN ({OVERTURE_DROP})) "
+        f"FROM read_parquet('{folder / 'lines.parquet'}')",
+        "overture_lines",
+    )
 
 
 # Each source's function, its input folder and the layers it writes.
@@ -389,6 +405,7 @@ SOURCES: tuple[tuple[Callable, Path, tuple[str, ...]], ...] = (
     (osm, download_dir / "osm", ("osm_land",)),
     (ungeodata, download_dir / "ungeodata", ("ungeodata_polygons", "ungeodata_lines")),
     (fieldmaps, download_dir / "fieldmaps", ("fieldmaps_polygons", "fieldmaps_lines")),
+    (overture, download_dir / "overture", ("overture_polygons", "overture_lines")),
     (wb, download_dir / "wb", ("wb_polygons", "wb_lines")),
 )
 

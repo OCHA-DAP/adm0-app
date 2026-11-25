@@ -51,6 +51,7 @@ LSIB_NS = {
 UNTERM_URL = "https://conferences.unite.un.org/untermapi/api/term/downloadCountries"
 FIELDMAPS_LICENSE = "odbl"
 FIELDMAPS_URL = "https://data.source.coop/fieldmaps/international/{license}/humanitarian/adm0-{geom}/adm0_{geom}.parquet"
+OVERTURE_URL = "https://data.source.coop/fieldmaps/site/compare/overture-{geom}/overture_{geom}.parquet"
 M49_URL = "https://unstats.un.org/unsd/methodology/m49/overview/"
 UNGEODATA_URL = "https://pro-ags2.dfs.un.org/arcgis/rest/services/Hosted/UNgeodata_1Million/FeatureServer"
 UNGEODATA_ITEM_URL = "https://geoportal.un.org/arcgis/sharing/rest/content/items/52bf5f875877459dae265c8cff69338f"
@@ -211,6 +212,14 @@ def _fieldmaps(out: Path) -> str:
     return max(dates)
 
 
+def _overture(out: Path) -> str:
+    dates = [
+        _stream(OVERTURE_URL.format(geom=geom), out / f"{geom}.parquet")
+        for geom in ("polygons", "lines")
+    ]
+    return max(dates)
+
+
 def _wb(out: Path) -> str:
     return _stream(WB_URL, out / "adm0_all_layers.parquet")
 
@@ -297,6 +306,7 @@ def main() -> None:
         "wp": _wp,
         "ref": _ref,
         "fieldmaps": _fieldmaps,
+        "overture": _overture,
         "wb": _wb,
     }
     # Needs AGS_TOKEN, so only downloaded when named.
