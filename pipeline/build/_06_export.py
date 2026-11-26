@@ -214,6 +214,7 @@ def main() -> None:
     """Write the ADM0 output and UN layer, then fail on any check that fails."""
     inputs = [
         Path(__file__),
+        Path(__file__).with_name("common.py"),
         Path(data("05", "units")),
         curated_dir / "changes.json",
     ]

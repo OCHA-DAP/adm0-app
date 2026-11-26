@@ -8,6 +8,7 @@ from pipeline.config import write_parquet
 
 from .common import (
     KM2,
+    OWN_ROWS,
     STEPS,
     changes,
     connect,
@@ -56,8 +57,8 @@ def _units(conn: DuckDBPyConnection) -> None:
         "INSERT INTO entities VALUES (?, ?, ?)",
         [(c["id"], e["code"], e["name"]) for c in changes() if (e := c.get("entity"))],
     )
-    # Every step but the split one applies to the UN layer too.
-    shared = {t for s, types in STEPS.items() if s != "split" for t in types}
+    # Changes that make their own rows leave the UN layer as UN Geodata draws it.
+    shared = {t for types in STEPS.values() for t in types} - set(OWN_ROWS)
     conn.execute("CREATE TABLE moves (change_id VARCHAR, to_objectid BIGINT)")
     conn.executemany(
         "INSERT INTO moves VALUES (?, ?)",
@@ -203,7 +204,7 @@ def _record(change: dict, conn: DuckDBPyConnection) -> dict:
     columns = ("un_objectid", "un", "un_name", "gaul", "gaul_name", "km2")
     after = (
         "a.iso3, a.adm0_name"
-        if change["type"] in STEPS["split"]
+        if change["type"] in OWN_ROWS
         else "coalesce(t.entity, g.MAP_CODE), coalesce(e.name, g.GAUL0_NAME)"
     )
     values = conn.execute(f"""--sql
@@ -416,7 +417,7 @@ LABEL_GAP_M = 50_000
 
 def _labels(conn: DuckDBPyConnection) -> None:
     """Write a label per cluster of a change's nearby parts, on its largest part."""
-    split = [c["id"] for c in changes() if c["type"] in STEPS["split"]]
+    split = [c["id"] for c in changes() if c["type"] in OWN_ROWS]
     named = [
         (c["id"], r["name"])
         for c in changes()
