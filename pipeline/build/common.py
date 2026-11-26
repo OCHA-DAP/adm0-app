@@ -71,12 +71,14 @@ def changes() -> list[dict]:
 # The change types each page step applies, in page order.
 STEPS = {
     "lines": ["line_update"],
-    "errors": ["un_error"],
-    "split": ["restore", "india_china", "split", "merge", "group_split"],
+    "errors": ["un_error", "restore", "india_china"],
+    "split": ["split", "merge", "group_split"],
     "coast": ["coast"],
     "islands": ["new_island"],
     "land": ["land_area"],
 }
+# The change types whose records show the output row they become.
+OWN_ROWS = ["restore", "india_china", *STEPS["split"]]
 
 
 def stages() -> list[dict]:

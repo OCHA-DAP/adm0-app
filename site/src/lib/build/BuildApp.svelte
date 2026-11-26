@@ -52,7 +52,7 @@
   const STATIC_STEPS = ["errors", "split"];
   const STATIC_LEGEND = ["UN Geodata unit", "Part moved by the fix"];
   compare.mode = "polygon";
-  const splitTypes = ["restore", "india_china", "split", "merge", "group_split"];
+  const parentOf = (c: Change) => sides(c).before.map((e) => e.code).join();
 
   const step = $derived(steps[stepIndex]);
   const still = $derived(STATIC_STEPS.includes(step?.id ?? ""));
@@ -66,7 +66,7 @@
   const stepChanges = (s: Step) => {
     const list = changes.filter((c) => s.types.includes(c.type) && !(c.type === "coast" && (c.km2 ?? 0) < MIN_KM2));
     if (s.types.some((t) => COAST_TYPES.includes(t))) return list.sort((a, b) => Number(!!b.review) - Number(!!a.review) || byShare(a, b));
-    if (s.types.includes("group_split")) return list.sort((a, b) => outCode(a).localeCompare(outCode(b)) || byArea(a, b));
+    if (s.types.includes("group_split")) return list.sort((a, b) => parentOf(a).localeCompare(parentOf(b)) || outCode(a).localeCompare(outCode(b)) || byArea(a, b));
     return s.types.includes("un_error") ? list.sort(byArea) : list;
   };
   const unitChanges = $derived(step?.compare ? stepChanges(step).filter((c) => c.units > 0).map((c) => c.id) : []);
@@ -154,8 +154,13 @@
                         <li class="own-head table"><span>Entity</span><span class="num">Gained km²</span><span class="num">Lost km²</span><span class="num">% of area</span></li>
                       {:else if isCoast(c) && (i === 0 || listedChanges(s)[i - 1].type !== c.type)}
                         <li class="own-head"><span class="own"><span>Entity</span><span>{coastHead[c.type]}</span></span><span class="km2">{c.type === "coast" ? "% of area" : "Area"}</span></li>
+                      {:else if i === 0 && s.id === "split"}
+                        <li class="own-head"><span class="own one indent"><span>Output</span></span><span class="km2">Area</span></li>
                       {:else if i === 0 && c.type !== "line_update" && !isCoast(c)}
-                        <li class="own-head"><span class="own"><span>UN Geodata</span><span>{c.type === "un_error" ? "Corrected" : splitTypes.includes(c.type) ? "Output" : "GAUL"}</span></span><span class="km2">Area</span></li>
+                        <li class="own-head"><span class="own"><span>UN Geodata</span><span>{s.types.includes("un_error") ? "Corrected" : "GAUL"}</span></span><span class="km2">Area</span></li>
+                      {/if}
+                      {#if s.id === "split" && (i === 0 || parentOf(listedChanges(s)[i - 1]) !== parentOf(c))}
+                        <li class="group-head">{@render entities(sides(c).before)}</li>
                       {/if}
                       <li>
                         <button class:active={change === c} onclick={() => (change = c)}>
@@ -168,6 +173,8 @@
                             {:else if isCoast(c)}
                               {@const v = c.values?.[0]}
                               <span class="own"><span>{#if v}{@render entities([entity(v.un, v.un_name)])}{/if}</span><span class:review={c.review}>{coastDetail(c)}</span></span>
+                            {:else if s.id === "split"}
+                              <span class="own one indent" title={c.values?.map((v) => `${v.un_name} → ${v.gaul_name}: ${km2.format(v.km2)} km²`).join("\n")}><span>{#each sides(c).after as e (e.code)}<span class="entity">{e.name || e.code}</span>{/each}</span></span>
                             {:else}
                               {@const side = sides(c)}
                               <span class="own" title={c.values?.map((v) => `${v.un_name} → ${v.gaul_name}: ${km2.format(v.km2)} km²`).join("\n")}><span>{@render entities(side.before)}</span><span>{@render entities(side.after)}</span></span>
@@ -405,6 +412,19 @@
     grid-template-columns: 1fr 1fr;
     gap: 0.5rem;
     min-width: 0;
+  }
+  .own.one {
+    grid-template-columns: 1fr;
+  }
+  .own.indent {
+    padding-left: 1rem;
+  }
+  .group-head {
+    margin-top: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-bottom: 1px solid var(--cd-grey--400);
+    background: var(--cd-grey--300);
+    font-weight: 600;
   }
   .entity {
     display: flex;
